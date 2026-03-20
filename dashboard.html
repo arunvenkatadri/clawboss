@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clawboss Dashboard</title>
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --surface: #25262b;
+      --surface2: #2c2e33;
+      --border: #373a40;
+      --text: #e8e8e8;
+      --muted: #868e96;
+      --accent: #4dabf7;
+      --accent-dim: #339af0;
+      --green: #51cf66;
+      --yellow: #fcc419;
+      --red: #fa5252;
+      --orange: #ff922b;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
+    .topbar .actions { display: flex; gap: 0.5rem; align-items: center; }
+    .topbar button {
+      font-size: 0.8rem; padding: 0.3rem 0.65rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      cursor: pointer; text-decoration: none; white-space: nowrap;
+    }
+    .topbar button:hover { background: var(--border); }
+
+    /* ── Tab nav ── */
+    .tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; background: var(--surface);
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      padding: 0.6rem 1rem; font-size: 0.85rem; cursor: pointer;
+      white-space: nowrap; border-bottom: 2px solid transparent;
+      color: var(--muted); transition: color 0.15s, border-color 0.15s;
+      background: none; border-top: none; border-left: none; border-right: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Content area ── */
+    .content { padding: 1rem; max-width: 960px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid; gap: 0.75rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) {
+      .card-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.85rem 1rem; overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .card-title { font-size: 0.95rem; font-weight: 600; }
+    .badge {
+      font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 99px;
+      font-weight: 500;
+    }
+    .badge-blue { background: rgba(77,171,247,0.2); color: var(--accent); }
+    .badge-green { background: rgba(81,207,102,0.2); color: var(--green); }
+    .badge-yellow { background: rgba(252,196,25,0.2); color: var(--yellow); }
+    .badge-red { background: rgba(250,82,82,0.2); color: var(--red); }
+    .badge-orange { background: rgba(255,146,43,0.2); color: var(--orange); }
+    .badge-muted { background: var(--surface2); color: var(--muted); }
+
+    .card-desc {
+      font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem;
+      line-height: 1.4;
+    }
+
+    /* ── Tags ── */
+    .tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+    .tag {
+      font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;
+      background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+    }
+
+    /* ── Detail rows ── */
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.3rem 0; font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+    .detail-row:first-child { border-top: none; }
+    .detail-label { color: var(--muted); }
+    .detail-value { font-weight: 500; text-align: right; }
+
+    /* ── Collapsible tool list ── */
+    .collapsible-header {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8rem; color: var(--muted); cursor: pointer;
+      padding: 0.3rem 0; user-select: none;
+    }
+    .collapsible-header .arrow { transition: transform 0.2s; font-size: 0.65rem; }
+    .collapsible-header.open .arrow { transform: rotate(90deg); }
+    .collapsible-body { display: none; padding-left: 0.5rem; }
+    .collapsible-body.open { display: block; }
+    .tool-item {
+      font-size: 0.78rem; padding: 0.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tool-item:last-child { border-bottom: none; }
+    .tool-name { font-weight: 600; color: var(--text); }
+    .tool-desc { color: var(--muted); font-size: 0.75rem; }
+    .param-list { padding-left: 0.75rem; margin-top: 0.15rem; }
+    .param { font-size: 0.72rem; color: var(--muted); }
+    .param .pname { color: var(--accent); }
+    .param .ptype { color: var(--orange); }
+    .param .preq { color: var(--red); font-size: 0.65rem; }
+
+    /* ── Supervision box ── */
+    .supervision-box {
+      background: var(--surface2); border-radius: 6px;
+      padding: 0.5rem 0.65rem; margin-top: 0.4rem;
+    }
+    .supervision-box .label {
+      font-size: 0.7rem; color: var(--accent); font-weight: 600;
+      margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ── Status dots ── */
+    .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 0.3rem; vertical-align: middle;
+    }
+    .dot-green { background: var(--green); }
+    .dot-red { background: var(--red); }
+    .dot-yellow { background: var(--yellow); }
+
+    /* ── System overview cards ── */
+    .sys-grid {
+      display: grid; gap: 0.5rem;
+      grid-template-columns: repeat(2, 1fr);
+    }
+    @media (min-width: 640px) {
+      .sys-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .sys-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.65rem 0.8rem; text-align: center;
+    }
+    .sys-card .sys-value {
+      font-size: 1.1rem; font-weight: 700; margin-bottom: 0.15rem;
+    }
+    .sys-card .sys-label { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Budget bar ── */
+    .budget-bar {
+      background: var(--surface2); border-radius: 6px; height: 6px;
+      overflow: hidden; margin-top: 0.3rem;
+    }
+    .budget-fill {
+      height: 100%; border-radius: 6px; transition: width 0.3s;
+    }
+    .budget-fill.ok { background: var(--green); }
+    .budget-fill.warn { background: var(--yellow); }
+    .budget-fill.over { background: var(--red); }
+
+    /* ── Cost table ── */
+    .cost-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+    .cost-table th {
+      text-align: left; padding: 0.4rem 0.5rem; color: var(--muted);
+      border-bottom: 1px solid var(--border); font-weight: 500;
+    }
+    .cost-table td {
+      padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border);
+    }
+    .cost-table .money { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Set budget form ── */
+    .budget-form {
+      display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;
+      margin-top: 0.75rem;
+    }
+    .budget-form input, .budget-form select {
+      padding: 0.35rem 0.5rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 0.82rem;
+    }
+    .budget-form input { width: 100px; }
+    .budget-form input[name="name"] { width: 140px; }
+    .budget-form button {
+      padding: 0.35rem 0.65rem; border-radius: 6px;
+      border: 1px solid var(--accent); background: var(--accent);
+      color: #fff; cursor: pointer; font-size: 0.8rem;
+    }
+    .budget-form button:hover { background: var(--accent-dim); }
+
+    /* ── Toggle switch ── */
+    .toggle { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.78rem; }
+    .toggle-track {
+      width: 34px; height: 18px; border-radius: 99px; position: relative;
+      background: var(--border); transition: background 0.2s;
+    }
+    .toggle-track.on { background: var(--red); }
+    .toggle-track .toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--text); transition: left 0.2s;
+    }
+    .toggle-track.on .toggle-thumb { left: 18px; }
+    .toggle-label { color: var(--muted); user-select: none; }
+    .toggle-label.on { color: var(--red); font-weight: 500; }
+
+    /* ── Hourly chart ── */
+    .hourly-chart { display: flex; align-items: flex-end; gap: 2px; height: 60px; margin-top: 0.5rem; }
+    .hourly-bar {
+      flex: 1; background: var(--accent); border-radius: 2px 2px 0 0;
+      min-width: 4px; position: relative;
+    }
+    .hourly-bar:hover::after {
+      content: attr(data-label);
+      position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.2rem 0.4rem; font-size: 0.65rem; white-space: nowrap; z-index: 5;
+    }
+
+    /* ── Skill builder ── */
+    .builder-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem; margin-bottom: 1rem;
+    }
+    .builder-box h3 {
+      font-size: 0.9rem; font-weight: 600; margin-bottom: 0.6rem;
+    }
+    .builder-box textarea {
+      width: 100%; min-height: 80px; padding: 0.6rem 0.75rem;
+      border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 0.85rem;
+      font-family: inherit; resize: vertical; line-height: 1.5;
+    }
+    .builder-box textarea:focus { outline: none; border-color: var(--accent); }
+    .builder-box textarea::placeholder { color: var(--muted); }
+    .builder-actions {
+      display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center;
+    }
+    .btn-primary {
+      padding: 0.45rem 1rem; border-radius: 8px; border: none;
+      background: var(--accent); color: #fff; font-size: 0.85rem;
+      cursor: pointer; font-weight: 500;
+    }
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 0.4rem 0.8rem; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 0.8rem; cursor: pointer;
+    }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger {
+      padding: 0.35rem 0.6rem; border-radius: 6px;
+      border: 1px solid var(--red); background: transparent;
+      color: var(--red); font-size: 0.75rem; cursor: pointer;
+    }
+    .btn-danger:hover { background: rgba(250,82,82,0.15); }
+    .builder-status {
+      font-size: 0.8rem; color: var(--muted); margin-left: 0.5rem;
+    }
+    .builder-status.error { color: var(--red); }
+    .builder-status.success { color: var(--green); }
+
+    /* ── Skill card actions ── */
+    .skill-actions {
+      display: flex; gap: 0.35rem; margin-top: 0.6rem;
+      padding-top: 0.5rem; border-top: 1px solid var(--border);
+    }
+
+    /* ── Permissions grid ── */
+    .perm-grid {
+      display: grid; gap: 0.5rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 480px) {
+      .perm-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .perm-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.65rem 0.8rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .perm-item .perm-label { font-size: 0.82rem; flex: 1; }
+    .perm-status { font-size: 0.78rem; font-weight: 500; }
+
+    /* ── Demo banner ── */
+    .demo-banner {
+      background: rgba(77,171,247,0.1); border: 1px solid rgba(77,171,247,0.3);
+      border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem;
+      font-size: 0.82rem; color: var(--accent);
+    }
+    .demo-banner code {
+      background: var(--surface2); padding: 0.1rem 0.35rem; border-radius: 4px;
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>Clawboss</h1>
+  <div class="actions">
+    <button type="button" id="btn-reload">Reload Demo</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" role="tablist">
+  <button class="tab active" data-tab="overview" role="tab">Overview</button>
+  <button class="tab" data-tab="skills" role="tab">Skills</button>
+  <button class="tab" data-tab="costs" role="tab">Costs</button>
+  <button class="tab" data-tab="policies" role="tab">Policies</button>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Overview -->
+  <div class="section active" id="sec-overview">
+    <div class="demo-banner">
+      Interactive demo &mdash; this dashboard shows what Clawboss supervision looks like.
+      Connect it to a live agent with <code>pip install clawboss</code>.
+    </div>
+    <div class="sys-grid" id="sys-grid"></div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Supervised Skills</h3>
+    <div class="card-grid" id="overview-skills"></div>
+  </div>
+
+  <!-- Skills -->
+  <div class="section" id="sec-skills">
+    <div class="builder-box">
+      <h3>Create a Supervised Skill</h3>
+      <textarea id="builder-input" placeholder="Describe what you want the skill to do in plain English...&#10;&#10;Example: A skill that researches topics on the web, limited to 5 searches, with a 30 second timeout, and asks before deleting anything"></textarea>
+      <div class="builder-actions">
+        <button class="btn-primary" id="btn-create-skill">Create Skill</button>
+        <span class="builder-status" id="builder-status"></span>
+      </div>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Skills</h3>
+    <div class="card-grid" id="skills-grid"></div>
+  </div>
+
+  <!-- Costs -->
+  <div class="section" id="sec-costs">
+    <div class="sys-grid" id="cost-totals"></div>
+
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Budgets</h3>
+    <div id="budgets-list"></div>
+    <div class="budget-form" id="budget-form">
+      <input type="text" name="name" placeholder="global or skill name">
+      <input type="number" name="dollars" placeholder="$ limit" step="0.01" min="0">
+      <select name="period">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly" selected>Monthly</option>
+        <option value="total">Total</option>
+      </select>
+      <label class="toggle" id="hard-stop-toggle">
+        <div class="toggle-track" id="hard-stop-track"><div class="toggle-thumb"></div></div>
+        <span class="toggle-label" id="hard-stop-label">Hard stop</span>
+      </label>
+      <button type="button" id="btn-set-budget">Set Budget</button>
+    </div>
+
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Cost by Skill</h3>
+    <div id="cost-by-skill"></div>
+
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Last 24 Hours</h3>
+    <div id="cost-hourly"></div>
+  </div>
+
+  <!-- Policies -->
+  <div class="section" id="sec-policies">
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Active Policies</h3>
+    <div class="perm-grid" id="policy-grid"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Helpers ──
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+function sysCard(value, label) {
+  return '<div class="sys-card"><div class="sys-value">' + esc(String(value)) + '</div><div class="sys-label">' + esc(label) + '</div></div>';
+}
+
+// ── Demo data ──
+const DEMO_SKILLS = [
+  {
+    name: 'web-researcher',
+    description: 'Searches the web for information, summarises findings, and cites sources.',
+    triggers: ['research', 'look up', 'find out'],
+    tools: [
+      { name: 'web_search', description: 'Search the web', parameters: [{ name: 'query', type: 'string', required: true }] },
+      { name: 'fetch_page', description: 'Fetch and extract page content', parameters: [{ name: 'url', type: 'string', required: true }] }
+    ],
+    supervision: {
+      max_iterations: 5,
+      tool_timeout: 15,
+      token_budget: 10000,
+      on_timeout: 'terminate',
+      on_budget_exceeded: 'terminate',
+      require_confirm: []
+    }
+  },
+  {
+    name: 'file-manager',
+    description: 'Reads, writes, and organises files on disk.',
+    triggers: ['save file', 'read file', 'organise'],
+    tools: [
+      { name: 'read_file', description: 'Read a file', parameters: [{ name: 'path', type: 'string', required: true }] },
+      { name: 'write_file', description: 'Write content to a file', parameters: [{ name: 'path', type: 'string', required: true }, { name: 'content', type: 'string', required: true }] },
+      { name: 'delete_file', description: 'Delete a file', parameters: [{ name: 'path', type: 'string', required: true }] }
+    ],
+    supervision: {
+      max_iterations: 10,
+      tool_timeout: 30,
+      token_budget: 20000,
+      on_timeout: 'warn',
+      on_budget_exceeded: 'warn',
+      require_confirm: ['delete_file', 'write_file']
+    }
+  },
+  {
+    name: 'code-reviewer',
+    description: 'Reviews pull requests and leaves inline comments with suggestions.',
+    triggers: ['review PR', 'code review'],
+    tools: [
+      { name: 'get_diff', description: 'Get PR diff', parameters: [{ name: 'pr_number', type: 'integer', required: true }] },
+      { name: 'post_comment', description: 'Post a review comment', parameters: [{ name: 'pr_number', type: 'integer', required: true }, { name: 'body', type: 'string', required: true }] }
+    ],
+    supervision: {
+      max_iterations: 3,
+      tool_timeout: 20,
+      token_budget: 15000,
+      on_timeout: 'terminate',
+      on_budget_exceeded: 'terminate',
+      require_confirm: ['post_comment']
+    }
+  }
+];
+
+const DEMO_COSTS = {
+  total_cost_usd: 2.3471,
+  total_tokens: 482910,
+  total_calls: 147,
+  budgets: [
+    { name: 'global', limit_usd: 50, spent_usd: 2.3471, remaining_usd: 47.6529, percent_used: 5, period: 'monthly', hard_stop: false },
+    { name: 'web-researcher', limit_usd: 10, spent_usd: 1.2034, remaining_usd: 8.7966, percent_used: 12, period: 'monthly', hard_stop: true }
+  ],
+  by_skill: [
+    { skill: 'web-researcher', calls: 83, tokens: 241200, cost: 1.2034 },
+    { skill: 'file-manager', calls: 41, tokens: 156300, cost: 0.7812 },
+    { skill: 'code-reviewer', calls: 23, tokens: 85410, cost: 0.3625 }
+  ],
+  hourly_24h: Array.from({ length: 24 }, (_, i) => ({
+    hour: '2026-03-20T' + String(i).padStart(2, '0') + ':00:00',
+    cost: Math.random() * 0.3,
+    calls: Math.floor(Math.random() * 15)
+  }))
+};
+
+// ── Tabs ──
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Collapsible ──
+function toggleCollapsible(el) {
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// ── Render helpers ──
+function renderTags(arr) {
+  if (!arr || !arr.length) return '';
+  return '<div class="tags">' + arr.map(t => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>';
+}
+
+function renderToolDetail(tool) {
+  let html = '<div class="tool-item"><span class="tool-name">' + esc(tool.name) + '</span>';
+  if (tool.description) html += ' <span class="tool-desc">&mdash; ' + esc(tool.description) + '</span>';
+  if (tool.parameters && tool.parameters.length) {
+    html += '<div class="param-list">';
+    tool.parameters.forEach(p => {
+      html += '<div class="param"><span class="pname">' + esc(p.name) + '</span>';
+      html += ' <span class="ptype">' + esc(p.type || 'string') + '</span>';
+      if (p.required) html += ' <span class="preq">required</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSupervision(s) {
+  if (!s) return '';
+  let html = '<div class="supervision-box"><div class="label"><span class="dot dot-green"></span> Clawboss Active</div>';
+  html += '<div class="detail-row"><span class="detail-label">Max iterations</span><span class="detail-value">' + s.max_iterations + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Tool timeout</span><span class="detail-value">' + s.tool_timeout + 's</span></div>';
+  if (s.token_budget) html += '<div class="detail-row"><span class="detail-label">Token budget</span><span class="detail-value">' + s.token_budget.toLocaleString() + ' tokens</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(s.on_timeout) + '</span></div>';
+  if (s.on_budget_exceeded) html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(s.on_budget_exceeded) + '</span></div>';
+  if (s.require_confirm && s.require_confirm.length) {
+    html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red)">' + s.require_confirm.map(esc).join(', ') + '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSkillCard(skill) {
+  const toolCount = skill.tools ? skill.tools.length : 0;
+  const supervised = !!skill.supervision;
+
+  let html = '<div class="card">';
+  html += '<div class="card-header"><span class="card-title">' + esc(skill.name) + '</span>';
+  html += '<span>';
+  if (supervised) html += '<span class="badge badge-blue">supervised</span> ';
+  if (toolCount > 0) html += '<span class="badge badge-green">' + toolCount + ' tool' + (toolCount > 1 ? 's' : '') + '</span>';
+  else html += '<span class="badge badge-muted">prompt only</span>';
+  html += '</span></div>';
+
+  html += '<div class="card-desc">' + esc(skill.description) + '</div>';
+  html += renderTags(skill.triggers);
+
+  if (toolCount > 0) {
+    html += '<div class="collapsible-header" onclick="toggleCollapsible(this)"><span class="arrow">&#9654;</span> Tools</div>';
+    html += '<div class="collapsible-body">';
+    skill.tools.forEach(t => { html += renderToolDetail(t); });
+    html += '</div>';
+  }
+
+  html += renderSupervision(skill.supervision);
+  html += '</div>';
+  return html;
+}
+
+// ── Render overview ──
+function renderOverview() {
+  const supervisedCount = DEMO_SKILLS.filter(s => s.supervision).length;
+  const totalTools = DEMO_SKILLS.reduce((n, s) => n + (s.tools ? s.tools.length : 0), 0);
+
+  document.getElementById('sys-grid').innerHTML =
+    sysCard('$' + DEMO_COSTS.total_cost_usd.toFixed(2), 'This Month') +
+    sysCard(DEMO_SKILLS.length, 'Skills') +
+    sysCard(totalTools, 'Tools') +
+    sysCard(supervisedCount, 'Supervised') +
+    sysCard(DEMO_COSTS.total_calls, 'API Calls') +
+    sysCard(DEMO_COSTS.total_tokens.toLocaleString(), 'Tokens');
+
+  document.getElementById('overview-skills').innerHTML =
+    DEMO_SKILLS.map(s => renderSkillCard(s)).join('');
+}
+
+// ── Render skills tab ──
+function renderSkills() {
+  document.getElementById('skills-grid').innerHTML =
+    DEMO_SKILLS.map(s => renderSkillCard(s)).join('');
+}
+
+// ── Render costs ──
+function renderCosts() {
+  const costs = DEMO_COSTS;
+
+  document.getElementById('cost-totals').innerHTML =
+    sysCard('$' + costs.total_cost_usd.toFixed(4), 'This Month') +
+    sysCard(costs.total_tokens.toLocaleString(), 'Tokens') +
+    sysCard(costs.total_calls, 'API Calls');
+
+  // Budgets
+  if (costs.budgets.length) {
+    let html = '<div class="card-grid">';
+    costs.budgets.forEach(b => {
+      const pct = b.percent_used;
+      const cls = pct > 90 ? 'over' : pct > 70 ? 'warn' : 'ok';
+      html += '<div class="card">';
+      html += '<div class="card-header"><span class="card-title">' + esc(b.name) + '</span><span>';
+      if (b.hard_stop) html += '<span class="badge badge-red">hard stop</span> ';
+      html += '<span class="badge ' + (cls === 'over' ? 'badge-red' : cls === 'warn' ? 'badge-yellow' : 'badge-green') + '">' + pct + '%</span>';
+      html += '</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Limit</span><span class="detail-value">$' + b.limit_usd.toFixed(2) + ' / ' + esc(b.period) + '</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Spent</span><span class="detail-value">$' + b.spent_usd.toFixed(4) + '</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Remaining</span><span class="detail-value">$' + b.remaining_usd.toFixed(4) + '</span></div>';
+      html += '<div class="budget-bar"><div class="budget-fill ' + cls + '" style="width:' + Math.min(100, pct) + '%"></div></div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('budgets-list').innerHTML = html;
+  }
+
+  // By skill
+  if (costs.by_skill.length) {
+    let html = '<div class="card"><table class="cost-table"><thead><tr><th>Skill</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
+    costs.by_skill.forEach(r => {
+      html += '<tr><td>' + esc(r.skill) + '</td><td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td><td class="money">$' + r.cost.toFixed(4) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('cost-by-skill').innerHTML = html;
+  }
+
+  // Hourly
+  if (costs.hourly_24h.length) {
+    const maxCost = Math.max(...costs.hourly_24h.map(h => h.cost), 0.0001);
+    let html = '<div class="card"><div class="hourly-chart">';
+    costs.hourly_24h.forEach(h => {
+      const pct = Math.max(2, (h.cost / maxCost) * 100);
+      const hour = h.hour ? h.hour.slice(11, 16) : '';
+      html += '<div class="hourly-bar" style="height:' + pct + '%" data-label="' + hour + ': $' + h.cost.toFixed(4) + ' (' + h.calls + ' calls)"></div>';
+    });
+    html += '</div></div>';
+    document.getElementById('cost-hourly').innerHTML = html;
+  }
+}
+
+// ── Render policies ──
+function renderPolicies() {
+  let html = '';
+  DEMO_SKILLS.forEach(s => {
+    if (!s.supervision) return;
+    const sv = s.supervision;
+    html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(s.name) + ' &mdash; max ' + sv.max_iterations + ' iterations</span><span class="perm-status">' + sv.tool_timeout + 's timeout</span></div>';
+    if (sv.token_budget) {
+      html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(s.name) + ' &mdash; token budget</span><span class="perm-status">' + sv.token_budget.toLocaleString() + '</span></div>';
+    }
+    if (sv.require_confirm && sv.require_confirm.length) {
+      sv.require_confirm.forEach(tool => {
+        html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(s.name) + ' &rarr; ' + esc(tool) + '</span><span class="perm-status">Requires confirm</span></div>';
+      });
+    }
+  });
+  document.getElementById('policy-grid').innerHTML = html;
+}
+
+// ── Skill builder (demo) ──
+document.getElementById('btn-create-skill').addEventListener('click', () => {
+  const input = document.getElementById('builder-input');
+  const status = document.getElementById('builder-status');
+  const desc = input.value.trim();
+  if (!desc) return;
+
+  status.className = 'builder-status';
+  status.textContent = 'Generating skill...';
+
+  setTimeout(() => {
+    const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    DEMO_SKILLS.push({
+      name: name || 'custom-skill',
+      description: desc,
+      triggers: [],
+      tools: [],
+      supervision: {
+        max_iterations: 5,
+        tool_timeout: 15,
+        token_budget: 10000,
+        on_timeout: 'terminate',
+        on_budget_exceeded: 'warn',
+        require_confirm: []
+      }
+    });
+    status.className = 'builder-status success';
+    status.textContent = 'Created: ' + (name || 'custom-skill');
+    input.value = '';
+    renderAll();
+  }, 800);
+});
+
+// ── Hard-stop toggle ──
+let hardStopOn = false;
+document.getElementById('hard-stop-toggle').addEventListener('click', () => {
+  hardStopOn = !hardStopOn;
+  document.getElementById('hard-stop-track').classList.toggle('on', hardStopOn);
+  const lbl = document.getElementById('hard-stop-label');
+  lbl.classList.toggle('on', hardStopOn);
+  lbl.textContent = hardStopOn ? 'Hard stop ON' : 'Hard stop';
+});
+
+// ── Budget form (demo) ──
+document.getElementById('btn-set-budget').addEventListener('click', () => {
+  const form = document.getElementById('budget-form');
+  const name = form.querySelector('[name="name"]').value.trim();
+  const dollars = parseFloat(form.querySelector('[name="dollars"]').value);
+  const period = form.querySelector('[name="period"]').value;
+  if (!name || isNaN(dollars) || dollars <= 0) return;
+
+  DEMO_COSTS.budgets.push({
+    name, limit_usd: dollars, spent_usd: 0, remaining_usd: dollars,
+    percent_used: 0, period, hard_stop: hardStopOn
+  });
+  form.querySelector('[name="name"]').value = '';
+  form.querySelector('[name="dollars"]').value = '';
+  renderCosts();
+});
+
+// ── Reload ──
+document.getElementById('btn-reload').addEventListener('click', renderAll);
+
+function renderAll() {
+  renderOverview();
+  renderSkills();
+  renderCosts();
+  renderPolicies();
+}
+
+renderAll();
+</script>
+</body>
+</html>
