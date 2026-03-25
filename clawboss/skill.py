@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class ToolParameter:
     """A parameter on a tool."""
+
     name: str
     type: str = "string"
     description: str = ""
@@ -22,6 +23,7 @@ class ToolParameter:
 @dataclass
 class ToolDefinition:
     """A tool that a skill can use."""
+
     name: str
     description: str = ""
     parameters: List[ToolParameter] = field(default_factory=list)
@@ -34,6 +36,7 @@ class Skill:
     This is the clawboss-native skill format. It can be converted to/from
     POML, JSON, YAML, or any other format your agent framework uses.
     """
+
     name: str
     description: str
     triggers: List[str] = field(default_factory=list)
@@ -64,11 +67,13 @@ class Skill:
         tools = []
         for t in d.get("tools", []):
             params = [ToolParameter(**p) for p in t.get("parameters", [])]
-            tools.append(ToolDefinition(
-                name=t["name"],
-                description=t.get("description", ""),
-                parameters=params,
-            ))
+            tools.append(
+                ToolDefinition(
+                    name=t["name"],
+                    description=t.get("description", ""),
+                    parameters=params,
+                )
+            )
 
         return cls(
             name=d["name"],
@@ -109,7 +114,7 @@ class Skill:
                         if p.description:
                             lines.append(f"        description: {p.description}")
                         if p.required:
-                            lines.append(f"        required: true")
+                            lines.append("        required: true")
                         if p.default is not None:
                             lines.append(f"        default: {p.default}")
 
@@ -215,11 +220,13 @@ class SkillStore:
             for path in sorted(self._dir.glob("*.json")):
                 try:
                     data = json.loads(path.read_text())
-                    skills.append({
-                        "name": data.get("name", path.stem),
-                        "description": data.get("description", ""),
-                        "version": data.get("version", ""),
-                    })
+                    skills.append(
+                        {
+                            "name": data.get("name", path.stem),
+                            "description": data.get("description", ""),
+                            "version": data.get("version", ""),
+                        }
+                    )
                 except (json.JSONDecodeError, KeyError):
                     continue
         return skills

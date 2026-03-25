@@ -4,11 +4,11 @@ import json
 import sys
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, IO
+from typing import IO, Any, Dict, List, Optional
 
 
 class AuditPhase(Enum):
@@ -35,6 +35,7 @@ class AuditOutcome(Enum):
 @dataclass
 class AuditEntry:
     """A single audit log entry."""
+
     timestamp: str
     request_id: str
     phase: str
@@ -55,8 +56,7 @@ class AuditSink(ABC):
     """Interface for audit log destinations."""
 
     @abstractmethod
-    def write(self, entry: AuditEntry) -> None:
-        ...
+    def write(self, entry: AuditEntry) -> None: ...
 
 
 class JsonlAuditSink(AuditSink):

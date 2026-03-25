@@ -10,6 +10,7 @@ from .errors import ClawbossError
 @dataclass
 class BudgetSnapshot:
     """Point-in-time snapshot of budget usage."""
+
     tokens_used: int
     token_limit: Optional[int]
     iterations: int

@@ -1,7 +1,7 @@
 """Circuit breaker — stops calling tools that keep failing."""
 
-import time
 import threading
+import time
 from enum import Enum
 from typing import Optional
 
@@ -9,9 +9,9 @@ from .errors import ClawbossError
 
 
 class CircuitState(Enum):
-    CLOSED = "closed"       # Normal operation
-    OPEN = "open"           # Blocking calls (too many failures)
-    HALF_OPEN = "half_open" # Allowing one test call
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Blocking calls (too many failures)
+    HALF_OPEN = "half_open"  # Allowing one test call
 
 
 class CircuitBreaker:

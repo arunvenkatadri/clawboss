@@ -21,20 +21,20 @@ Usage:
 
 import asyncio
 import time
-import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Coroutine, Dict, Optional
 
-from .audit import AuditLog, AuditPhase, AuditOutcome
-from .budget import BudgetTracker, BudgetSnapshot
+from .audit import AuditLog, AuditOutcome, AuditPhase
+from .budget import BudgetSnapshot, BudgetTracker
 from .circuit_breaker import CircuitBreaker
 from .errors import ClawbossError
-from .policy import Policy, Action
+from .policy import Policy
 
 
 @dataclass
 class SupervisedResult:
     """Result of a supervised tool call."""
+
     output: Any = None
     error: Optional[ClawbossError] = None
     succeeded: bool = False
@@ -74,7 +74,7 @@ class Supervisor:
             AuditPhase.REQUEST_START,
             AuditOutcome.INFO,
             detail=f"Supervisor started with policy: max_iter={policy.max_iterations}, "
-                   f"tool_timeout={policy.tool_timeout}s, token_budget={policy.token_budget}",
+            f"tool_timeout={policy.tool_timeout}s, token_budget={policy.token_budget}",
         )
 
     @classmethod
@@ -141,9 +141,7 @@ class Supervisor:
     def _check_confirm(self, tool_name: str) -> None:
         """Check if this tool requires confirmation."""
         if tool_name in self._policy.require_confirm:
-            raise ClawbossError.policy_denied(
-                f"Tool '{tool_name}' requires user confirmation"
-            )
+            raise ClawbossError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
 
     async def call(
         self,
@@ -300,6 +298,7 @@ class Supervisor:
         Wraps the sync function and runs it through the async supervisor.
         For use when you don't have an event loop.
         """
+
         async def _wrapper(**kw):
             return fn(**kw)
 
@@ -308,6 +307,7 @@ class Supervisor:
             if loop.is_running():
                 # We're inside an async context — can't use run()
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     future = pool.submit(asyncio.run, self.call(tool_name, _wrapper, **kwargs))
                     return future.result(timeout=self._policy.tool_timeout + 5)
@@ -324,7 +324,7 @@ class Supervisor:
             AuditPhase.REQUEST_END,
             AuditOutcome.INFO,
             detail=f"Request complete: {snap.iterations} iterations, "
-                   f"{snap.tokens_used} tokens, {int(elapsed * 1000)}ms",
+            f"{snap.tokens_used} tokens, {int(elapsed * 1000)}ms",
             metadata={
                 "tokens_used": snap.tokens_used,
                 "iterations": snap.iterations,

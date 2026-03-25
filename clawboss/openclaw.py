@@ -20,13 +20,13 @@ import json
 import re
 import threading
 import urllib.parse
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 
 from .audit import AuditLog
 from .policy import Policy
 from .skill import Skill, ToolDefinition
-from .supervisor import Supervisor, SupervisedResult
+from .supervisor import SupervisedResult, Supervisor
 
 
 def _slugify(name: str) -> str:
@@ -193,8 +193,7 @@ class OpenClawBridge:
         for tool in skill.tools:
             if tool.name not in tool_impls:
                 raise ValueError(
-                    f"Missing implementation for tool '{tool.name}'. "
-                    f"Provide it in tool_impls."
+                    f"Missing implementation for tool '{tool.name}'. Provide it in tool_impls."
                 )
             self.register_tool(tool, tool_impls[tool.name])
 
@@ -218,7 +217,10 @@ class OpenClawBridge:
     def _execute_tool(self, tool_name: str, params: dict) -> dict:
         """Execute a tool through the Supervisor. Called from HTTP handler thread."""
         if not self._loop:
-            return {"success": False, "error": {"kind": "internal", "message": "Event loop not running"}}
+            return {
+                "success": False,
+                "error": {"kind": "internal", "message": "Event loop not running"},
+            }
 
         supervisor = Supervisor(self._policy, audit=self._audit or AuditLog.noop())
 
@@ -260,10 +262,13 @@ class OpenClawBridge:
                 path = parsed.path.strip("/")
 
                 if path == "health":
-                    self._send_json(200, {
-                        "status": "ok",
-                        "tools": len(bridge._registry),
-                    })
+                    self._send_json(
+                        200,
+                        {
+                            "status": "ok",
+                            "tools": len(bridge._registry),
+                        },
+                    )
                 elif path == "tools":
                     tools = []
                     with bridge._lock:
@@ -285,9 +290,12 @@ class OpenClawBridge:
 
                 with bridge._lock:
                     if tool_name not in bridge._registry:
-                        self._send_json(404, {
-                            "error": f"Tool '{tool_name}' not registered",
-                        })
+                        self._send_json(
+                            404,
+                            {
+                                "error": f"Tool '{tool_name}' not registered",
+                            },
+                        )
                         return
 
                 # Parse request body
@@ -303,9 +311,12 @@ class OpenClawBridge:
                     return
 
                 if not isinstance(body.get("params"), dict):
-                    self._send_json(400, {
-                        "error": "Request body must contain 'params' object",
-                    })
+                    self._send_json(
+                        400,
+                        {
+                            "error": "Request body must contain 'params' object",
+                        },
+                    )
                     return
 
                 # Execute through supervisor
@@ -313,9 +324,12 @@ class OpenClawBridge:
                     response = bridge._execute_tool(tool_name, body["params"])
                     self._send_json(200, response)
                 except Exception as e:
-                    self._send_json(500, {
-                        "error": f"Internal server error: {e}",
-                    })
+                    self._send_json(
+                        500,
+                        {
+                            "error": f"Internal server error: {e}",
+                        },
+                    )
 
         return Handler
 

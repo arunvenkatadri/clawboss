@@ -18,13 +18,13 @@ Usage:
 
 import json
 import re
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, Optional
 
 from .skill import Skill
 
 # The prompt that teaches the LLM how to produce a valid skill definition.
 # Kept as a module constant so users can inspect/override it.
-SKILL_GENERATION_PROMPT = '''\
+SKILL_GENERATION_PROMPT = """\
 You are a skill builder for AI agents. Given a natural language description of what \
 a skill should do, produce a complete skill definition as JSON.
 
@@ -80,9 +80,9 @@ Rules:
 - on_budget_exceeded options: same as above
 - require_confirm: list tool names that should need human approval before running
 
-Respond with ONLY the JSON object. No markdown fences, no explanation.'''
+Respond with ONLY the JSON object. No markdown fences, no explanation."""
 
-SKILL_REFINEMENT_PROMPT = '''\
+SKILL_REFINEMENT_PROMPT = """\
 You are refining an existing skill definition based on user feedback.
 
 Current skill definition:
@@ -94,7 +94,7 @@ The user wants the following changes:
 {feedback}
 
 Apply the requested changes and return the complete updated skill definition as JSON.
-Follow the same schema as the original. Respond with ONLY the JSON object.'''
+Follow the same schema as the original. Respond with ONLY the JSON object."""
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -103,7 +103,8 @@ def _extract_json(text: str) -> Dict[str, Any]:
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*\n?", "", text)
     text = re.sub(r"\n?```\s*$", "", text)
-    return json.loads(text.strip())
+    result: Dict[str, Any] = json.loads(text.strip())
+    return result
 
 
 class SkillBuilder:
@@ -141,9 +142,7 @@ class SkillBuilder:
         try:
             data = _extract_json(raw)
         except (json.JSONDecodeError, ValueError) as e:
-            raise ValueError(
-                f"LLM returned invalid JSON. Raw output:\n{raw[:500]}"
-            ) from e
+            raise ValueError(f"LLM returned invalid JSON. Raw output:\n{raw[:500]}") from e
 
         if "name" not in data:
             raise ValueError("LLM output missing required 'name' field")

@@ -1,8 +1,5 @@
 """Clawboss error types — every error has a user_message()."""
 
-from enum import Enum
-from typing import Optional
-
 
 class ClawbossError(Exception):
     """Base error for all clawboss supervision failures."""
@@ -28,7 +25,8 @@ class ClawbossError(Exception):
         return ClawbossError(
             "budget_exceeded",
             f"Token budget exceeded: {used} / {limit}",
-            used=used, limit=limit,
+            used=used,
+            limit=limit,
         )
 
     @staticmethod
@@ -36,7 +34,8 @@ class ClawbossError(Exception):
         return ClawbossError(
             "max_iterations",
             f"Maximum iterations reached: {iterations} / {max_iter}",
-            iterations=iterations, max=max_iter,
+            iterations=iterations,
+            max=max_iter,
         )
 
     @staticmethod
@@ -44,7 +43,8 @@ class ClawbossError(Exception):
         return ClawbossError(
             "circuit_open",
             f"Circuit breaker open for '{tool}': {consecutive_failures} consecutive failures",
-            tool=tool, consecutive_failures=consecutive_failures,
+            tool=tool,
+            consecutive_failures=consecutive_failures,
         )
 
     @staticmethod
