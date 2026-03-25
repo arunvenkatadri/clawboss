@@ -7,7 +7,7 @@
 
 **Stop your AI agents from going rogue.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
-Zero dependencies. Works with any agent framework. First-class [OpenClaw](https://github.com/openclaw/openclaw) integration.
+Zero dependencies. Works with any agent framework. First-class [OpenClaw](https://github.com/openclaw/openclaw) integration. Includes a [dashboard](#dashboard) for managing agents, skills, and conversations in one place.
 
 ## Why
 
@@ -61,6 +61,18 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## Dashboard
+
+Open `dashboard.html` in a browser for a full management UI:
+
+- **Agents** — create, edit, delete, pause/resume/stop agents with supervision policies
+- **Skills** — define reusable capabilities (tool collections) and assign them to agents
+- **Chat** — open a conversation with any agent directly from the dashboard
+- **Costs** — track spend, set budgets with hard stops, view usage over time
+- **Policies** — see all active supervision rules at a glance
+
+Agents have a status (running/paused/stopped) controllable from the card controls. Skills are assigned to agents with a checkbox, and agents can optionally use unassigned skills via a toggle.
 
 ## What it does
 

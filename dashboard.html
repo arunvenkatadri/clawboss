@@ -27,7 +27,7 @@
       min-height: 100vh;
     }
 
-    /* ── Top bar ── */
+    /* -- Top bar -- */
     .topbar {
       position: sticky; top: 0; z-index: 10;
       background: var(--surface);
@@ -45,7 +45,7 @@
     }
     .topbar button:hover { background: var(--border); }
 
-    /* ── Tab nav ── */
+    /* -- Tab nav -- */
     .tabs {
       display: flex; gap: 0; border-bottom: 1px solid var(--border);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -61,12 +61,12 @@
     .tab:hover { color: var(--text); }
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-    /* ── Content area ── */
+    /* -- Content area -- */
     .content { padding: 1rem; max-width: 960px; margin: 0 auto; }
     .section { display: none; }
     .section.active { display: block; }
 
-    /* ── Cards ── */
+    /* -- Cards -- */
     .card-grid {
       display: grid; gap: 0.75rem;
       grid-template-columns: 1fr;
@@ -81,6 +81,14 @@
     .card-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 0.5rem;
+    }
+    .card-header-left {
+      display: flex; align-items: center; gap: 0.4rem;
+      min-width: 0; flex: 1;
+    }
+    .card-header-right {
+      display: flex; align-items: center; gap: 0.35rem;
+      flex-shrink: 0;
     }
     .card-title { font-size: 0.95rem; font-weight: 600; }
     .badge {
@@ -99,14 +107,17 @@
       line-height: 1.4;
     }
 
-    /* ── Tags ── */
+    /* -- Tags -- */
     .tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
     .tag {
       font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;
       background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
     }
+    .tag-skill {
+      background: rgba(77,171,247,0.15); color: var(--accent); border-color: rgba(77,171,247,0.3);
+    }
 
-    /* ── Detail rows ── */
+    /* -- Detail rows -- */
     .detail-row {
       display: flex; justify-content: space-between; align-items: center;
       padding: 0.3rem 0; font-size: 0.8rem;
@@ -116,7 +127,7 @@
     .detail-label { color: var(--muted); }
     .detail-value { font-weight: 500; text-align: right; }
 
-    /* ── Collapsible tool list ── */
+    /* -- Collapsible -- */
     .collapsible-header {
       display: flex; align-items: center; gap: 0.4rem;
       font-size: 0.8rem; color: var(--muted); cursor: pointer;
@@ -139,7 +150,7 @@
     .param .ptype { color: var(--orange); }
     .param .preq { color: var(--red); font-size: 0.65rem; }
 
-    /* ── Supervision box ── */
+    /* -- Supervision box -- */
     .supervision-box {
       background: var(--surface2); border-radius: 6px;
       padding: 0.5rem 0.65rem; margin-top: 0.4rem;
@@ -149,7 +160,7 @@
       margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.5px;
     }
 
-    /* ── Status dots ── */
+    /* -- Status dots -- */
     .dot {
       display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       margin-right: 0.3rem; vertical-align: middle;
@@ -157,8 +168,9 @@
     .dot-green { background: var(--green); }
     .dot-red { background: var(--red); }
     .dot-yellow { background: var(--yellow); }
+    .dot-gray { background: var(--muted); }
 
-    /* ── System overview cards ── */
+    /* -- System overview cards -- */
     .sys-grid {
       display: grid; gap: 0.5rem;
       grid-template-columns: repeat(2, 1fr);
@@ -175,7 +187,7 @@
     }
     .sys-card .sys-label { font-size: 0.72rem; color: var(--muted); }
 
-    /* ── Budget bar ── */
+    /* -- Budget bar -- */
     .budget-bar {
       background: var(--surface2); border-radius: 6px; height: 6px;
       overflow: hidden; margin-top: 0.3rem;
@@ -187,7 +199,7 @@
     .budget-fill.warn { background: var(--yellow); }
     .budget-fill.over { background: var(--red); }
 
-    /* ── Cost table ── */
+    /* -- Cost table -- */
     .cost-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
     .cost-table th {
       text-align: left; padding: 0.4rem 0.5rem; color: var(--muted);
@@ -198,7 +210,7 @@
     }
     .cost-table .money { text-align: right; font-variant-numeric: tabular-nums; }
 
-    /* ── Set budget form ── */
+    /* -- Budget form -- */
     .budget-form {
       display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;
       margin-top: 0.75rem;
@@ -217,13 +229,14 @@
     }
     .budget-form button:hover { background: var(--accent-dim); }
 
-    /* ── Toggle switch ── */
+    /* -- Toggle switch -- */
     .toggle { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.78rem; }
     .toggle-track {
       width: 34px; height: 18px; border-radius: 99px; position: relative;
-      background: var(--border); transition: background 0.2s;
+      background: var(--border); transition: background 0.2s; flex-shrink: 0;
     }
-    .toggle-track.on { background: var(--red); }
+    .toggle-track.on { background: var(--green); }
+    .toggle-track.red.on { background: var(--red); }
     .toggle-track .toggle-thumb {
       position: absolute; top: 2px; left: 2px;
       width: 14px; height: 14px; border-radius: 50%;
@@ -231,9 +244,9 @@
     }
     .toggle-track.on .toggle-thumb { left: 18px; }
     .toggle-label { color: var(--muted); user-select: none; }
-    .toggle-label.on { color: var(--red); font-weight: 500; }
+    .toggle-label.on { color: var(--text); font-weight: 500; }
 
-    /* ── Hourly chart ── */
+    /* -- Hourly chart -- */
     .hourly-chart { display: flex; align-items: flex-end; gap: 2px; height: 60px; margin-top: 0.5rem; }
     .hourly-bar {
       flex: 1; background: var(--accent); border-radius: 2px 2px 0 0;
@@ -246,7 +259,7 @@
       padding: 0.2rem 0.4rem; font-size: 0.65rem; white-space: nowrap; z-index: 5;
     }
 
-    /* ── Skill builder ── */
+    /* -- Builder box -- */
     .builder-box {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 10px; padding: 1rem; margin-bottom: 1rem;
@@ -290,13 +303,13 @@
     .builder-status.error { color: var(--red); }
     .builder-status.success { color: var(--green); }
 
-    /* ── Skill card actions ── */
-    .skill-actions {
+    /* -- Card actions -- */
+    .card-actions {
       display: flex; gap: 0.35rem; margin-top: 0.6rem;
       padding-top: 0.5rem; border-top: 1px solid var(--border);
     }
 
-    /* ── Permissions grid ── */
+    /* -- Permissions grid -- */
     .perm-grid {
       display: grid; gap: 0.5rem;
       grid-template-columns: 1fr;
@@ -312,7 +325,7 @@
     .perm-item .perm-label { font-size: 0.82rem; flex: 1; }
     .perm-status { font-size: 0.78rem; font-weight: 500; }
 
-    /* ── Demo banner ── */
+    /* -- Demo banner -- */
     .demo-banner {
       background: rgba(77,171,247,0.1); border: 1px solid rgba(77,171,247,0.3);
       border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem;
@@ -323,7 +336,7 @@
       font-size: 0.78rem;
     }
 
-    /* ── Modal overlay ── */
+    /* -- Modal overlay -- */
     .modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 100;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
@@ -346,7 +359,7 @@
     }
     .modal-close:hover { background: var(--surface2); color: var(--text); }
 
-    /* ── Form fields ── */
+    /* -- Form fields -- */
     .form-group { margin-bottom: 0.75rem; }
     .form-label {
       display: block; font-size: 0.78rem; color: var(--muted);
@@ -367,7 +380,7 @@
     }
     .form-row .form-group { flex: 1; }
 
-    /* ── Tools editor ── */
+    /* -- Tools editor -- */
     .tools-editor { margin-top: 0.25rem; }
     .tool-entry {
       background: var(--surface2); border: 1px solid var(--border);
@@ -405,7 +418,7 @@
     }
     .btn-add-tool:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Supervision section ── */
+    /* -- Supervision section -- */
     .supervision-fields {
       background: var(--surface2); border-radius: 8px;
       padding: 0.65rem 0.75rem;
@@ -413,25 +426,159 @@
     .supervision-fields .form-group { margin-bottom: 0.5rem; }
     .supervision-fields .form-group:last-child { margin-bottom: 0; }
 
-    /* ── Modal footer ── */
+    /* -- Modal footer -- */
     .modal-footer {
       display: flex; gap: 0.5rem; justify-content: flex-end;
       margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
     }
 
-    /* ── Confirm dialog ── */
+    /* -- Confirm dialog -- */
     .confirm-dialog {
       text-align: center; padding: 1rem;
     }
     .confirm-dialog p {
       font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.5;
     }
-    .confirm-dialog .agent-name {
+    .confirm-dialog .highlight {
       color: var(--accent); font-weight: 600;
     }
     .confirm-actions {
       display: flex; gap: 0.5rem; justify-content: center;
     }
+
+    /* -- Skill assignment checklist -- */
+    .skill-checklist { display: flex; flex-direction: column; gap: 0.4rem; }
+    .skill-check-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.6rem; border-radius: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      font-size: 0.82rem; cursor: pointer;
+    }
+    .skill-check-item:hover { border-color: var(--accent); }
+    .skill-check-item input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
+    .skill-check-item .skill-check-name { font-weight: 500; }
+    .skill-check-item .skill-check-desc { color: var(--muted); font-size: 0.75rem; margin-left: auto; }
+    .no-skills-msg { font-size: 0.82rem; color: var(--muted); padding: 0.5rem 0; }
+
+    /* -- Status control buttons -- */
+    .status-ctrl-btn {
+      width: 26px; height: 26px; border: none; border-radius: 4px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 0.85rem; display: inline-flex; align-items: center;
+      justify-content: center; transition: background 0.15s, color 0.15s;
+      padding: 0; line-height: 1;
+    }
+    .status-ctrl-btn:hover { background: var(--surface2); color: var(--text); }
+    .status-ctrl-btn.btn-pause:hover { color: var(--yellow); }
+    .status-ctrl-btn.btn-stop:hover { color: var(--red); }
+    .status-ctrl-btn.btn-play:hover { color: var(--green); }
+
+    /* -- Status badge on card -- */
+    .badge-status-running { background: rgba(81,207,102,0.2); color: var(--green); }
+    .badge-status-paused { background: rgba(252,196,25,0.2); color: var(--yellow); }
+    .badge-status-stopped { background: var(--surface2); color: var(--muted); }
+
+    /* -- Chat panel -- */
+    .chat-panel {
+      position: fixed; right: 0; top: 0; height: 100vh; width: 400px;
+      background: var(--surface); border-left: 1px solid var(--border);
+      z-index: 50; display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 0.25s ease;
+    }
+    .chat-panel.open { transform: translateX(0); }
+    @media (max-width: 500px) {
+      .chat-panel { width: 100vw; }
+    }
+    .chat-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chat-panel-header-left {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-weight: 600; font-size: 0.95rem;
+    }
+    .chat-panel-close {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 1.2rem; padding: 0.2rem 0.4rem; border-radius: 4px;
+    }
+    .chat-panel-close:hover { background: var(--surface2); color: var(--text); }
+
+    .chat-panel-banner {
+      padding: 0.6rem 1rem; font-size: 0.82rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.5rem; flex-shrink: 0;
+    }
+    .chat-panel-banner.paused-banner {
+      background: rgba(252,196,25,0.1); border-bottom: 1px solid rgba(252,196,25,0.3);
+      color: var(--yellow);
+    }
+    .chat-panel-banner.stopped-banner {
+      background: rgba(134,142,150,0.1); border-bottom: 1px solid rgba(134,142,150,0.3);
+      color: var(--muted);
+    }
+    .chat-panel-banner .btn-banner-action {
+      padding: 0.25rem 0.6rem; border-radius: 5px; border: none;
+      font-size: 0.78rem; cursor: pointer; font-weight: 500;
+    }
+    .paused-banner .btn-banner-action {
+      background: var(--yellow); color: #1a1b1e;
+    }
+    .stopped-banner .btn-banner-action {
+      background: var(--muted); color: #1a1b1e;
+    }
+
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 0.75rem 1rem;
+      display: flex; flex-direction: column; gap: 0.6rem;
+    }
+    .chat-msg {
+      max-width: 85%; padding: 0.55rem 0.75rem; border-radius: 10px;
+      font-size: 0.84rem; line-height: 1.45; word-wrap: break-word;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: rgba(77,171,247,0.2); color: var(--text);
+      border-bottom-right-radius: 3px;
+    }
+    .chat-msg.agent {
+      align-self: flex-start;
+      background: var(--surface2); color: var(--text);
+      border-bottom-left-radius: 3px;
+    }
+    .chat-msg .msg-role {
+      font-size: 0.68rem; color: var(--muted); margin-bottom: 0.2rem;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .chat-tool-call {
+      display: inline-block; margin: 0.25rem 0; padding: 0.3rem 0.55rem;
+      border-radius: 6px; font-size: 0.76rem; font-family: 'SF Mono', 'Consolas', monospace;
+      background: rgba(255,146,43,0.12); border: 1px solid rgba(255,146,43,0.3);
+      color: var(--orange);
+    }
+    .chat-tool-call .tool-call-name {
+      font-weight: 600;
+    }
+    .chat-tool-call .tool-call-params {
+      color: var(--muted); font-size: 0.72rem;
+    }
+
+    .chat-input-area {
+      display: flex; gap: 0.4rem; padding: 0.65rem 1rem;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .chat-input-area input {
+      flex: 1; padding: 0.45rem 0.6rem; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 0.85rem; font-family: inherit;
+    }
+    .chat-input-area input:focus { outline: none; border-color: var(--accent); }
+    .chat-input-area button {
+      padding: 0.45rem 0.8rem; border-radius: 8px; border: none;
+      background: var(--accent); color: #fff; font-size: 0.85rem;
+      cursor: pointer; font-weight: 500;
+    }
+    .chat-input-area button:hover { background: var(--accent-dim); }
   </style>
 </head>
 <body>
@@ -447,6 +594,7 @@
 <!-- Tabs -->
 <div class="tabs" role="tablist">
   <button class="tab active" data-tab="overview" role="tab">Overview</button>
+  <button class="tab" data-tab="agents" role="tab">Agents</button>
   <button class="tab" data-tab="skills" role="tab">Skills</button>
   <button class="tab" data-tab="costs" role="tab">Costs</button>
   <button class="tab" data-tab="policies" role="tab">Policies</button>
@@ -462,35 +610,51 @@
       Connect it to a live agent with <code>pip install clawboss</code>.
     </div>
     <div class="sys-grid" id="sys-grid"></div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Supervised Agents</h3>
-    <div class="card-grid" id="overview-skills"></div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Agents</h3>
+    <div class="card-grid" id="overview-agents"></div>
+  </div>
+
+  <!-- Agents -->
+  <div class="section" id="sec-agents">
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        Create an Agent
+        <button class="btn-secondary" onclick="openAgentModal()">+ New Agent (Manual)</button>
+      </h3>
+      <textarea id="agent-builder-input" placeholder="Describe what you want the agent to do in plain English...&#10;&#10;Example: An agent that researches topics on the web, limited to 5 searches, with a 30 second timeout, and asks before deleting anything"></textarea>
+      <div class="builder-actions">
+        <button class="btn-primary" id="btn-create-agent-nl">Create from Description</button>
+        <span class="builder-status" id="agent-builder-status"></span>
+      </div>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Agents</h3>
+    <div class="card-grid" id="agents-grid"></div>
   </div>
 
   <!-- Skills -->
   <div class="section" id="sec-skills">
     <div class="builder-box">
       <h3 style="display:flex; align-items:center; justify-content:space-between;">
-        Create a Supervised Agent
-        <button class="btn-secondary" onclick="openAgentModal()">+ New Agent (Manual)</button>
+        Create a Skill
+        <button class="btn-secondary" onclick="openSkillModal()">+ New Skill (Manual)</button>
       </h3>
-      <textarea id="builder-input" placeholder="Describe what you want the agent to do in plain English...&#10;&#10;Example: An agent that researches topics on the web, limited to 5 searches, with a 30 second timeout, and asks before deleting anything"></textarea>
+      <textarea id="skill-builder-input" placeholder="Describe the skill (capability) in plain English...&#10;&#10;Example: A web search skill with a search tool and a page fetcher tool"></textarea>
       <div class="builder-actions">
-        <button class="btn-primary" id="btn-create-skill">Create from Description</button>
-        <span class="builder-status" id="builder-status"></span>
+        <button class="btn-primary" id="btn-create-skill-nl">Create from Description</button>
+        <span class="builder-status" id="skill-builder-status"></span>
       </div>
     </div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Agents</h3>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Skills</h3>
     <div class="card-grid" id="skills-grid"></div>
   </div>
 
   <!-- Costs -->
   <div class="section" id="sec-costs">
     <div class="sys-grid" id="cost-totals"></div>
-
     <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Budgets</h3>
     <div id="budgets-list"></div>
     <div class="budget-form" id="budget-form">
-      <input type="text" name="name" placeholder="global or skill name">
+      <input type="text" name="name" placeholder="global or agent name">
       <input type="number" name="dollars" placeholder="$ limit" step="0.01" min="0">
       <select name="period">
         <option value="daily">Daily</option>
@@ -499,15 +663,13 @@
         <option value="total">Total</option>
       </select>
       <label class="toggle" id="hard-stop-toggle">
-        <div class="toggle-track" id="hard-stop-track"><div class="toggle-thumb"></div></div>
+        <div class="toggle-track red" id="hard-stop-track"><div class="toggle-thumb"></div></div>
         <span class="toggle-label" id="hard-stop-label">Hard stop</span>
       </label>
       <button type="button" id="btn-set-budget">Set Budget</button>
     </div>
-
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Cost by Skill</h3>
-    <div id="cost-by-skill"></div>
-
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Cost by Agent</h3>
+    <div id="cost-by-agent"></div>
     <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Last 24 Hours</h3>
     <div id="cost-hourly"></div>
   </div>
@@ -524,7 +686,7 @@
 <div class="modal-overlay" id="agent-modal">
   <div class="modal">
     <div class="modal-title">
-      <span id="modal-title-text">New Agent</span>
+      <span id="agent-modal-title">New Agent</span>
       <button class="modal-close" onclick="closeAgentModal()">&times;</button>
     </div>
 
@@ -544,11 +706,20 @@
       <div class="form-hint">Keywords that activate this agent</div>
     </div>
 
-    <!-- Tools -->
+    <!-- Assigned Skills -->
     <div class="form-group">
-      <label class="form-label">Tools</label>
-      <div class="tools-editor" id="tools-editor"></div>
-      <button class="btn-add-tool" onclick="addToolEntry()">+ Add Tool</button>
+      <label class="form-label">Assigned Skills</label>
+      <div class="skill-checklist" id="agent-skill-checklist"></div>
+      <div class="form-hint" style="margin-top:0.35rem;">Select which skills this agent can use</div>
+    </div>
+
+    <!-- Allow unassigned skills -->
+    <div class="form-group">
+      <label class="toggle" id="allow-unassigned-toggle" style="margin-top:0.25rem;">
+        <div class="toggle-track" id="allow-unassigned-track"><div class="toggle-thumb"></div></div>
+        <span class="toggle-label" id="allow-unassigned-label">Allow unassigned skills</span>
+      </label>
+      <div class="form-hint">When enabled, this agent can use any skill, not just the ones assigned above</div>
     </div>
 
     <!-- Supervision policy -->
@@ -601,11 +772,43 @@
   </div>
 </div>
 
+<!-- Skill form modal -->
+<div class="modal-overlay" id="skill-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="skill-modal-title">New Skill</span>
+      <button class="modal-close" onclick="closeSkillModal()">&times;</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="skill-name" placeholder="e.g. web-search">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="skill-desc" rows="2" placeholder="What capability does this skill provide?"></textarea>
+    </div>
+
+    <!-- Tools -->
+    <div class="form-group">
+      <label class="form-label">Tools</label>
+      <div class="tools-editor" id="skill-tools-editor"></div>
+      <button class="btn-add-tool" onclick="addToolEntry()">+ Add Tool</button>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSkillModal()">Cancel</button>
+      <button class="btn-primary" id="btn-save-skill" onclick="saveSkill()">Create Skill</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete confirmation modal -->
 <div class="modal-overlay" id="delete-modal">
   <div class="modal" style="max-width:380px;">
     <div class="confirm-dialog">
-      <p>Delete agent <span class="agent-name" id="delete-agent-name"></span>?<br>This cannot be undone.</p>
+      <p>Delete <span class="highlight" id="delete-target-name"></span>?<br>This cannot be undone.</p>
       <div class="confirm-actions">
         <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
         <button class="btn-danger" style="padding:0.45rem 1rem; font-size:0.85rem;" id="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
@@ -614,8 +817,25 @@
   </div>
 </div>
 
+<!-- Chat Panel -->
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-panel-header">
+    <div class="chat-panel-header-left">
+      <span class="dot" id="chat-panel-status-dot"></span>
+      <span id="chat-panel-agent-name"></span>
+    </div>
+    <button class="chat-panel-close" onclick="closeChatPanel()">&times;</button>
+  </div>
+  <div id="chat-panel-banner-area"></div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-input-area">
+    <input type="text" id="chat-input" placeholder="Send a message..." autocomplete="off">
+    <button id="btn-chat-send" onclick="sendChatMessage()">Send</button>
+  </div>
+</div>
+
 <script>
-// ── Helpers ──
+// -- Helpers --
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
@@ -625,22 +845,48 @@ function sysCard(value, label) {
   return '<div class="sys-card"><div class="sys-value">' + esc(String(value)) + '</div><div class="sys-label">' + esc(label) + '</div></div>';
 }
 
-// ── Demo data ──
-const DEMO_SKILLS = [
+// -- Data Model --
+// Skills: capabilities with tools
+let SKILLS = [
+  {
+    name: 'web-search',
+    description: 'Search the web and fetch pages',
+    tools: [
+      { name: 'web_search', description: 'Search the web', parameters: [{ name: 'query', type: 'string', required: true }] },
+      { name: 'fetch_page', description: 'Fetch and extract page content', parameters: [{ name: 'url', type: 'string', required: true }] }
+    ]
+  },
+  {
+    name: 'file-ops',
+    description: 'Read, write, and delete files on disk',
+    tools: [
+      { name: 'read_file', description: 'Read a file', parameters: [{ name: 'path', type: 'string', required: true }] },
+      { name: 'write_file', description: 'Write content to a file', parameters: [{ name: 'path', type: 'string', required: true }, { name: 'content', type: 'string', required: true }] },
+      { name: 'delete_file', description: 'Delete a file', parameters: [{ name: 'path', type: 'string', required: true }] }
+    ]
+  },
+  {
+    name: 'code-review',
+    description: 'Get PR diffs and post review comments',
+    tools: [
+      { name: 'get_diff', description: 'Get PR diff', parameters: [{ name: 'pr_number', type: 'integer', required: true }] },
+      { name: 'post_comment', description: 'Post a review comment', parameters: [{ name: 'pr_number', type: 'integer', required: true }, { name: 'body', type: 'string', required: true }] }
+    ]
+  }
+];
+
+// Agents: supervised entities that use skills
+let AGENTS = [
   {
     name: 'web-researcher',
     description: 'Searches the web for information, summarises findings, and cites sources.',
     triggers: ['research', 'look up', 'find out'],
-    tools: [
-      { name: 'web_search', description: 'Search the web', parameters: [{ name: 'query', type: 'string', required: true }] },
-      { name: 'fetch_page', description: 'Fetch and extract page content', parameters: [{ name: 'url', type: 'string', required: true }] }
-    ],
+    assignedSkills: ['web-search'],
+    allowUnassignedSkills: false,
+    status: 'running',
     supervision: {
-      max_iterations: 5,
-      tool_timeout: 15,
-      token_budget: 10000,
-      on_timeout: 'terminate',
-      on_budget_exceeded: 'terminate',
+      max_iterations: 5, tool_timeout: 15, token_budget: 10000,
+      on_timeout: 'terminate', on_budget_exceeded: 'terminate',
       require_confirm: []
     }
   },
@@ -648,17 +894,12 @@ const DEMO_SKILLS = [
     name: 'file-manager',
     description: 'Reads, writes, and organises files on disk.',
     triggers: ['save file', 'read file', 'organise'],
-    tools: [
-      { name: 'read_file', description: 'Read a file', parameters: [{ name: 'path', type: 'string', required: true }] },
-      { name: 'write_file', description: 'Write content to a file', parameters: [{ name: 'path', type: 'string', required: true }, { name: 'content', type: 'string', required: true }] },
-      { name: 'delete_file', description: 'Delete a file', parameters: [{ name: 'path', type: 'string', required: true }] }
-    ],
+    assignedSkills: ['file-ops'],
+    allowUnassignedSkills: false,
+    status: 'running',
     supervision: {
-      max_iterations: 10,
-      tool_timeout: 30,
-      token_budget: 20000,
-      on_timeout: 'warn',
-      on_budget_exceeded: 'warn',
+      max_iterations: 10, tool_timeout: 30, token_budget: 20000,
+      on_timeout: 'warn', on_budget_exceeded: 'warn',
       require_confirm: ['delete_file', 'write_file']
     }
   },
@@ -666,16 +907,12 @@ const DEMO_SKILLS = [
     name: 'code-reviewer',
     description: 'Reviews pull requests and leaves inline comments with suggestions.',
     triggers: ['review PR', 'code review'],
-    tools: [
-      { name: 'get_diff', description: 'Get PR diff', parameters: [{ name: 'pr_number', type: 'integer', required: true }] },
-      { name: 'post_comment', description: 'Post a review comment', parameters: [{ name: 'pr_number', type: 'integer', required: true }, { name: 'body', type: 'string', required: true }] }
-    ],
+    assignedSkills: ['code-review', 'web-search'],
+    allowUnassignedSkills: true,
+    status: 'paused',
     supervision: {
-      max_iterations: 3,
-      tool_timeout: 20,
-      token_budget: 15000,
-      on_timeout: 'terminate',
-      on_budget_exceeded: 'terminate',
+      max_iterations: 3, tool_timeout: 20, token_budget: 15000,
+      on_timeout: 'terminate', on_budget_exceeded: 'terminate',
       require_confirm: ['post_comment']
     }
   }
@@ -689,10 +926,10 @@ const DEMO_COSTS = {
     { name: 'global', limit_usd: 50, spent_usd: 2.3471, remaining_usd: 47.6529, percent_used: 5, period: 'monthly', hard_stop: false },
     { name: 'web-researcher', limit_usd: 10, spent_usd: 1.2034, remaining_usd: 8.7966, percent_used: 12, period: 'monthly', hard_stop: true }
   ],
-  by_skill: [
-    { skill: 'web-researcher', calls: 83, tokens: 241200, cost: 1.2034 },
-    { skill: 'file-manager', calls: 41, tokens: 156300, cost: 0.7812 },
-    { skill: 'code-reviewer', calls: 23, tokens: 85410, cost: 0.3625 }
+  by_agent: [
+    { agent: 'web-researcher', calls: 83, tokens: 241200, cost: 1.2034 },
+    { agent: 'file-manager', calls: 41, tokens: 156300, cost: 0.7812 },
+    { agent: 'code-reviewer', calls: 23, tokens: 85410, cost: 0.3625 }
   ],
   hourly_24h: Array.from({ length: 24 }, (_, i) => ({
     hour: '2026-03-20T' + String(i).padStart(2, '0') + ':00:00',
@@ -701,7 +938,105 @@ const DEMO_COSTS = {
   }))
 };
 
-// ── Tabs ──
+// -- Chat data model --
+// chatHistory: { agentName: [ { role: 'user'|'agent', content: string, toolCalls?: [{ name, params }] } ] }
+let chatHistory = {
+  'web-researcher': [
+    { role: 'user', content: 'What are the latest developments in quantum computing?' },
+    { role: 'agent', content: null, toolCalls: [{ name: 'web_search', params: 'query="quantum computing latest developments 2026"' }] },
+    { role: 'agent', content: 'Based on my research, here are the key developments in quantum computing for 2026:\n\n1. Google achieved quantum supremacy on a 1500-qubit processor\n2. Error correction rates improved by 10x over last year\n3. New hybrid classical-quantum algorithms are showing practical advantages in drug discovery' },
+    { role: 'user', content: "Can you find more about IBM's new processor?" },
+    { role: 'agent', content: null, toolCalls: [{ name: 'web_search', params: 'query="IBM quantum processor 2026"' }] },
+    { role: 'agent', content: null, toolCalls: [{ name: 'fetch_page', params: 'url="https://research.ibm.com/quantum"' }] },
+    { role: 'agent', content: "IBM announced their new 1000+ qubit processor, codenamed \"Condor II\". Key highlights:\n\n- 1,121 superconducting qubits with improved coherence times\n- 99.9% two-qubit gate fidelity\n- Integrated classical-quantum middleware for hybrid workloads\n- Expected to be available via IBM Quantum Network in Q3 2026" }
+  ]
+};
+
+// Current open chat agent name
+let chatOpenAgent = null;
+
+// -- Simulated agent response templates --
+const agentResponseTemplates = [
+  {
+    toolCalls: [{ name: 'web_search', params: 'query="<topic>"' }],
+    content: 'I found several relevant results. Let me summarize the key findings for you.'
+  },
+  {
+    toolCalls: [{ name: 'fetch_page', params: 'url="https://example.com/result"' }],
+    content: 'After reviewing the page, here is what I found relevant to your question.'
+  },
+  {
+    toolCalls: [{ name: 'read_file', params: 'path="./data/results.json"' }],
+    content: 'I read the file and extracted the relevant information for you.'
+  },
+  {
+    toolCalls: [{ name: 'get_diff', params: 'pr_number=42' }],
+    content: 'I reviewed the diff and here are my observations on the code changes.'
+  },
+  {
+    toolCalls: [],
+    content: 'That is an interesting question. Based on what I know, I can provide some insights on this topic.'
+  },
+  {
+    toolCalls: [{ name: 'web_search', params: 'query="<topic> latest"' }],
+    content: 'Here are the most recent findings on this topic. The data suggests several important trends.'
+  }
+];
+
+// -- Get tools available to an agent --
+function getAgentTools(agent) {
+  let tools = [];
+  const skillNames = agent.allowUnassignedSkills
+    ? SKILLS.map(s => s.name)
+    : (agent.assignedSkills || []);
+  skillNames.forEach(sn => {
+    const skill = SKILLS.find(s => s.name === sn);
+    if (skill) tools = tools.concat(skill.tools);
+  });
+  return tools;
+}
+
+// -- Status helpers --
+function statusDotClass(status) {
+  if (status === 'running') return 'dot-green';
+  if (status === 'paused') return 'dot-yellow';
+  return 'dot-gray';
+}
+
+function statusBadgeClass(status) {
+  if (status === 'running') return 'badge-status-running';
+  if (status === 'paused') return 'badge-status-paused';
+  return 'badge-status-stopped';
+}
+
+function setAgentStatus(idx, newStatus) {
+  if (idx >= 0 && idx < AGENTS.length) {
+    AGENTS[idx].status = newStatus;
+    renderAll();
+    // Update chat panel if it is open for this agent
+    if (chatOpenAgent === AGENTS[idx].name) {
+      renderChatPanel();
+    }
+  }
+}
+
+function renderStatusControls(idx) {
+  const agent = AGENTS[idx];
+  const st = agent.status || 'stopped';
+  let html = '';
+  if (st === 'running') {
+    html += '<button class="status-ctrl-btn btn-pause" title="Pause" onclick="event.stopPropagation();setAgentStatus(' + idx + ',\'paused\')">&#x23F8;</button>';
+    html += '<button class="status-ctrl-btn btn-stop" title="Stop" onclick="event.stopPropagation();setAgentStatus(' + idx + ',\'stopped\')">&#x23F9;</button>';
+  } else if (st === 'paused') {
+    html += '<button class="status-ctrl-btn btn-play" title="Resume" onclick="event.stopPropagation();setAgentStatus(' + idx + ',\'running\')">&#x25B6;</button>';
+    html += '<button class="status-ctrl-btn btn-stop" title="Stop" onclick="event.stopPropagation();setAgentStatus(' + idx + ',\'stopped\')">&#x23F9;</button>';
+  } else {
+    html += '<button class="status-ctrl-btn btn-play" title="Start" onclick="event.stopPropagation();setAgentStatus(' + idx + ',\'running\')">&#x25B6;</button>';
+  }
+  return html;
+}
+
+// -- Tabs --
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -711,16 +1046,17 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// ── Collapsible ──
+// -- Collapsible --
 function toggleCollapsible(el) {
   el.classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
 }
 
-// ── Render helpers ──
-function renderTags(arr) {
+// -- Render helpers --
+function renderTags(arr, cls) {
   if (!arr || !arr.length) return '';
-  return '<div class="tags">' + arr.map(t => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>';
+  const c = cls || '';
+  return '<div class="tags">' + arr.map(t => '<span class="tag ' + c + '">' + esc(t) + '</span>').join('') + '</div>';
 }
 
 function renderToolDetail(tool) {
@@ -755,21 +1091,79 @@ function renderSupervision(s) {
   return html;
 }
 
+// -- Agent card --
+function renderAgentCard(agent, showActions) {
+  const tools = getAgentTools(agent);
+  const skillCount = (agent.assignedSkills || []).length;
+  const idx = AGENTS.indexOf(agent);
+  const st = agent.status || 'stopped';
+
+  let html = '<div class="card">';
+  html += '<div class="card-header">';
+  html += '<div class="card-header-left">';
+  html += '<span class="dot ' + statusDotClass(st) + '"></span>';
+  html += '<span class="card-title">' + esc(agent.name) + '</span>';
+  html += '</div>';
+  html += '<div class="card-header-right">';
+  html += '<span class="badge ' + statusBadgeClass(st) + '">' + esc(st) + '</span> ';
+  html += '<span class="badge badge-blue">supervised</span> ';
+  html += '<span class="badge badge-green">' + skillCount + ' skill' + (skillCount !== 1 ? 's' : '') + '</span>';
+  if (agent.allowUnassignedSkills) html += ' <span class="badge badge-yellow">open</span>';
+  html += ' ' + renderStatusControls(idx);
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="card-desc">' + esc(agent.description) + '</div>';
+  html += renderTags(agent.triggers);
+
+  // Show assigned skills
+  if (agent.assignedSkills && agent.assignedSkills.length) {
+    html += renderTags(agent.assignedSkills, 'tag-skill');
+  }
+
+  // Show tools
+  if (tools.length > 0) {
+    html += '<div class="collapsible-header" onclick="toggleCollapsible(this)"><span class="arrow">&#9654;</span> ' + tools.length + ' tool' + (tools.length !== 1 ? 's' : '') + ' available</div>';
+    html += '<div class="collapsible-body">';
+    tools.forEach(t => { html += renderToolDetail(t); });
+    html += '</div>';
+  }
+
+  html += renderSupervision(agent.supervision);
+
+  // Card actions - always show Chat button; conditionally show edit/export/delete
+  html += '<div class="card-actions">';
+  html += '<button class="btn-secondary" onclick="openChatPanel(\'' + esc(agent.name) + '\')">Chat</button>';
+  if (showActions) {
+    html += '<button class="btn-secondary" onclick="editAgent(' + idx + ')">Edit</button>';
+    html += '<button class="btn-secondary" onclick="exportAgent(' + idx + ')">Export JSON</button>';
+    html += '<button class="btn-danger" onclick="requestDeleteAgent(' + idx + ')">Delete</button>';
+  }
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// -- Skill card --
 function renderSkillCard(skill, showActions) {
   const toolCount = skill.tools ? skill.tools.length : 0;
-  const supervised = !!skill.supervision;
-  const idx = DEMO_SKILLS.indexOf(skill);
+  const idx = SKILLS.indexOf(skill);
+  const usedBy = AGENTS.filter(a => a.assignedSkills && a.assignedSkills.includes(skill.name));
 
   let html = '<div class="card">';
   html += '<div class="card-header"><span class="card-title">' + esc(skill.name) + '</span>';
   html += '<span>';
-  if (supervised) html += '<span class="badge badge-blue">supervised</span> ';
-  if (toolCount > 0) html += '<span class="badge badge-green">' + toolCount + ' tool' + (toolCount > 1 ? 's' : '') + '</span>';
-  else html += '<span class="badge badge-muted">prompt only</span>';
+  html += '<span class="badge badge-green">' + toolCount + ' tool' + (toolCount !== 1 ? 's' : '') + '</span>';
+  if (usedBy.length) html += ' <span class="badge badge-blue">' + usedBy.length + ' agent' + (usedBy.length !== 1 ? 's' : '') + '</span>';
   html += '</span></div>';
 
   html += '<div class="card-desc">' + esc(skill.description) + '</div>';
-  html += renderTags(skill.triggers);
+
+  // Show which agents use this skill
+  if (usedBy.length) {
+    html += '<div style="font-size:0.75rem; color:var(--muted); margin-bottom:0.4rem;">Used by: ' + usedBy.map(a => '<strong>' + esc(a.name) + '</strong>').join(', ') + '</div>';
+  }
 
   if (toolCount > 0) {
     html += '<div class="collapsible-header" onclick="toggleCollapsible(this)"><span class="arrow">&#9654;</span> Tools</div>';
@@ -778,13 +1172,11 @@ function renderSkillCard(skill, showActions) {
     html += '</div>';
   }
 
-  html += renderSupervision(skill.supervision);
-
   if (showActions) {
-    html += '<div class="skill-actions">';
-    html += '<button class="btn-secondary" onclick="editAgent(' + idx + ')">Edit</button>';
-    html += '<button class="btn-secondary" onclick="exportAgent(' + idx + ')">Export JSON</button>';
-    html += '<button class="btn-danger" onclick="deleteAgent(' + idx + ')">Delete</button>';
+    html += '<div class="card-actions">';
+    html += '<button class="btn-secondary" onclick="editSkill(' + idx + ')">Edit</button>';
+    html += '<button class="btn-secondary" onclick="exportSkill(' + idx + ')">Export JSON</button>';
+    html += '<button class="btn-danger" onclick="requestDeleteSkill(' + idx + ')">Delete</button>';
     html += '</div>';
   }
 
@@ -792,39 +1184,45 @@ function renderSkillCard(skill, showActions) {
   return html;
 }
 
-// ── Render overview ──
+// -- Render sections --
 function renderOverview() {
-  const supervisedCount = DEMO_SKILLS.filter(s => s.supervision).length;
-  const totalTools = DEMO_SKILLS.reduce((n, s) => n + (s.tools ? s.tools.length : 0), 0);
+  const totalTools = SKILLS.reduce((n, s) => n + (s.tools ? s.tools.length : 0), 0);
+  const runningCount = AGENTS.filter(a => a.status === 'running').length;
+  const pausedCount = AGENTS.filter(a => a.status === 'paused').length;
+  const stoppedCount = AGENTS.filter(a => a.status === 'stopped').length;
 
   document.getElementById('sys-grid').innerHTML =
     sysCard('$' + DEMO_COSTS.total_cost_usd.toFixed(2), 'This Month') +
-    sysCard(DEMO_SKILLS.length, 'Agents') +
+    sysCard(AGENTS.length, 'Agents') +
+    sysCard(SKILLS.length, 'Skills') +
     sysCard(totalTools, 'Tools') +
-    sysCard(supervisedCount, 'Supervised') +
     sysCard(DEMO_COSTS.total_calls, 'API Calls') +
-    sysCard(DEMO_COSTS.total_tokens.toLocaleString(), 'Tokens');
+    sysCard(DEMO_COSTS.total_tokens.toLocaleString(), 'Tokens') +
+    sysCard(runningCount, 'Running') +
+    sysCard(pausedCount, 'Paused') +
+    sysCard(stoppedCount, 'Stopped');
 
-  document.getElementById('overview-skills').innerHTML =
-    DEMO_SKILLS.map(s => renderSkillCard(s, false)).join('');
+  document.getElementById('overview-agents').innerHTML =
+    AGENTS.map(a => renderAgentCard(a, false)).join('');
 }
 
-// ── Render skills tab ──
+function renderAgents() {
+  document.getElementById('agents-grid').innerHTML =
+    AGENTS.map(a => renderAgentCard(a, true)).join('');
+}
+
 function renderSkills() {
   document.getElementById('skills-grid').innerHTML =
-    DEMO_SKILLS.map(s => renderSkillCard(s, true)).join('');
+    SKILLS.map(s => renderSkillCard(s, true)).join('');
 }
 
-// ── Render costs ──
 function renderCosts() {
   const costs = DEMO_COSTS;
-
   document.getElementById('cost-totals').innerHTML =
     sysCard('$' + costs.total_cost_usd.toFixed(4), 'This Month') +
     sysCard(costs.total_tokens.toLocaleString(), 'Tokens') +
     sysCard(costs.total_calls, 'API Calls');
 
-  // Budgets
   if (costs.budgets.length) {
     let html = '<div class="card-grid">';
     costs.budgets.forEach(b => {
@@ -845,17 +1243,15 @@ function renderCosts() {
     document.getElementById('budgets-list').innerHTML = html;
   }
 
-  // By skill
-  if (costs.by_skill.length) {
-    let html = '<div class="card"><table class="cost-table"><thead><tr><th>Skill</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
-    costs.by_skill.forEach(r => {
-      html += '<tr><td>' + esc(r.skill) + '</td><td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td><td class="money">$' + r.cost.toFixed(4) + '</td></tr>';
+  if (costs.by_agent.length) {
+    let html = '<div class="card"><table class="cost-table"><thead><tr><th>Agent</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
+    costs.by_agent.forEach(r => {
+      html += '<tr><td>' + esc(r.agent) + '</td><td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td><td class="money">$' + r.cost.toFixed(4) + '</td></tr>';
     });
     html += '</tbody></table></div>';
-    document.getElementById('cost-by-skill').innerHTML = html;
+    document.getElementById('cost-by-agent').innerHTML = html;
   }
 
-  // Hourly
   if (costs.hourly_24h.length) {
     const maxCost = Math.max(...costs.hourly_24h.map(h => h.cost), 0.0001);
     let html = '<div class="card"><div class="hourly-chart">';
@@ -869,29 +1265,176 @@ function renderCosts() {
   }
 }
 
-// ── Render policies ──
 function renderPolicies() {
   let html = '';
-  DEMO_SKILLS.forEach(s => {
-    if (!s.supervision) return;
-    const sv = s.supervision;
-    html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(s.name) + ' &mdash; max ' + sv.max_iterations + ' iterations</span><span class="perm-status">' + sv.tool_timeout + 's timeout</span></div>';
+  AGENTS.forEach(a => {
+    if (!a.supervision) return;
+    const sv = a.supervision;
+    html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(a.name) + ' &mdash; max ' + sv.max_iterations + ' iterations</span><span class="perm-status">' + sv.tool_timeout + 's timeout</span></div>';
     if (sv.token_budget) {
-      html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(s.name) + ' &mdash; token budget</span><span class="perm-status">' + sv.token_budget.toLocaleString() + '</span></div>';
+      html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(a.name) + ' &mdash; token budget</span><span class="perm-status">' + sv.token_budget.toLocaleString() + '</span></div>';
+    }
+    if (a.allowUnassignedSkills) {
+      html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(a.name) + '</span><span class="perm-status" style="color:var(--yellow)">Open skills</span></div>';
     }
     if (sv.require_confirm && sv.require_confirm.length) {
       sv.require_confirm.forEach(tool => {
-        html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(s.name) + ' &rarr; ' + esc(tool) + '</span><span class="perm-status">Requires confirm</span></div>';
+        html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(a.name) + ' &rarr; ' + esc(tool) + '</span><span class="perm-status">Requires confirm</span></div>';
       });
     }
   });
   document.getElementById('policy-grid').innerHTML = html;
 }
 
-// ── Skill builder (demo – natural language) ──
-document.getElementById('btn-create-skill').addEventListener('click', () => {
-  const input = document.getElementById('builder-input');
-  const status = document.getElementById('builder-status');
+// -- Chat Panel --
+function openChatPanel(agentName) {
+  chatOpenAgent = agentName;
+  // Initialize chat history for this agent if not present
+  if (!chatHistory[agentName]) {
+    chatHistory[agentName] = [];
+  }
+  renderChatPanel();
+  document.getElementById('chat-panel').classList.add('open');
+  // Focus input
+  setTimeout(() => {
+    document.getElementById('chat-input').focus();
+  }, 300);
+}
+
+function closeChatPanel() {
+  document.getElementById('chat-panel').classList.remove('open');
+  chatOpenAgent = null;
+}
+
+function renderChatPanel() {
+  if (!chatOpenAgent) return;
+  const agent = AGENTS.find(a => a.name === chatOpenAgent);
+  if (!agent) { closeChatPanel(); return; }
+
+  const st = agent.status || 'stopped';
+
+  // Header
+  document.getElementById('chat-panel-agent-name').textContent = agent.name;
+  const dotEl = document.getElementById('chat-panel-status-dot');
+  dotEl.className = 'dot ' + statusDotClass(st);
+
+  // Banner
+  const bannerArea = document.getElementById('chat-panel-banner-area');
+  const agentIdx = AGENTS.indexOf(agent);
+  if (st === 'paused') {
+    bannerArea.innerHTML = '<div class="chat-panel-banner paused-banner">' +
+      '<span>Agent is paused. Resume to continue.</span>' +
+      '<button class="btn-banner-action" onclick="setAgentStatus(' + agentIdx + ',\'running\')">Resume</button>' +
+      '</div>';
+  } else if (st === 'stopped') {
+    bannerArea.innerHTML = '<div class="chat-panel-banner stopped-banner">' +
+      '<span>Agent is stopped. Start to begin.</span>' +
+      '<button class="btn-banner-action" onclick="setAgentStatus(' + agentIdx + ',\'running\')">Start</button>' +
+      '</div>';
+  } else {
+    bannerArea.innerHTML = '';
+  }
+
+  // Messages
+  const msgs = chatHistory[chatOpenAgent] || [];
+  const msgContainer = document.getElementById('chat-messages');
+  let html = '';
+  msgs.forEach(msg => {
+    if (msg.toolCalls && msg.toolCalls.length && !msg.content) {
+      // Pure tool call message
+      html += '<div class="chat-msg agent">';
+      html += '<div class="msg-role">agent</div>';
+      msg.toolCalls.forEach(tc => {
+        html += '<div class="chat-tool-call"><span class="tool-call-name">' + esc(tc.name) + '</span>';
+        if (tc.params) html += '<span class="tool-call-params">(' + esc(tc.params) + ')</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    } else if (msg.toolCalls && msg.toolCalls.length && msg.content) {
+      // Tool call + text
+      html += '<div class="chat-msg agent">';
+      html += '<div class="msg-role">agent</div>';
+      msg.toolCalls.forEach(tc => {
+        html += '<div class="chat-tool-call"><span class="tool-call-name">' + esc(tc.name) + '</span>';
+        if (tc.params) html += '<span class="tool-call-params">(' + esc(tc.params) + ')</span>';
+        html += '</div>';
+      });
+      html += '<div style="margin-top:0.35rem;">' + esc(msg.content) + '</div>';
+      html += '</div>';
+    } else if (msg.role === 'user') {
+      html += '<div class="chat-msg user">';
+      html += '<div class="msg-role">you</div>';
+      html += esc(msg.content);
+      html += '</div>';
+    } else {
+      html += '<div class="chat-msg agent">';
+      html += '<div class="msg-role">agent</div>';
+      html += esc(msg.content);
+      html += '</div>';
+    }
+  });
+  msgContainer.innerHTML = html;
+  // Scroll to bottom
+  msgContainer.scrollTop = msgContainer.scrollHeight;
+}
+
+function sendChatMessage() {
+  if (!chatOpenAgent) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Initialize if needed
+  if (!chatHistory[chatOpenAgent]) chatHistory[chatOpenAgent] = [];
+
+  // Add user message
+  chatHistory[chatOpenAgent].push({ role: 'user', content: text });
+  input.value = '';
+  renderChatPanel();
+
+  // Simulate agent response after 800ms
+  setTimeout(() => {
+    if (!chatOpenAgent) return;
+    const tmpl = agentResponseTemplates[Math.floor(Math.random() * agentResponseTemplates.length)];
+
+    // First, send tool call message if there are tool calls
+    if (tmpl.toolCalls && tmpl.toolCalls.length) {
+      const toolCalls = tmpl.toolCalls.map(tc => ({
+        name: tc.name,
+        params: tc.params.replace('<topic>', text.split(' ').slice(0, 4).join(' '))
+      }));
+      chatHistory[chatOpenAgent].push({
+        role: 'agent',
+        content: null,
+        toolCalls: toolCalls
+      });
+      renderChatPanel();
+    }
+
+    // Then send text response after another short delay
+    setTimeout(() => {
+      if (!chatOpenAgent) return;
+      chatHistory[chatOpenAgent].push({
+        role: 'agent',
+        content: tmpl.content
+      });
+      renderChatPanel();
+    }, 400);
+  }, 800);
+}
+
+// Handle Enter key in chat input
+document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+
+// -- Natural language agent builder --
+document.getElementById('btn-create-agent-nl').addEventListener('click', () => {
+  const input = document.getElementById('agent-builder-input');
+  const status = document.getElementById('agent-builder-status');
   const desc = input.value.trim();
   if (!desc) return;
 
@@ -900,17 +1443,16 @@ document.getElementById('btn-create-skill').addEventListener('click', () => {
 
   setTimeout(() => {
     const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
-    DEMO_SKILLS.push({
+    AGENTS.push({
       name: name || 'custom-agent',
       description: desc,
       triggers: [],
-      tools: [],
+      assignedSkills: [],
+      allowUnassignedSkills: false,
+      status: 'stopped',
       supervision: {
-        max_iterations: 5,
-        tool_timeout: 15,
-        token_budget: 10000,
-        on_timeout: 'terminate',
-        on_budget_exceeded: 'warn',
+        max_iterations: 5, tool_timeout: 15, token_budget: 10000,
+        on_timeout: 'terminate', on_budget_exceeded: 'warn',
         require_confirm: []
       }
     });
@@ -921,24 +1463,48 @@ document.getElementById('btn-create-skill').addEventListener('click', () => {
   }, 800);
 });
 
-// ── Agent modal (create / edit) ──
-let editingIndex = -1; // -1 = creating new
+// -- Natural language skill builder --
+document.getElementById('btn-create-skill-nl').addEventListener('click', () => {
+  const input = document.getElementById('skill-builder-input');
+  const status = document.getElementById('skill-builder-status');
+  const desc = input.value.trim();
+  if (!desc) return;
+
+  status.className = 'builder-status';
+  status.textContent = 'Generating skill...';
+
+  setTimeout(() => {
+    const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    SKILLS.push({
+      name: name || 'custom-skill',
+      description: desc,
+      tools: []
+    });
+    status.className = 'builder-status success';
+    status.textContent = 'Created: ' + (name || 'custom-skill');
+    input.value = '';
+    renderAll();
+  }, 800);
+});
+
+// -- Agent Modal --
+let editingAgentIdx = -1;
+let allowUnassignedOn = false;
 
 function openAgentModal(index) {
-  editingIndex = typeof index === 'number' ? index : -1;
-  const isEdit = editingIndex >= 0;
-  const skill = isEdit ? DEMO_SKILLS[editingIndex] : null;
+  editingAgentIdx = typeof index === 'number' ? index : -1;
+  const isEdit = editingAgentIdx >= 0;
+  const agent = isEdit ? AGENTS[editingAgentIdx] : null;
 
-  document.getElementById('modal-title-text').textContent = isEdit ? 'Edit Agent' : 'New Agent';
+  document.getElementById('agent-modal-title').textContent = isEdit ? 'Edit Agent' : 'New Agent';
   document.getElementById('btn-save-agent').textContent = isEdit ? 'Save Changes' : 'Create Agent';
 
-  // Populate fields
-  document.getElementById('agent-name').value = isEdit ? skill.name : '';
-  document.getElementById('agent-desc').value = isEdit ? skill.description : '';
-  document.getElementById('agent-triggers').value = isEdit && skill.triggers ? skill.triggers.join(', ') : '';
+  document.getElementById('agent-name').value = isEdit ? agent.name : '';
+  document.getElementById('agent-desc').value = isEdit ? agent.description : '';
+  document.getElementById('agent-triggers').value = isEdit && agent.triggers ? agent.triggers.join(', ') : '';
 
   // Supervision
-  const sv = isEdit && skill.supervision ? skill.supervision : {};
+  const sv = isEdit && agent.supervision ? agent.supervision : {};
   document.getElementById('sv-max-iter').value = sv.max_iterations || 5;
   document.getElementById('sv-timeout').value = sv.tool_timeout || 15;
   document.getElementById('sv-token-budget').value = sv.token_budget || 10000;
@@ -946,10 +1512,23 @@ function openAgentModal(index) {
   document.getElementById('sv-on-budget').value = sv.on_budget_exceeded || 'terminate';
   document.getElementById('sv-require-confirm').value = sv.require_confirm ? sv.require_confirm.join(', ') : '';
 
-  // Tools
-  document.getElementById('tools-editor').innerHTML = '';
-  if (isEdit && skill.tools) {
-    skill.tools.forEach(t => addToolEntry(t));
+  // Allow unassigned toggle
+  allowUnassignedOn = isEdit ? !!agent.allowUnassignedSkills : false;
+  updateAllowUnassignedToggle();
+
+  // Skill checklist
+  const assigned = isEdit ? (agent.assignedSkills || []) : [];
+  const checklist = document.getElementById('agent-skill-checklist');
+  if (SKILLS.length === 0) {
+    checklist.innerHTML = '<div class="no-skills-msg">No skills created yet. Create skills first in the Skills tab.</div>';
+  } else {
+    checklist.innerHTML = SKILLS.map(s => {
+      const checked = assigned.includes(s.name) ? ' checked' : '';
+      const toolCount = s.tools ? s.tools.length : 0;
+      return '<label class="skill-check-item"><input type="checkbox" value="' + esc(s.name) + '"' + checked + '>' +
+        '<span class="skill-check-name">' + esc(s.name) + '</span>' +
+        '<span class="skill-check-desc">' + toolCount + ' tool' + (toolCount !== 1 ? 's' : '') + '</span></label>';
+    }).join('');
   }
 
   document.getElementById('agent-modal').classList.add('open');
@@ -957,11 +1536,92 @@ function openAgentModal(index) {
 
 function closeAgentModal() {
   document.getElementById('agent-modal').classList.remove('open');
-  editingIndex = -1;
+  editingAgentIdx = -1;
+}
+
+function updateAllowUnassignedToggle() {
+  document.getElementById('allow-unassigned-track').classList.toggle('on', allowUnassignedOn);
+  const lbl = document.getElementById('allow-unassigned-label');
+  lbl.classList.toggle('on', allowUnassignedOn);
+  lbl.textContent = allowUnassignedOn ? 'Allow unassigned skills (ON)' : 'Allow unassigned skills';
+}
+
+document.getElementById('allow-unassigned-toggle').addEventListener('click', () => {
+  allowUnassignedOn = !allowUnassignedOn;
+  updateAllowUnassignedToggle();
+});
+
+function saveAgent() {
+  const name = document.getElementById('agent-name').value.trim();
+  const desc = document.getElementById('agent-desc').value.trim();
+  if (!name) { alert('Agent name is required.'); return; }
+
+  const triggers = document.getElementById('agent-triggers').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  const assignedSkills = [];
+  document.querySelectorAll('#agent-skill-checklist input[type="checkbox"]:checked').forEach(cb => {
+    assignedSkills.push(cb.value);
+  });
+
+  const requireConfirm = document.getElementById('sv-require-confirm').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  const data = {
+    name, description: desc, triggers, assignedSkills,
+    allowUnassignedSkills: allowUnassignedOn,
+    status: editingAgentIdx >= 0 ? (AGENTS[editingAgentIdx].status || 'stopped') : 'stopped',
+    supervision: {
+      max_iterations: parseInt(document.getElementById('sv-max-iter').value) || 5,
+      tool_timeout: parseInt(document.getElementById('sv-timeout').value) || 15,
+      token_budget: parseInt(document.getElementById('sv-token-budget').value) || 10000,
+      on_timeout: document.getElementById('sv-on-timeout').value,
+      on_budget_exceeded: document.getElementById('sv-on-budget').value,
+      require_confirm: requireConfirm
+    }
+  };
+
+  if (editingAgentIdx >= 0) {
+    AGENTS[editingAgentIdx] = data;
+  } else {
+    AGENTS.push(data);
+  }
+
+  closeAgentModal();
+  renderAll();
+}
+
+function editAgent(index) { openAgentModal(index); }
+
+// -- Skill Modal --
+let editingSkillIdx = -1;
+
+function openSkillModal(index) {
+  editingSkillIdx = typeof index === 'number' ? index : -1;
+  const isEdit = editingSkillIdx >= 0;
+  const skill = isEdit ? SKILLS[editingSkillIdx] : null;
+
+  document.getElementById('skill-modal-title').textContent = isEdit ? 'Edit Skill' : 'New Skill';
+  document.getElementById('btn-save-skill').textContent = isEdit ? 'Save Changes' : 'Create Skill';
+
+  document.getElementById('skill-name').value = isEdit ? skill.name : '';
+  document.getElementById('skill-desc').value = isEdit ? skill.description : '';
+
+  document.getElementById('skill-tools-editor').innerHTML = '';
+  if (isEdit && skill.tools) {
+    skill.tools.forEach(t => addToolEntry(t));
+  }
+
+  document.getElementById('skill-modal').classList.add('open');
+}
+
+function closeSkillModal() {
+  document.getElementById('skill-modal').classList.remove('open');
+  editingSkillIdx = -1;
 }
 
 function addToolEntry(existing) {
-  const editor = document.getElementById('tools-editor');
+  const editor = document.getElementById('skill-tools-editor');
   const entry = document.createElement('div');
   entry.className = 'tool-entry';
 
@@ -973,9 +1633,7 @@ function addToolEntry(existing) {
   html += '<input class="form-input tool-desc-input" placeholder="Description" value="' + esc(tool.description || '') + '" style="margin-bottom:0.3rem;">';
   html += '<div class="params-list">';
   if (tool.parameters && tool.parameters.length) {
-    tool.parameters.forEach(p => {
-      html += renderParamEntry(p);
-    });
+    tool.parameters.forEach(p => { html += renderParamEntry(p); });
   }
   html += '</div>';
   html += '<button class="btn-add-param" onclick="addParamToTool(this)">+ Add parameter</button>';
@@ -1008,17 +1666,13 @@ function addParamToTool(btn) {
   paramsList.appendChild(div.firstElementChild);
 }
 
-function collectFormData() {
-  const name = document.getElementById('agent-name').value.trim();
-  const desc = document.getElementById('agent-desc').value.trim();
-  if (!name) { alert('Agent name is required.'); return null; }
+function saveSkill() {
+  const name = document.getElementById('skill-name').value.trim();
+  const desc = document.getElementById('skill-desc').value.trim();
+  if (!name) { alert('Skill name is required.'); return; }
 
-  const triggers = document.getElementById('agent-triggers').value
-    .split(',').map(s => s.trim()).filter(Boolean);
-
-  // Collect tools
   const tools = [];
-  document.querySelectorAll('#tools-editor .tool-entry').forEach(entry => {
+  document.querySelectorAll('#skill-tools-editor .tool-entry').forEach(entry => {
     const toolName = entry.querySelector('.tool-name-input').value.trim();
     if (!toolName) return;
     const toolDesc = entry.querySelector('.tool-desc-input').value.trim();
@@ -1035,88 +1689,108 @@ function collectFormData() {
     tools.push({ name: toolName, description: toolDesc, parameters: params });
   });
 
-  // Supervision
-  const requireConfirm = document.getElementById('sv-require-confirm').value
-    .split(',').map(s => s.trim()).filter(Boolean);
+  const oldName = editingSkillIdx >= 0 ? SKILLS[editingSkillIdx].name : null;
 
-  return {
-    name, description: desc, triggers, tools,
-    supervision: {
-      max_iterations: parseInt(document.getElementById('sv-max-iter').value) || 5,
-      tool_timeout: parseInt(document.getElementById('sv-timeout').value) || 15,
-      token_budget: parseInt(document.getElementById('sv-token-budget').value) || 10000,
-      on_timeout: document.getElementById('sv-on-timeout').value,
-      on_budget_exceeded: document.getElementById('sv-on-budget').value,
-      require_confirm: requireConfirm
+  const data = { name, description: desc, tools };
+
+  if (editingSkillIdx >= 0) {
+    SKILLS[editingSkillIdx] = data;
+    // Update agent references if skill was renamed
+    if (oldName && oldName !== name) {
+      AGENTS.forEach(a => {
+        if (a.assignedSkills) {
+          const idx = a.assignedSkills.indexOf(oldName);
+          if (idx >= 0) a.assignedSkills[idx] = name;
+        }
+      });
     }
-  };
-}
-
-function saveAgent() {
-  const data = collectFormData();
-  if (!data) return;
-
-  if (editingIndex >= 0) {
-    DEMO_SKILLS[editingIndex] = data;
   } else {
-    DEMO_SKILLS.push(data);
+    SKILLS.push(data);
   }
 
-  closeAgentModal();
+  closeSkillModal();
   renderAll();
 }
 
-// ── Edit agent ──
-function editAgent(index) {
-  openAgentModal(index);
-}
+function editSkill(index) { openSkillModal(index); }
 
-// ── Delete agent ──
+// -- Delete --
+let deleteType = null; // 'agent' or 'skill'
 let deletingIndex = -1;
 
-function deleteAgent(index) {
+function requestDeleteAgent(index) {
+  deleteType = 'agent';
   deletingIndex = index;
-  document.getElementById('delete-agent-name').textContent = DEMO_SKILLS[index].name;
+  document.getElementById('delete-target-name').textContent = 'agent "' + AGENTS[index].name + '"';
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function requestDeleteSkill(index) {
+  deleteType = 'skill';
+  deletingIndex = index;
+  document.getElementById('delete-target-name').textContent = 'skill "' + SKILLS[index].name + '"';
   document.getElementById('delete-modal').classList.add('open');
 }
 
 function closeDeleteModal() {
   document.getElementById('delete-modal').classList.remove('open');
+  deleteType = null;
   deletingIndex = -1;
 }
 
 function confirmDelete() {
-  if (deletingIndex >= 0) {
-    DEMO_SKILLS.splice(deletingIndex, 1);
+  if (deleteType === 'agent' && deletingIndex >= 0) {
+    const agentName = AGENTS[deletingIndex].name;
+    AGENTS.splice(deletingIndex, 1);
+    // Close chat panel if open for this agent
+    if (chatOpenAgent === agentName) {
+      closeChatPanel();
+    }
+  } else if (deleteType === 'skill' && deletingIndex >= 0) {
+    const skillName = SKILLS[deletingIndex].name;
+    SKILLS.splice(deletingIndex, 1);
+    // Remove from agent assignments
+    AGENTS.forEach(a => {
+      if (a.assignedSkills) {
+        a.assignedSkills = a.assignedSkills.filter(s => s !== skillName);
+      }
+    });
   }
   closeDeleteModal();
   renderAll();
 }
 
-// ── Export agent as JSON ──
+// -- Export --
 function exportAgent(index) {
-  const skill = DEMO_SKILLS[index];
-  const json = JSON.stringify(skill, null, 2);
+  const agent = AGENTS[index];
+  const json = JSON.stringify(agent, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = skill.name + '.json';
-  document.body.appendChild(a);
-  a.click();
+  a.href = url; a.download = agent.name + '.json';
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// ── Close modals on overlay click ──
-document.getElementById('agent-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeAgentModal();
-});
-document.getElementById('delete-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeDeleteModal();
-});
+function exportSkill(index) {
+  const skill = SKILLS[index];
+  const json = JSON.stringify(skill, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = skill.name + '.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
-// ── Hard-stop toggle ──
+// -- Close modals on overlay click --
+document.getElementById('agent-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAgentModal(); });
+document.getElementById('skill-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSkillModal(); });
+document.getElementById('delete-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDeleteModal(); });
+
+// -- Hard-stop toggle --
 let hardStopOn = false;
 document.getElementById('hard-stop-toggle').addEventListener('click', () => {
   hardStopOn = !hardStopOn;
@@ -1126,7 +1800,7 @@ document.getElementById('hard-stop-toggle').addEventListener('click', () => {
   lbl.textContent = hardStopOn ? 'Hard stop ON' : 'Hard stop';
 });
 
-// ── Budget form (demo) ──
+// -- Budget form --
 document.getElementById('btn-set-budget').addEventListener('click', () => {
   const form = document.getElementById('budget-form');
   const name = form.querySelector('[name="name"]').value.trim();
@@ -1143,11 +1817,12 @@ document.getElementById('btn-set-budget').addEventListener('click', () => {
   renderCosts();
 });
 
-// ── Reload ──
+// -- Reload --
 document.getElementById('btn-reload').addEventListener('click', renderAll);
 
 function renderAll() {
   renderOverview();
+  renderAgents();
   renderSkills();
   renderCosts();
   renderPolicies();
