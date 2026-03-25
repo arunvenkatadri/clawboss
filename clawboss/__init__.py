@@ -27,6 +27,7 @@ from .audit import AuditLog, AuditEntry, AuditPhase, AuditOutcome, AuditSink, Js
 from .errors import ClawbossError
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
 from .builder import SkillBuilder
+from .openclaw import OpenClawBridge, to_openclaw_tool_schema, to_openclaw_manifest
 
 __all__ = [
     "Policy", "OnFailure", "Action",
@@ -37,4 +38,5 @@ __all__ = [
     "ClawbossError",
     "Skill", "SkillStore", "ToolDefinition", "ToolParameter",
     "SkillBuilder",
+    "OpenClawBridge", "to_openclaw_tool_schema", "to_openclaw_manifest",
 ]

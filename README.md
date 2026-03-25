@@ -1,8 +1,21 @@
 # Clawboss
 
-A way of controlling deployed agents to keep your (and their) sanity.
+[![CI](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml/badge.svg)](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 
-Clawboss wraps your AI agent's tool calls with **timeouts**, **token budgets**, **iteration limits**, **circuit breakers**, and **audit logging**. Zero dependencies. Works with any agent framework.
+**Stop your AI agents from going rogue.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
+
+Zero dependencies. Works with any agent framework. First-class [OpenClaw](https://github.com/openclaw/openclaw) integration.
+
+## Why
+
+You deploy an agent. It calls a flaky API in a loop. 47 times. At $0.03 per call. At 3am. Nobody's watching.
+
+Or: your agent decides to "keep researching" and burns through your entire token budget in one conversation. Or: a tool hangs for 90 seconds and your user stares at a spinner.
+
+Clawboss is the guardrail layer between your agent and its tools. Every tool call goes through supervision — timeouts, budgets, circuit breakers — so you can deploy agents without white-knuckling it.
 
 ## Install
 
@@ -61,6 +74,47 @@ asyncio.run(main())
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
 
+## OpenClaw integration
+
+Clawboss includes a built-in bridge for [OpenClaw](https://github.com/openclaw/openclaw). Expose your supervised tools to OpenClaw over HTTP — all supervision (timeouts, budgets, circuit breakers) applies automatically.
+
+```python
+from clawboss import OpenClawBridge, Skill, ToolDefinition, ToolParameter
+
+# Define your skill with tools and supervision limits
+skill = Skill(
+    name="web_research",
+    description="Research topics on the web",
+    tools=[
+        ToolDefinition(
+            name="web_search",
+            description="Search the web",
+            parameters=[
+                ToolParameter(name="query", type="string",
+                              description="Search query", required=True),
+            ],
+        ),
+    ],
+    supervision={"tool_timeout": 15, "max_iterations": 5, "token_budget": 10000},
+)
+
+# Start the bridge
+bridge = OpenClawBridge(port=9229)
+bridge.register_skill(skill, {"web_search": my_search_fn})
+bridge.serve()  # GET /tools, POST /execute/{name}
+```
+
+Then install the TypeScript plugin from `openclaw-plugin/` into OpenClaw. The plugin auto-discovers tools from the bridge and registers them. See `examples/openclaw_bridge.py` for a full working example.
+
+You can also convert schemas without running a bridge:
+
+```python
+from clawboss import to_openclaw_tool_schema, to_openclaw_manifest
+
+schema = to_openclaw_tool_schema(tool_def)    # OpenClaw JSON Schema format
+manifest = to_openclaw_manifest(skill)         # openclaw.plugin.json content
+```
+
 ## Policy from config
 
 Load policy from a dictionary (YAML, JSON, database — whatever you use):
@@ -115,9 +169,9 @@ class MyDatabaseSink(AuditSink):
 Per-tool circuit breakers stop your agent from hammering a broken tool:
 
 ```
-CLOSED  →  failures < threshold, calls pass through
-OPEN    →  failures >= threshold, calls blocked
-HALF_OPEN → after reset period, allow one test call
+CLOSED    ->  failures < threshold, calls pass through
+OPEN      ->  failures >= threshold, calls blocked
+HALF_OPEN ->  after reset period, allow one test call
 ```
 
 ```python
@@ -236,6 +290,14 @@ Dataclass with all configuration. Every field has a sensible default.
 - `budget` — `BudgetSnapshot` at time of completion
 - `user_message()` — always returns a string (output or error message)
 
+### `OpenClawBridge(policy, audit, host, port)`
+
+- `register_tool(tool, fn)` — register a tool with its async callable
+- `register_skill(skill, tool_impls)` — register all tools from a skill
+- `serve()` — start the bridge (blocking)
+- `serve_background()` — start the bridge in a background thread
+- `shutdown()` — stop the bridge
+
 ### `SkillBuilder(llm)`
 
 - `create(description)` — generate a skill from natural language
@@ -255,6 +317,23 @@ Dataclass with all configuration. Every field has a sensible default.
 - `to_dict()` / `from_dict(d)` — serialize/deserialize
 - `to_poml()` — render as POML format
 - `to_json()` — serialize to JSON string
+
+## Contributing
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check .
+ruff format --check .
+
+# Type check
+mypy clawboss/
+```
 
 ## License
 

@@ -1,0 +1,16 @@
+{
+  "name": "clawboss-openclaw-plugin",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin that bridges to clawboss-supervised Python tools",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  }
+}
