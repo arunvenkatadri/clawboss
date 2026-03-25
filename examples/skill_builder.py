@@ -7,56 +7,79 @@ This example uses a mock LLM. Replace mock_llm() with your real LLM client
 import asyncio
 import json
 import tempfile
-from clawboss import SkillBuilder, SkillStore, Skill
+
+from clawboss import SkillBuilder, SkillStore
 
 
 # ── Replace this with your real LLM ──────────────────────────────────
 async def mock_llm(prompt: str) -> str:
     """Pretend to be an LLM that generates skill definitions."""
-    return json.dumps({
-        "name": "web_research",
-        "description": "Research a topic using web search and summarize findings",
-        "triggers": ["research", "look up", "find out", "search for"],
-        "role": "You are a research assistant that finds and synthesizes information from the web.",
-        "task": (
-            "When the user asks you to research something:\n"
-            "1. Search the web for relevant information\n"
-            "2. Read the most relevant results\n"
-            "3. Synthesize findings into a clear summary\n"
-            "4. Cite your sources"
-        ),
-        "instructions": [
-            "Always cite sources with URLs",
-            "Prefer recent sources over older ones",
-            "If the first search doesn't work, refine your query",
-            "Summarize in plain language, not jargon",
-            "If you can't find reliable info, say so honestly",
-        ],
-        "tools": [
-            {
-                "name": "web_search",
-                "description": "Search the web for information",
-                "parameters": [
-                    {"name": "query", "type": "string", "description": "Search query", "required": True},
-                    {"name": "max_results", "type": "integer", "description": "Max results", "required": False, "default": 5},
-                ],
+    return json.dumps(
+        {
+            "name": "web_research",
+            "description": "Research a topic using web search and summarize findings",
+            "triggers": ["research", "look up", "find out", "search for"],
+            "role": (
+                "You are a research assistant that finds and synthesizes information from the web."
+            ),
+            "task": (
+                "When the user asks you to research something:\n"
+                "1. Search the web for relevant information\n"
+                "2. Read the most relevant results\n"
+                "3. Synthesize findings into a clear summary\n"
+                "4. Cite your sources"
+            ),
+            "instructions": [
+                "Always cite sources with URLs",
+                "Prefer recent sources over older ones",
+                "If the first search doesn't work, refine your query",
+                "Summarize in plain language, not jargon",
+                "If you can't find reliable info, say so honestly",
+            ],
+            "tools": [
+                {
+                    "name": "web_search",
+                    "description": "Search the web for information",
+                    "parameters": [
+                        {
+                            "name": "query",
+                            "type": "string",
+                            "description": "Search query",
+                            "required": True,
+                        },
+                        {
+                            "name": "max_results",
+                            "type": "integer",
+                            "description": "Max results",
+                            "required": False,
+                            "default": 5,
+                        },
+                    ],
+                },
+                {
+                    "name": "fetch_page",
+                    "description": "Fetch text content from a URL",
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "type": "string",
+                            "description": "URL to fetch",
+                            "required": True,
+                        },
+                    ],
+                },
+            ],
+            "supervision": {
+                "max_iterations": 5,
+                "tool_timeout": 30,
+                "token_budget": 15000,
+                "on_timeout": "return_error",
+                "on_budget_exceeded": "respond_with_best_effort",
             },
-            {
-                "name": "fetch_page",
-                "description": "Fetch text content from a URL",
-                "parameters": [
-                    {"name": "url", "type": "string", "description": "URL to fetch", "required": True},
-                ],
-            },
-        ],
-        "supervision": {
-            "max_iterations": 5,
-            "tool_timeout": 30,
-            "token_budget": 15000,
-            "on_timeout": "return_error",
-            "on_budget_exceeded": "respond_with_best_effort",
-        },
-    })
+        }
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────
 
 

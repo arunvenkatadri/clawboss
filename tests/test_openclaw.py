@@ -1,13 +1,12 @@
 """Tests for clawboss.openclaw — OpenClaw integration, bridge, schema conversion."""
+
 from __future__ import annotations
 
-import asyncio
 import json
 import socket
-import threading
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 import pytest
 
@@ -18,7 +17,6 @@ from clawboss.openclaw import (
 )
 from clawboss.policy import Policy
 from clawboss.skill import Skill, ToolDefinition, ToolParameter
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -199,10 +197,13 @@ class TestOpenClawBridgeRegistration:
     def test_register_skill(self):
         bridge = OpenClawBridge()
         skill = _make_skill_with_tools()
-        bridge.register_skill(skill, {
-            "echo": _echo_tool,
-            "fail": _failing_tool,
-        })
+        bridge.register_skill(
+            skill,
+            {
+                "echo": _echo_tool,
+                "fail": _failing_tool,
+            },
+        )
         assert "echo" in bridge._registry
         assert "fail" in bridge._registry
 
@@ -216,10 +217,13 @@ class TestOpenClawBridgeRegistration:
     def test_register_skill_applies_supervision_policy(self):
         bridge = OpenClawBridge()
         skill = _make_skill_with_tools()
-        bridge.register_skill(skill, {
-            "echo": _echo_tool,
-            "fail": _failing_tool,
-        })
+        bridge.register_skill(
+            skill,
+            {
+                "echo": _echo_tool,
+                "fail": _failing_tool,
+            },
+        )
         assert bridge._policy.max_iterations == 3
         assert bridge._policy.tool_timeout == 10
 
@@ -258,7 +262,7 @@ def bridge_server():
     )
     bridge.register_tool(fail_tool, _failing_tool)
 
-    thread = bridge.serve_background()
+    bridge.serve_background()
     # Give server a moment to start
     time.sleep(0.2)
 

@@ -1,7 +1,8 @@
 """Audit logging — record everything your agent does to JSONL or stdout."""
 
 import asyncio
-from clawboss import Supervisor, Policy, AuditLog, JsonlAuditSink
+
+from clawboss import AuditLog, JsonlAuditSink, Policy, Supervisor
 
 
 async def calculator(expression: str) -> str:

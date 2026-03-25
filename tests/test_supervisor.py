@@ -7,8 +7,7 @@ import pytest
 from clawboss.audit import AuditLog, MemoryAuditSink
 from clawboss.errors import ClawbossError
 from clawboss.policy import Policy
-from clawboss.supervisor import Supervisor, SupervisedResult
-
+from clawboss.supervisor import SupervisedResult, Supervisor
 
 # ---------------------------------------------------------------------------
 # Helper tool functions

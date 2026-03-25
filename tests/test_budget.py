@@ -8,7 +8,6 @@ from clawboss.budget import BudgetSnapshot, BudgetTracker
 from clawboss.errors import ClawbossError
 from clawboss.policy import Policy
 
-
 # ---------------------------------------------------------------------------
 # BudgetSnapshot properties
 # ---------------------------------------------------------------------------

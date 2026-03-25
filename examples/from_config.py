@@ -2,8 +2,8 @@
 
 import asyncio
 import json
-from clawboss import Supervisor, Policy
 
+from clawboss import Policy, Supervisor
 
 # This could come from a YAML file, database, API, etc.
 CONFIG = {

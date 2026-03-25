@@ -1,9 +1,6 @@
 """Tests for clawboss.policy — Policy dataclass, OnFailure, Action."""
 
-import pytest
-
-from clawboss.policy import Action, OnFailure, Policy
-
+from clawboss.policy import Action, Policy
 
 # ---------------------------------------------------------------------------
 # Action.from_str
@@ -123,16 +120,12 @@ class TestPolicyFromDict:
         assert p.on_timeout.action is Action.KILL
 
     def test_on_failure_as_dict(self):
-        p = Policy.from_dict({
-            "on_timeout": {"action": "kill", "retries": 2}
-        })
+        p = Policy.from_dict({"on_timeout": {"action": "kill", "retries": 2}})
         assert p.on_timeout.action is Action.KILL
         assert p.on_timeout.retries == 2
 
     def test_on_failure_as_dict_defaults(self):
-        p = Policy.from_dict({
-            "on_budget_exceeded": {"retries": 1}
-        })
+        p = Policy.from_dict({"on_budget_exceeded": {"retries": 1}})
         assert p.on_budget_exceeded.action is Action.RETURN_ERROR
         assert p.on_budget_exceeded.retries == 1
 

@@ -2,10 +2,7 @@
 
 import json
 
-import pytest
-
 from clawboss.skill import Skill, SkillStore, ToolDefinition, ToolParameter, _slugify
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,8 +25,18 @@ def _make_skill(**overrides) -> Skill:
                 name="web_search",
                 description="Search the web",
                 parameters=[
-                    ToolParameter(name="query", type="string", description="Search query", required=True),
-                    ToolParameter(name="limit", type="integer", description="Max results", default=10),
+                    ToolParameter(
+                        name="query",
+                        type="string",
+                        description="Search query",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="limit",
+                        type="integer",
+                        description="Max results",
+                        default=10,
+                    ),
                 ],
             ),
         ],
@@ -307,7 +314,7 @@ class TestSkillStoreCRUD:
 
     def test_creates_directory_if_missing(self, tmp_path):
         deep_path = tmp_path / "a" / "b" / "c" / "skills"
-        store = SkillStore(str(deep_path))
+        SkillStore(str(deep_path))
         assert deep_path.exists()
 
 

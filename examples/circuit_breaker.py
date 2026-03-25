@@ -1,8 +1,8 @@
 """Circuit breaker — stop hammering tools that keep failing."""
 
 import asyncio
-from clawboss import Supervisor, Policy
 
+from clawboss import Policy, Supervisor
 
 call_count = 0
 
@@ -20,8 +20,8 @@ async def main():
     policy = Policy(
         max_iterations=10,
         tool_timeout=5.0,
-        circuit_breaker_threshold=3,   # open after 3 failures
-        circuit_breaker_reset=2.0,     # try again after 2 seconds
+        circuit_breaker_threshold=3,  # open after 3 failures
+        circuit_breaker_reset=2.0,  # try again after 2 seconds
     )
     supervisor = Supervisor(policy)
 
@@ -29,7 +29,7 @@ async def main():
     for i in range(4):
         supervisor.record_iteration()
         result = await supervisor.call("flaky_api", flaky_api, query="test")
-        print(f"Call {i+1}: succeeded={result.succeeded}, error={result.error}")
+        print(f"Call {i + 1}: succeeded={result.succeeded}, error={result.error}")
 
     # Wait for circuit breaker reset
     print("\nWaiting for circuit breaker reset...")

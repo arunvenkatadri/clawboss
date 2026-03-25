@@ -116,6 +116,9 @@
     .tag-skill {
       background: rgba(77,171,247,0.15); color: var(--accent); border-color: rgba(77,171,247,0.3);
     }
+    .tag-policy {
+      background: rgba(255,146,43,0.15); color: var(--orange); border-color: rgba(255,146,43,0.3);
+    }
 
     /* -- Detail rows -- */
     .detail-row {
@@ -418,14 +421,6 @@
     }
     .btn-add-tool:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* -- Supervision section -- */
-    .supervision-fields {
-      background: var(--surface2); border-radius: 8px;
-      padding: 0.65rem 0.75rem;
-    }
-    .supervision-fields .form-group { margin-bottom: 0.5rem; }
-    .supervision-fields .form-group:last-child { margin-bottom: 0; }
-
     /* -- Modal footer -- */
     .modal-footer {
       display: flex; gap: 0.5rem; justify-content: flex-end;
@@ -459,6 +454,45 @@
     .skill-check-item .skill-check-name { font-weight: 500; }
     .skill-check-item .skill-check-desc { color: var(--muted); font-size: 0.75rem; margin-left: auto; }
     .no-skills-msg { font-size: 0.82rem; color: var(--muted); padding: 0.5rem 0; }
+
+    /* -- Policy assignment checklist -- */
+    .policy-checklist { display: flex; flex-direction: column; gap: 0.4rem; }
+    .policy-check-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.6rem; border-radius: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      font-size: 0.82rem; cursor: pointer;
+    }
+    .policy-check-item:hover { border-color: var(--orange); }
+    .policy-check-item input[type="checkbox"] { margin: 0; accent-color: var(--orange); }
+    .policy-check-item .policy-check-name { font-weight: 500; color: var(--orange); }
+    .policy-check-item .policy-check-desc { color: var(--muted); font-size: 0.75rem; margin-left: auto; }
+    .no-policies-msg { font-size: 0.82rem; color: var(--muted); padding: 0.5rem 0; }
+
+    /* -- Effective policy preview -- */
+    .effective-policy-preview {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 0.5rem 0.65rem; margin-top: 0.5rem;
+    }
+    .effective-policy-preview .ep-label {
+      font-size: 0.7rem; color: var(--orange); font-weight: 600;
+      margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .effective-policy-preview .detail-row { font-size: 0.78rem; }
+
+    /* -- Policy field toggle row -- */
+    .policy-field-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+    }
+    .policy-field-row:last-child { border-bottom: none; }
+    .policy-field-row input[type="checkbox"] { margin: 0; accent-color: var(--orange); flex-shrink: 0; }
+    .policy-field-row .pf-label { font-size: 0.82rem; min-width: 140px; color: var(--muted); }
+    .policy-field-row .pf-input { flex: 1; }
+    .policy-field-row .form-input,
+    .policy-field-row .form-select { font-size: 0.82rem; padding: 0.3rem 0.5rem; }
+    .policy-field-row .form-input:disabled,
+    .policy-field-row .form-select:disabled { opacity: 0.4; }
 
     /* -- Status control buttons -- */
     .status-ctrl-btn {
@@ -676,8 +710,18 @@
 
   <!-- Policies -->
   <div class="section" id="sec-policies">
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Active Policies</h3>
-    <div class="perm-grid" id="policy-grid"></div>
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        Policies
+        <button class="btn-secondary" onclick="openPolicyModal()">+ New Policy</button>
+      </h3>
+      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
+        Policies are granular supervision rules. Each policy controls specific aspects of agent behavior.
+        Assign multiple policies to an agent &mdash; they merge in order (later policies override earlier ones for overlapping fields).
+      </p>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Policies</h3>
+    <div class="card-grid" id="policy-grid"></div>
   </div>
 
 </div>
@@ -722,46 +766,18 @@
       <div class="form-hint">When enabled, this agent can use any skill, not just the ones assigned above</div>
     </div>
 
-    <!-- Supervision policy -->
+    <!-- Assigned Policies -->
     <div class="form-group">
-      <label class="form-label">Supervision Policy</label>
-      <div class="supervision-fields">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Max iterations</label>
-            <input class="form-input" id="sv-max-iter" type="number" value="5" min="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tool timeout (s)</label>
-            <input class="form-input" id="sv-timeout" type="number" value="15" min="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Token budget</label>
-            <input class="form-input" id="sv-token-budget" type="number" value="10000" min="0">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">On timeout</label>
-            <select class="form-select" id="sv-on-timeout">
-              <option value="terminate">Terminate</option>
-              <option value="warn">Warn</option>
-              <option value="retry">Retry</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">On budget exceeded</label>
-            <select class="form-select" id="sv-on-budget">
-              <option value="terminate">Terminate</option>
-              <option value="warn">Warn</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Require confirmation for</label>
-          <input class="form-input" id="sv-require-confirm" placeholder="Comma-separated tool names, e.g. delete_file, write_file">
-          <div class="form-hint">Tools that need user approval before executing</div>
-        </div>
+      <label class="form-label">Assigned Policies</label>
+      <div class="policy-checklist" id="agent-policy-checklist"></div>
+      <div class="form-hint" style="margin-top:0.35rem;">Select policies to apply. Order matters: later policies override earlier ones for overlapping fields.</div>
+    </div>
+
+    <!-- Effective policy preview -->
+    <div class="form-group">
+      <div class="effective-policy-preview" id="agent-effective-policy-preview">
+        <div class="ep-label">Effective Policy (merged preview)</div>
+        <div id="agent-effective-policy-content"></div>
       </div>
     </div>
 
@@ -804,11 +820,84 @@
   </div>
 </div>
 
+<!-- Policy form modal -->
+<div class="modal-overlay" id="policy-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="policy-modal-title">New Policy</span>
+      <button class="modal-close" onclick="closePolicyModal()">&times;</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="policy-name" placeholder="e.g. rate-limiter">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="policy-desc" rows="2" placeholder="What does this policy control?"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Fields (check to include in this policy)</label>
+      <div style="background:var(--surface2); border-radius:8px; padding:0.65rem 0.75rem;">
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-max-iter-on">
+          <span class="pf-label">Max iterations</span>
+          <div class="pf-input"><input class="form-input" id="pf-max-iter" type="number" value="5" min="1" disabled></div>
+        </div>
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-timeout-on">
+          <span class="pf-label">Tool timeout (s)</span>
+          <div class="pf-input"><input class="form-input" id="pf-timeout" type="number" value="15" min="1" disabled></div>
+        </div>
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-token-budget-on">
+          <span class="pf-label">Token budget</span>
+          <div class="pf-input"><input class="form-input" id="pf-token-budget" type="number" value="10000" min="0" disabled></div>
+        </div>
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-on-timeout-on">
+          <span class="pf-label">On timeout</span>
+          <div class="pf-input">
+            <select class="form-select" id="pf-on-timeout" disabled>
+              <option value="terminate">Terminate</option>
+              <option value="warn">Warn</option>
+              <option value="retry">Retry</option>
+            </select>
+          </div>
+        </div>
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-on-budget-on">
+          <span class="pf-label">On budget exceeded</span>
+          <div class="pf-input">
+            <select class="form-select" id="pf-on-budget" disabled>
+              <option value="terminate">Terminate</option>
+              <option value="warn">Warn</option>
+            </select>
+          </div>
+        </div>
+        <div class="policy-field-row">
+          <input type="checkbox" id="pf-require-confirm-on">
+          <span class="pf-label">Require confirmation</span>
+          <div class="pf-input"><input class="form-input" id="pf-require-confirm" placeholder="Comma-separated tool names" disabled></div>
+        </div>
+      </div>
+      <div class="form-hint">Only checked fields will be saved to this policy</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closePolicyModal()">Cancel</button>
+      <button class="btn-primary" id="btn-save-policy" onclick="savePolicy()">Create Policy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete confirmation modal -->
 <div class="modal-overlay" id="delete-modal">
   <div class="modal" style="max-width:380px;">
     <div class="confirm-dialog">
-      <p>Delete <span class="highlight" id="delete-target-name"></span>?<br>This cannot be undone.</p>
+      <p id="delete-dialog-msg">Delete <span class="highlight" id="delete-target-name"></span>?<br>This cannot be undone.</p>
       <div class="confirm-actions">
         <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
         <button class="btn-danger" style="padding:0.45rem 1rem; font-size:0.85rem;" id="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
@@ -846,6 +935,38 @@ function sysCard(value, label) {
 }
 
 // -- Data Model --
+
+// Policies: granular supervision rules
+let POLICIES = [
+  {
+    name: 'tight-budget',
+    description: 'Strict token budget with termination on exceed',
+    token_budget: 5000,
+    on_budget_exceeded: 'terminate'
+  },
+  {
+    name: 'rate-limiter',
+    description: 'Limits iteration count and tool timeout',
+    max_iterations: 5,
+    tool_timeout: 15,
+    on_timeout: 'terminate'
+  },
+  {
+    name: 'generous-limits',
+    description: 'Relaxed limits for long-running tasks',
+    max_iterations: 20,
+    tool_timeout: 60,
+    token_budget: 50000,
+    on_timeout: 'warn',
+    on_budget_exceeded: 'warn'
+  },
+  {
+    name: 'confirmation-required',
+    description: 'Requires user confirmation for destructive operations',
+    require_confirm: ['delete_file', 'write_file', 'send_email']
+  }
+];
+
 // Skills: capabilities with tools
 let SKILLS = [
   {
@@ -875,7 +996,7 @@ let SKILLS = [
   }
 ];
 
-// Agents: supervised entities that use skills
+// Agents: supervised entities that use skills and have policies
 let AGENTS = [
   {
     name: 'web-researcher',
@@ -884,11 +1005,7 @@ let AGENTS = [
     assignedSkills: ['web-search'],
     allowUnassignedSkills: false,
     status: 'running',
-    supervision: {
-      max_iterations: 5, tool_timeout: 15, token_budget: 10000,
-      on_timeout: 'terminate', on_budget_exceeded: 'terminate',
-      require_confirm: []
-    }
+    assignedPolicies: ['rate-limiter', 'tight-budget']
   },
   {
     name: 'file-manager',
@@ -897,11 +1014,7 @@ let AGENTS = [
     assignedSkills: ['file-ops'],
     allowUnassignedSkills: false,
     status: 'running',
-    supervision: {
-      max_iterations: 10, tool_timeout: 30, token_budget: 20000,
-      on_timeout: 'warn', on_budget_exceeded: 'warn',
-      require_confirm: ['delete_file', 'write_file']
-    }
+    assignedPolicies: ['generous-limits', 'confirmation-required']
   },
   {
     name: 'code-reviewer',
@@ -910,11 +1023,7 @@ let AGENTS = [
     assignedSkills: ['code-review', 'web-search'],
     allowUnassignedSkills: true,
     status: 'paused',
-    supervision: {
-      max_iterations: 3, tool_timeout: 20, token_budget: 15000,
-      on_timeout: 'terminate', on_budget_exceeded: 'terminate',
-      require_confirm: ['post_comment']
-    }
+    assignedPolicies: ['rate-limiter']
   }
 ];
 
@@ -939,7 +1048,6 @@ const DEMO_COSTS = {
 };
 
 // -- Chat data model --
-// chatHistory: { agentName: [ { role: 'user'|'agent', content: string, toolCalls?: [{ name, params }] } ] }
 let chatHistory = {
   'web-researcher': [
     { role: 'user', content: 'What are the latest developments in quantum computing?' },
@@ -952,7 +1060,6 @@ let chatHistory = {
   ]
 };
 
-// Current open chat agent name
 let chatOpenAgent = null;
 
 // -- Simulated agent response templates --
@@ -982,6 +1089,41 @@ const agentResponseTemplates = [
     content: 'Here are the most recent findings on this topic. The data suggests several important trends.'
   }
 ];
+
+// -- Effective policy helper --
+function getEffectivePolicy(agent) {
+  const defaults = {
+    max_iterations: 5,
+    tool_timeout: 30,
+    token_budget: null,
+    on_timeout: 'terminate',
+    on_budget_exceeded: 'warn',
+    require_confirm: []
+  };
+  const policyNames = agent.assignedPolicies || [];
+  policyNames.forEach(function(pName) {
+    const policy = POLICIES.find(function(p) { return p.name === pName; });
+    if (!policy) return;
+    if (policy.max_iterations !== undefined) defaults.max_iterations = policy.max_iterations;
+    if (policy.tool_timeout !== undefined) defaults.tool_timeout = policy.tool_timeout;
+    if (policy.token_budget !== undefined) defaults.token_budget = policy.token_budget;
+    if (policy.on_timeout !== undefined) defaults.on_timeout = policy.on_timeout;
+    if (policy.on_budget_exceeded !== undefined) defaults.on_budget_exceeded = policy.on_budget_exceeded;
+    if (policy.require_confirm !== undefined) {
+      // Concatenate arrays
+      defaults.require_confirm = defaults.require_confirm.concat(policy.require_confirm);
+    }
+  });
+  // Deduplicate require_confirm
+  defaults.require_confirm = Array.from(new Set(defaults.require_confirm));
+  return defaults;
+}
+
+// Compute effective policy from a list of policy names (for preview in modal)
+function getEffectivePolicyFromNames(policyNames) {
+  var fakeAgent = { assignedPolicies: policyNames };
+  return getEffectivePolicy(fakeAgent);
+}
 
 // -- Get tools available to an agent --
 function getAgentTools(agent) {
@@ -1013,7 +1155,6 @@ function setAgentStatus(idx, newStatus) {
   if (idx >= 0 && idx < AGENTS.length) {
     AGENTS[idx].status = newStatus;
     renderAll();
-    // Update chat panel if it is open for this agent
     if (chatOpenAgent === AGENTS[idx].name) {
       renderChatPanel();
     }
@@ -1076,25 +1217,47 @@ function renderToolDetail(tool) {
   return html;
 }
 
-function renderSupervision(s) {
-  if (!s) return '';
-  let html = '<div class="supervision-box"><div class="label"><span class="dot dot-green"></span> Clawboss Active</div>';
-  html += '<div class="detail-row"><span class="detail-label">Max iterations</span><span class="detail-value">' + s.max_iterations + '</span></div>';
-  html += '<div class="detail-row"><span class="detail-label">Tool timeout</span><span class="detail-value">' + s.tool_timeout + 's</span></div>';
-  if (s.token_budget) html += '<div class="detail-row"><span class="detail-label">Token budget</span><span class="detail-value">' + s.token_budget.toLocaleString() + ' tokens</span></div>';
-  html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(s.on_timeout) + '</span></div>';
-  if (s.on_budget_exceeded) html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(s.on_budget_exceeded) + '</span></div>';
-  if (s.require_confirm && s.require_confirm.length) {
-    html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red)">' + s.require_confirm.map(esc).join(', ') + '</span></div>';
+function renderEffectivePolicyHtml(ep) {
+  let html = '';
+  html += '<div class="detail-row"><span class="detail-label">Max iterations</span><span class="detail-value">' + ep.max_iterations + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Tool timeout</span><span class="detail-value">' + ep.tool_timeout + 's</span></div>';
+  if (ep.token_budget) html += '<div class="detail-row"><span class="detail-label">Token budget</span><span class="detail-value">' + ep.token_budget.toLocaleString() + ' tokens</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(ep.on_timeout) + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(ep.on_budget_exceeded) + '</span></div>';
+  if (ep.require_confirm && ep.require_confirm.length) {
+    html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red)">' + ep.require_confirm.map(esc).join(', ') + '</span></div>';
   }
+  return html;
+}
+
+function renderSupervision(agent) {
+  const policyNames = agent.assignedPolicies || [];
+  if (policyNames.length === 0) return '';
+  const ep = getEffectivePolicy(agent);
+
+  let html = '<div class="supervision-box"><div class="label"><span class="dot dot-green"></span> Clawboss Active &mdash; ' + policyNames.map(esc).join(', ') + '</div>';
+  html += renderEffectivePolicyHtml(ep);
   html += '</div>';
   return html;
+}
+
+// -- Policy summary (brief text for checklist) --
+function policyFieldSummary(policy) {
+  var parts = [];
+  if (policy.max_iterations !== undefined) parts.push('max_iter:' + policy.max_iterations);
+  if (policy.tool_timeout !== undefined) parts.push('timeout:' + policy.tool_timeout + 's');
+  if (policy.token_budget !== undefined) parts.push('budget:' + policy.token_budget);
+  if (policy.on_timeout !== undefined) parts.push('on_timeout:' + policy.on_timeout);
+  if (policy.on_budget_exceeded !== undefined) parts.push('on_budget:' + policy.on_budget_exceeded);
+  if (policy.require_confirm !== undefined && policy.require_confirm.length) parts.push('confirm:' + policy.require_confirm.join(','));
+  return parts.join(' | ');
 }
 
 // -- Agent card --
 function renderAgentCard(agent, showActions) {
   const tools = getAgentTools(agent);
   const skillCount = (agent.assignedSkills || []).length;
+  const policyCount = (agent.assignedPolicies || []).length;
   const idx = AGENTS.indexOf(agent);
   const st = agent.status || 'stopped';
 
@@ -1108,6 +1271,7 @@ function renderAgentCard(agent, showActions) {
   html += '<span class="badge ' + statusBadgeClass(st) + '">' + esc(st) + '</span> ';
   html += '<span class="badge badge-blue">supervised</span> ';
   html += '<span class="badge badge-green">' + skillCount + ' skill' + (skillCount !== 1 ? 's' : '') + '</span>';
+  if (policyCount > 0) html += ' <span class="badge badge-orange">' + policyCount + ' polic' + (policyCount !== 1 ? 'ies' : 'y') + '</span>';
   if (agent.allowUnassignedSkills) html += ' <span class="badge badge-yellow">open</span>';
   html += ' ' + renderStatusControls(idx);
   html += '</div>';
@@ -1121,6 +1285,11 @@ function renderAgentCard(agent, showActions) {
     html += renderTags(agent.assignedSkills, 'tag-skill');
   }
 
+  // Show assigned policies
+  if (agent.assignedPolicies && agent.assignedPolicies.length) {
+    html += renderTags(agent.assignedPolicies, 'tag-policy');
+  }
+
   // Show tools
   if (tools.length > 0) {
     html += '<div class="collapsible-header" onclick="toggleCollapsible(this)"><span class="arrow">&#9654;</span> ' + tools.length + ' tool' + (tools.length !== 1 ? 's' : '') + ' available</div>';
@@ -1129,9 +1298,9 @@ function renderAgentCard(agent, showActions) {
     html += '</div>';
   }
 
-  html += renderSupervision(agent.supervision);
+  html += renderSupervision(agent);
 
-  // Card actions - always show Chat button; conditionally show edit/export/delete
+  // Card actions
   html += '<div class="card-actions">';
   html += '<button class="btn-secondary" onclick="openChatPanel(\'' + esc(agent.name) + '\')">Chat</button>';
   if (showActions) {
@@ -1160,7 +1329,6 @@ function renderSkillCard(skill, showActions) {
 
   html += '<div class="card-desc">' + esc(skill.description) + '</div>';
 
-  // Show which agents use this skill
   if (usedBy.length) {
     html += '<div style="font-size:0.75rem; color:var(--muted); margin-bottom:0.4rem;">Used by: ' + usedBy.map(a => '<strong>' + esc(a.name) + '</strong>').join(', ') + '</div>';
   }
@@ -1184,6 +1352,44 @@ function renderSkillCard(skill, showActions) {
   return html;
 }
 
+// -- Policy card --
+function renderPolicyCard(policy, showActions) {
+  const idx = POLICIES.indexOf(policy);
+  const usedBy = AGENTS.filter(a => a.assignedPolicies && a.assignedPolicies.includes(policy.name));
+
+  let html = '<div class="card">';
+  html += '<div class="card-header"><span class="card-title" style="color:var(--orange);">' + esc(policy.name) + '</span>';
+  html += '<span>';
+  if (usedBy.length) html += '<span class="badge badge-blue">' + usedBy.length + ' agent' + (usedBy.length !== 1 ? 's' : '') + '</span> ';
+  html += '</span></div>';
+
+  html += '<div class="card-desc">' + esc(policy.description) + '</div>';
+
+  // Show only the fields this policy defines
+  var hasFields = false;
+  if (policy.max_iterations !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">Max iterations</span><span class="detail-value">' + policy.max_iterations + '</span></div>'; }
+  if (policy.tool_timeout !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">Tool timeout</span><span class="detail-value">' + policy.tool_timeout + 's</span></div>'; }
+  if (policy.token_budget !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">Token budget</span><span class="detail-value">' + policy.token_budget.toLocaleString() + '</span></div>'; }
+  if (policy.on_timeout !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(policy.on_timeout) + '</span></div>'; }
+  if (policy.on_budget_exceeded !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(policy.on_budget_exceeded) + '</span></div>'; }
+  if (policy.require_confirm !== undefined && policy.require_confirm.length) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red);">' + policy.require_confirm.map(esc).join(', ') + '</span></div>'; }
+
+  if (usedBy.length) {
+    html += '<div style="font-size:0.75rem; color:var(--muted); margin-top:0.4rem;">Used by: ' + usedBy.map(a => '<strong>' + esc(a.name) + '</strong>').join(', ') + '</div>';
+  }
+
+  if (showActions) {
+    html += '<div class="card-actions">';
+    html += '<button class="btn-secondary" onclick="editPolicy(' + idx + ')">Edit</button>';
+    html += '<button class="btn-secondary" onclick="exportPolicy(' + idx + ')">Export JSON</button>';
+    html += '<button class="btn-danger" onclick="requestDeletePolicy(' + idx + ')">Delete</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 // -- Render sections --
 function renderOverview() {
   const totalTools = SKILLS.reduce((n, s) => n + (s.tools ? s.tools.length : 0), 0);
@@ -1195,6 +1401,7 @@ function renderOverview() {
     sysCard('$' + DEMO_COSTS.total_cost_usd.toFixed(2), 'This Month') +
     sysCard(AGENTS.length, 'Agents') +
     sysCard(SKILLS.length, 'Skills') +
+    sysCard(POLICIES.length, 'Policies') +
     sysCard(totalTools, 'Tools') +
     sysCard(DEMO_COSTS.total_calls, 'API Calls') +
     sysCard(DEMO_COSTS.total_tokens.toLocaleString(), 'Tokens') +
@@ -1266,36 +1473,18 @@ function renderCosts() {
 }
 
 function renderPolicies() {
-  let html = '';
-  AGENTS.forEach(a => {
-    if (!a.supervision) return;
-    const sv = a.supervision;
-    html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(a.name) + ' &mdash; max ' + sv.max_iterations + ' iterations</span><span class="perm-status">' + sv.tool_timeout + 's timeout</span></div>';
-    if (sv.token_budget) {
-      html += '<div class="perm-item"><span class="dot dot-green"></span><span class="perm-label">' + esc(a.name) + ' &mdash; token budget</span><span class="perm-status">' + sv.token_budget.toLocaleString() + '</span></div>';
-    }
-    if (a.allowUnassignedSkills) {
-      html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(a.name) + '</span><span class="perm-status" style="color:var(--yellow)">Open skills</span></div>';
-    }
-    if (sv.require_confirm && sv.require_confirm.length) {
-      sv.require_confirm.forEach(tool => {
-        html += '<div class="perm-item"><span class="dot dot-yellow"></span><span class="perm-label">' + esc(a.name) + ' &rarr; ' + esc(tool) + '</span><span class="perm-status">Requires confirm</span></div>';
-      });
-    }
-  });
-  document.getElementById('policy-grid').innerHTML = html;
+  document.getElementById('policy-grid').innerHTML =
+    POLICIES.map(p => renderPolicyCard(p, true)).join('');
 }
 
 // -- Chat Panel --
 function openChatPanel(agentName) {
   chatOpenAgent = agentName;
-  // Initialize chat history for this agent if not present
   if (!chatHistory[agentName]) {
     chatHistory[agentName] = [];
   }
   renderChatPanel();
   document.getElementById('chat-panel').classList.add('open');
-  // Focus input
   setTimeout(() => {
     document.getElementById('chat-input').focus();
   }, 300);
@@ -1313,12 +1502,10 @@ function renderChatPanel() {
 
   const st = agent.status || 'stopped';
 
-  // Header
   document.getElementById('chat-panel-agent-name').textContent = agent.name;
   const dotEl = document.getElementById('chat-panel-status-dot');
   dotEl.className = 'dot ' + statusDotClass(st);
 
-  // Banner
   const bannerArea = document.getElementById('chat-panel-banner-area');
   const agentIdx = AGENTS.indexOf(agent);
   if (st === 'paused') {
@@ -1335,13 +1522,11 @@ function renderChatPanel() {
     bannerArea.innerHTML = '';
   }
 
-  // Messages
   const msgs = chatHistory[chatOpenAgent] || [];
   const msgContainer = document.getElementById('chat-messages');
   let html = '';
   msgs.forEach(msg => {
     if (msg.toolCalls && msg.toolCalls.length && !msg.content) {
-      // Pure tool call message
       html += '<div class="chat-msg agent">';
       html += '<div class="msg-role">agent</div>';
       msg.toolCalls.forEach(tc => {
@@ -1351,7 +1536,6 @@ function renderChatPanel() {
       });
       html += '</div>';
     } else if (msg.toolCalls && msg.toolCalls.length && msg.content) {
-      // Tool call + text
       html += '<div class="chat-msg agent">';
       html += '<div class="msg-role">agent</div>';
       msg.toolCalls.forEach(tc => {
@@ -1374,7 +1558,6 @@ function renderChatPanel() {
     }
   });
   msgContainer.innerHTML = html;
-  // Scroll to bottom
   msgContainer.scrollTop = msgContainer.scrollHeight;
 }
 
@@ -1384,20 +1567,15 @@ function sendChatMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  // Initialize if needed
   if (!chatHistory[chatOpenAgent]) chatHistory[chatOpenAgent] = [];
 
-  // Add user message
   chatHistory[chatOpenAgent].push({ role: 'user', content: text });
   input.value = '';
   renderChatPanel();
 
-  // Simulate agent response after 800ms
   setTimeout(() => {
     if (!chatOpenAgent) return;
     const tmpl = agentResponseTemplates[Math.floor(Math.random() * agentResponseTemplates.length)];
-
-    // First, send tool call message if there are tool calls
     if (tmpl.toolCalls && tmpl.toolCalls.length) {
       const toolCalls = tmpl.toolCalls.map(tc => ({
         name: tc.name,
@@ -1411,7 +1589,6 @@ function sendChatMessage() {
       renderChatPanel();
     }
 
-    // Then send text response after another short delay
     setTimeout(() => {
       if (!chatOpenAgent) return;
       chatHistory[chatOpenAgent].push({
@@ -1450,11 +1627,7 @@ document.getElementById('btn-create-agent-nl').addEventListener('click', () => {
       assignedSkills: [],
       allowUnassignedSkills: false,
       status: 'stopped',
-      supervision: {
-        max_iterations: 5, tool_timeout: 15, token_budget: 10000,
-        on_timeout: 'terminate', on_budget_exceeded: 'warn',
-        require_confirm: []
-      }
+      assignedPolicies: ['rate-limiter']
     });
     status.className = 'builder-status success';
     status.textContent = 'Created: ' + (name || 'custom-agent');
@@ -1503,27 +1676,18 @@ function openAgentModal(index) {
   document.getElementById('agent-desc').value = isEdit ? agent.description : '';
   document.getElementById('agent-triggers').value = isEdit && agent.triggers ? agent.triggers.join(', ') : '';
 
-  // Supervision
-  const sv = isEdit && agent.supervision ? agent.supervision : {};
-  document.getElementById('sv-max-iter').value = sv.max_iterations || 5;
-  document.getElementById('sv-timeout').value = sv.tool_timeout || 15;
-  document.getElementById('sv-token-budget').value = sv.token_budget || 10000;
-  document.getElementById('sv-on-timeout').value = sv.on_timeout || 'terminate';
-  document.getElementById('sv-on-budget').value = sv.on_budget_exceeded || 'terminate';
-  document.getElementById('sv-require-confirm').value = sv.require_confirm ? sv.require_confirm.join(', ') : '';
-
   // Allow unassigned toggle
   allowUnassignedOn = isEdit ? !!agent.allowUnassignedSkills : false;
   updateAllowUnassignedToggle();
 
   // Skill checklist
-  const assigned = isEdit ? (agent.assignedSkills || []) : [];
-  const checklist = document.getElementById('agent-skill-checklist');
+  const assignedSkills = isEdit ? (agent.assignedSkills || []) : [];
+  const skillChecklist = document.getElementById('agent-skill-checklist');
   if (SKILLS.length === 0) {
-    checklist.innerHTML = '<div class="no-skills-msg">No skills created yet. Create skills first in the Skills tab.</div>';
+    skillChecklist.innerHTML = '<div class="no-skills-msg">No skills created yet. Create skills first in the Skills tab.</div>';
   } else {
-    checklist.innerHTML = SKILLS.map(s => {
-      const checked = assigned.includes(s.name) ? ' checked' : '';
+    skillChecklist.innerHTML = SKILLS.map(s => {
+      const checked = assignedSkills.includes(s.name) ? ' checked' : '';
       const toolCount = s.tools ? s.tools.length : 0;
       return '<label class="skill-check-item"><input type="checkbox" value="' + esc(s.name) + '"' + checked + '>' +
         '<span class="skill-check-name">' + esc(s.name) + '</span>' +
@@ -1531,7 +1695,39 @@ function openAgentModal(index) {
     }).join('');
   }
 
+  // Policy checklist
+  const assignedPolicies = isEdit ? (agent.assignedPolicies || []) : ['rate-limiter'];
+  const policyChecklist = document.getElementById('agent-policy-checklist');
+  if (POLICIES.length === 0) {
+    policyChecklist.innerHTML = '<div class="no-policies-msg">No policies created yet. Create policies first in the Policies tab.</div>';
+  } else {
+    policyChecklist.innerHTML = POLICIES.map(p => {
+      const checked = assignedPolicies.includes(p.name) ? ' checked' : '';
+      const summary = policyFieldSummary(p);
+      return '<label class="policy-check-item"><input type="checkbox" value="' + esc(p.name) + '"' + checked + ' onchange="updateAgentEffectivePolicyPreview()">' +
+        '<span class="policy-check-name">' + esc(p.name) + '</span>' +
+        '<span class="policy-check-desc">' + esc(summary) + '</span></label>';
+    }).join('');
+  }
+
+  // Effective policy preview
+  updateAgentEffectivePolicyPreview();
+
   document.getElementById('agent-modal').classList.add('open');
+}
+
+function updateAgentEffectivePolicyPreview() {
+  var selected = [];
+  document.querySelectorAll('#agent-policy-checklist input[type="checkbox"]:checked').forEach(function(cb) {
+    selected.push(cb.value);
+  });
+  var ep = getEffectivePolicyFromNames(selected);
+  var contentEl = document.getElementById('agent-effective-policy-content');
+  if (selected.length === 0) {
+    contentEl.innerHTML = '<div style="font-size:0.78rem; color:var(--muted); padding:0.2rem 0;">No policies selected. Defaults will apply.</div>';
+  } else {
+    contentEl.innerHTML = renderEffectivePolicyHtml(ep);
+  }
 }
 
 function closeAgentModal() {
@@ -1564,21 +1760,16 @@ function saveAgent() {
     assignedSkills.push(cb.value);
   });
 
-  const requireConfirm = document.getElementById('sv-require-confirm').value
-    .split(',').map(s => s.trim()).filter(Boolean);
+  const assignedPolicies = [];
+  document.querySelectorAll('#agent-policy-checklist input[type="checkbox"]:checked').forEach(cb => {
+    assignedPolicies.push(cb.value);
+  });
 
   const data = {
     name, description: desc, triggers, assignedSkills,
     allowUnassignedSkills: allowUnassignedOn,
     status: editingAgentIdx >= 0 ? (AGENTS[editingAgentIdx].status || 'stopped') : 'stopped',
-    supervision: {
-      max_iterations: parseInt(document.getElementById('sv-max-iter').value) || 5,
-      tool_timeout: parseInt(document.getElementById('sv-timeout').value) || 15,
-      token_budget: parseInt(document.getElementById('sv-token-budget').value) || 10000,
-      on_timeout: document.getElementById('sv-on-timeout').value,
-      on_budget_exceeded: document.getElementById('sv-on-budget').value,
-      require_confirm: requireConfirm
-    }
+    assignedPolicies: assignedPolicies
   };
 
   if (editingAgentIdx >= 0) {
@@ -1695,7 +1886,6 @@ function saveSkill() {
 
   if (editingSkillIdx >= 0) {
     SKILLS[editingSkillIdx] = data;
-    // Update agent references if skill was renamed
     if (oldName && oldName !== name) {
       AGENTS.forEach(a => {
         if (a.assignedSkills) {
@@ -1714,14 +1904,148 @@ function saveSkill() {
 
 function editSkill(index) { openSkillModal(index); }
 
+// -- Policy Modal --
+let editingPolicyIdx = -1;
+
+// Wire up policy field toggles (enable/disable inputs when checkbox toggled)
+var policyFieldIds = ['max-iter', 'timeout', 'token-budget', 'on-timeout', 'on-budget', 'require-confirm'];
+policyFieldIds.forEach(function(fid) {
+  var cb = document.getElementById('pf-' + fid + '-on');
+  var input = document.getElementById('pf-' + fid);
+  if (cb && input) {
+    cb.addEventListener('change', function() {
+      input.disabled = !cb.checked;
+    });
+  }
+});
+
+function openPolicyModal(index) {
+  editingPolicyIdx = typeof index === 'number' ? index : -1;
+  var isEdit = editingPolicyIdx >= 0;
+  var policy = isEdit ? POLICIES[editingPolicyIdx] : null;
+
+  document.getElementById('policy-modal-title').textContent = isEdit ? 'Edit Policy' : 'New Policy';
+  document.getElementById('btn-save-policy').textContent = isEdit ? 'Save Changes' : 'Create Policy';
+
+  document.getElementById('policy-name').value = isEdit ? policy.name : '';
+  document.getElementById('policy-desc').value = isEdit ? (policy.description || '') : '';
+
+  // Reset all field checkboxes and inputs
+  policyFieldIds.forEach(function(fid) {
+    var cb = document.getElementById('pf-' + fid + '-on');
+    var input = document.getElementById('pf-' + fid);
+    if (cb) cb.checked = false;
+    if (input) { input.disabled = true; }
+  });
+
+  // Set defaults
+  document.getElementById('pf-max-iter').value = 5;
+  document.getElementById('pf-timeout').value = 15;
+  document.getElementById('pf-token-budget').value = 10000;
+  document.getElementById('pf-on-timeout').value = 'terminate';
+  document.getElementById('pf-on-budget').value = 'terminate';
+  document.getElementById('pf-require-confirm').value = '';
+
+  if (isEdit && policy) {
+    if (policy.max_iterations !== undefined) {
+      document.getElementById('pf-max-iter-on').checked = true;
+      document.getElementById('pf-max-iter').disabled = false;
+      document.getElementById('pf-max-iter').value = policy.max_iterations;
+    }
+    if (policy.tool_timeout !== undefined) {
+      document.getElementById('pf-timeout-on').checked = true;
+      document.getElementById('pf-timeout').disabled = false;
+      document.getElementById('pf-timeout').value = policy.tool_timeout;
+    }
+    if (policy.token_budget !== undefined) {
+      document.getElementById('pf-token-budget-on').checked = true;
+      document.getElementById('pf-token-budget').disabled = false;
+      document.getElementById('pf-token-budget').value = policy.token_budget;
+    }
+    if (policy.on_timeout !== undefined) {
+      document.getElementById('pf-on-timeout-on').checked = true;
+      document.getElementById('pf-on-timeout').disabled = false;
+      document.getElementById('pf-on-timeout').value = policy.on_timeout;
+    }
+    if (policy.on_budget_exceeded !== undefined) {
+      document.getElementById('pf-on-budget-on').checked = true;
+      document.getElementById('pf-on-budget').disabled = false;
+      document.getElementById('pf-on-budget').value = policy.on_budget_exceeded;
+    }
+    if (policy.require_confirm !== undefined && policy.require_confirm.length) {
+      document.getElementById('pf-require-confirm-on').checked = true;
+      document.getElementById('pf-require-confirm').disabled = false;
+      document.getElementById('pf-require-confirm').value = policy.require_confirm.join(', ');
+    }
+  }
+
+  document.getElementById('policy-modal').classList.add('open');
+}
+
+function closePolicyModal() {
+  document.getElementById('policy-modal').classList.remove('open');
+  editingPolicyIdx = -1;
+}
+
+function savePolicy() {
+  var name = document.getElementById('policy-name').value.trim();
+  var desc = document.getElementById('policy-desc').value.trim();
+  if (!name) { alert('Policy name is required.'); return; }
+
+  var data = { name: name, description: desc };
+
+  if (document.getElementById('pf-max-iter-on').checked) {
+    data.max_iterations = parseInt(document.getElementById('pf-max-iter').value) || 5;
+  }
+  if (document.getElementById('pf-timeout-on').checked) {
+    data.tool_timeout = parseInt(document.getElementById('pf-timeout').value) || 15;
+  }
+  if (document.getElementById('pf-token-budget-on').checked) {
+    data.token_budget = parseInt(document.getElementById('pf-token-budget').value) || 10000;
+  }
+  if (document.getElementById('pf-on-timeout-on').checked) {
+    data.on_timeout = document.getElementById('pf-on-timeout').value;
+  }
+  if (document.getElementById('pf-on-budget-on').checked) {
+    data.on_budget_exceeded = document.getElementById('pf-on-budget').value;
+  }
+  if (document.getElementById('pf-require-confirm-on').checked) {
+    var val = document.getElementById('pf-require-confirm').value;
+    data.require_confirm = val.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  var oldName = editingPolicyIdx >= 0 ? POLICIES[editingPolicyIdx].name : null;
+
+  if (editingPolicyIdx >= 0) {
+    POLICIES[editingPolicyIdx] = data;
+    // Update agent references if policy was renamed
+    if (oldName && oldName !== name) {
+      AGENTS.forEach(function(a) {
+        if (a.assignedPolicies) {
+          var idx = a.assignedPolicies.indexOf(oldName);
+          if (idx >= 0) a.assignedPolicies[idx] = name;
+        }
+      });
+    }
+  } else {
+    POLICIES.push(data);
+  }
+
+  closePolicyModal();
+  renderAll();
+}
+
+function editPolicy(index) { openPolicyModal(index); }
+
 // -- Delete --
-let deleteType = null; // 'agent' or 'skill'
+let deleteType = null; // 'agent', 'skill', or 'policy'
 let deletingIndex = -1;
 
 function requestDeleteAgent(index) {
   deleteType = 'agent';
   deletingIndex = index;
   document.getElementById('delete-target-name').textContent = 'agent "' + AGENTS[index].name + '"';
+  document.getElementById('delete-dialog-msg').innerHTML = 'Delete <span class="highlight">' + esc('agent "' + AGENTS[index].name + '"') + '</span>?<br>This cannot be undone.';
   document.getElementById('delete-modal').classList.add('open');
 }
 
@@ -1729,6 +2053,20 @@ function requestDeleteSkill(index) {
   deleteType = 'skill';
   deletingIndex = index;
   document.getElementById('delete-target-name').textContent = 'skill "' + SKILLS[index].name + '"';
+  document.getElementById('delete-dialog-msg').innerHTML = 'Delete <span class="highlight">' + esc('skill "' + SKILLS[index].name + '"') + '</span>?<br>This cannot be undone.';
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function requestDeletePolicy(index) {
+  deleteType = 'policy';
+  deletingIndex = index;
+  var policyName = POLICIES[index].name;
+  var usedBy = AGENTS.filter(function(a) { return a.assignedPolicies && a.assignedPolicies.includes(policyName); });
+  var msg = 'Delete <span class="highlight">' + esc('policy "' + policyName + '"') + '</span>?<br>This cannot be undone.';
+  if (usedBy.length > 0) {
+    msg += '<br><br><span style="color:var(--yellow); font-size:0.82rem;">Warning: This policy is used by ' + usedBy.map(function(a) { return '<strong>' + esc(a.name) + '</strong>'; }).join(', ') + '. It will be removed from their assignments.</span>';
+  }
+  document.getElementById('delete-dialog-msg').innerHTML = msg;
   document.getElementById('delete-modal').classList.add('open');
 }
 
@@ -1742,17 +2080,23 @@ function confirmDelete() {
   if (deleteType === 'agent' && deletingIndex >= 0) {
     const agentName = AGENTS[deletingIndex].name;
     AGENTS.splice(deletingIndex, 1);
-    // Close chat panel if open for this agent
     if (chatOpenAgent === agentName) {
       closeChatPanel();
     }
   } else if (deleteType === 'skill' && deletingIndex >= 0) {
     const skillName = SKILLS[deletingIndex].name;
     SKILLS.splice(deletingIndex, 1);
-    // Remove from agent assignments
     AGENTS.forEach(a => {
       if (a.assignedSkills) {
         a.assignedSkills = a.assignedSkills.filter(s => s !== skillName);
+      }
+    });
+  } else if (deleteType === 'policy' && deletingIndex >= 0) {
+    const policyName = POLICIES[deletingIndex].name;
+    POLICIES.splice(deletingIndex, 1);
+    AGENTS.forEach(function(a) {
+      if (a.assignedPolicies) {
+        a.assignedPolicies = a.assignedPolicies.filter(function(p) { return p !== policyName; });
       }
     });
   }
@@ -1763,7 +2107,9 @@ function confirmDelete() {
 // -- Export --
 function exportAgent(index) {
   const agent = AGENTS[index];
-  const json = JSON.stringify(agent, null, 2);
+  var exportData = JSON.parse(JSON.stringify(agent));
+  exportData.effectivePolicy = getEffectivePolicy(agent);
+  const json = JSON.stringify(exportData, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1785,9 +2131,22 @@ function exportSkill(index) {
   URL.revokeObjectURL(url);
 }
 
+function exportPolicy(index) {
+  const policy = POLICIES[index];
+  const json = JSON.stringify(policy, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = policy.name + '.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // -- Close modals on overlay click --
 document.getElementById('agent-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAgentModal(); });
 document.getElementById('skill-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSkillModal(); });
+document.getElementById('policy-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closePolicyModal(); });
 document.getElementById('delete-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDeleteModal(); });
 
 // -- Hard-stop toggle --

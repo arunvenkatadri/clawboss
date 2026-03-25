@@ -1,7 +1,6 @@
 """Tests for clawboss.circuit_breaker — CircuitBreaker state machine."""
 
 import time
-from unittest.mock import patch
 
 import pytest
 

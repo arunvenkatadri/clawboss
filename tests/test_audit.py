@@ -1,10 +1,7 @@
 """Tests for clawboss.audit — AuditLog, AuditEntry, sinks."""
 
 import json
-import sys
 from io import StringIO
-
-import pytest
 
 from clawboss.audit import (
     AuditEntry,
@@ -15,7 +12,6 @@ from clawboss.audit import (
     JsonlAuditSink,
     MemoryAuditSink,
 )
-
 
 # ---------------------------------------------------------------------------
 # AuditEntry
@@ -265,9 +261,7 @@ class TestJsonlAuditSinkFile:
 class TestMemoryAuditSink:
     def test_entries_returns_copy(self):
         sink = MemoryAuditSink()
-        entry = AuditEntry(
-            timestamp="t", request_id="r", phase="p", outcome="o"
-        )
+        entry = AuditEntry(timestamp="t", request_id="r", phase="p", outcome="o")
         sink.write(entry)
         entries = sink.entries
         entries.clear()
@@ -277,9 +271,7 @@ class TestMemoryAuditSink:
     def test_len_reflects_entry_count(self):
         sink = MemoryAuditSink()
         assert len(sink) == 0
-        entry = AuditEntry(
-            timestamp="t", request_id="r", phase="p", outcome="o"
-        )
+        entry = AuditEntry(timestamp="t", request_id="r", phase="p", outcome="o")
         sink.write(entry)
         sink.write(entry)
         assert len(sink) == 2

@@ -1,7 +1,8 @@
 """Basic clawboss usage — supervise tool calls with timeouts and budgets."""
 
 import asyncio
-from clawboss import Supervisor, Policy
+
+from clawboss import Policy, Supervisor
 
 
 async def web_search(query: str) -> str:

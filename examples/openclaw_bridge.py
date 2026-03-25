@@ -23,7 +23,6 @@ import json
 
 from clawboss import (
     OpenClawBridge,
-    Policy,
     Skill,
     ToolDefinition,
     ToolParameter,
@@ -31,8 +30,8 @@ from clawboss import (
     to_openclaw_tool_schema,
 )
 
-
 # ── Tool implementations ──────────────────────────────────────────
+
 
 async def web_search(query: str, max_results: int = 5) -> str:
     """Simulate a web search."""
@@ -56,19 +55,22 @@ research_skill = Skill(
             name="web_search",
             description="Search the web for information",
             parameters=[
-                ToolParameter(name="query", type="string",
-                              description="Search query", required=True),
-                ToolParameter(name="max_results", type="integer",
-                              description="Maximum results to return",
-                              default=5),
+                ToolParameter(
+                    name="query", type="string", description="Search query", required=True
+                ),
+                ToolParameter(
+                    name="max_results",
+                    type="integer",
+                    description="Maximum results to return",
+                    default=5,
+                ),
             ],
         ),
         ToolDefinition(
             name="fetch_page",
             description="Fetch the content of a web page",
             parameters=[
-                ToolParameter(name="url", type="string",
-                              description="URL to fetch", required=True),
+                ToolParameter(name="url", type="string", description="URL to fetch", required=True),
             ],
         ),
     ],
@@ -96,10 +98,13 @@ async def main():
 
     # Start the bridge
     bridge = OpenClawBridge(port=9229)
-    bridge.register_skill(research_skill, {
-        "web_search": web_search,
-        "fetch_page": fetch_page,
-    })
+    bridge.register_skill(
+        research_skill,
+        {
+            "web_search": web_search,
+            "fetch_page": fetch_page,
+        },
+    )
 
     print("=== Bridge Running ===")
     print("http://127.0.0.1:9229")
