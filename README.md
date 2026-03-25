@@ -80,6 +80,8 @@ Open `dashboard.html` in a browser for a full management UI:
 
 Agents have a status (running/paused/stopped) controllable from the card controls. Skills are assigned to agents with a checkbox, and agents can optionally use unassigned skills via a toggle.
 
+<img width="1498" height="953" alt="Screenshot 2026-03-25 at 6 05 30 PM" src="https://github.com/user-attachments/assets/11a5047c-6328-43bc-a6cf-d56a9b0b45da" />
+
 ## What it does
 
 | Feature | What it prevents |
@@ -276,6 +278,8 @@ store.export_all_poml("./poml_output/")
 ```
 
 ### Skill format
+<img width="1509" height="944" alt="Screenshot 2026-03-25 at 6 06 28 PM" src="https://github.com/user-attachments/assets/e1e28e88-0ce5-41fb-b0a6-32d16dd59f86" />
+
 
 Skills are stored as JSON and can be exported to POML. The format includes:
 
