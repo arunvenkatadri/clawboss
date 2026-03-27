@@ -23,6 +23,7 @@ from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, Js
 from .budget import BudgetSnapshot, BudgetTracker
 from .builder import SkillBuilder
 from .circuit_breaker import CircuitBreaker, CircuitState
+from .context import AnchoredState, CompressedContext, CompressedHistory, ContextWindow, Turn
 from .errors import ClawbossError
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
 from .policy import Action, OnFailure, Policy
@@ -51,6 +52,11 @@ __all__ = [
     "ToolDefinition",
     "ToolParameter",
     "SkillBuilder",
+    "ContextWindow",
+    "CompressedContext",
+    "CompressedHistory",
+    "AnchoredState",
+    "Turn",
     "OpenClawBridge",
     "to_openclaw_tool_schema",
     "to_openclaw_manifest",

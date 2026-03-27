@@ -115,6 +115,10 @@ class Supervisor:
             )
             raise
 
+    def circuit_breaker_states(self) -> Dict[str, str]:
+        """Get current circuit breaker states for all tracked tools."""
+        return {name: cb.state.value for name, cb in self._circuit_breakers.items()}
+
     def _get_circuit_breaker(self, tool_name: str) -> CircuitBreaker:
         """Get or create a circuit breaker for a tool."""
         if tool_name not in self._circuit_breakers:

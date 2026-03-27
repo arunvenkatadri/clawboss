@@ -93,6 +93,42 @@ Agents have a status (running/paused/stopped) controllable from the card control
 | **Dead man's switch** | Agent going silent (no activity for N seconds) |
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
+| **Context compression** | Agent forgetting its instructions mid-conversation |
+
+## Context compression
+
+Long-running agents drift. They forget their original instructions, blow past constraints, and hallucinate prior context. Clawboss solves this with **supervision-anchored compression** — a novel approach that only works because you have a supervision layer.
+
+The key insight: supervised agents can compress more aggressively than unsupervised ones. Safety-critical state (policies, budgets, circuit breakers) is enforced by the supervisor, not by the LLM's memory. So you never need to keep that in context — it's reconstructed fresh every turn.
+
+```python
+from clawboss import Supervisor, Policy
+from clawboss.context import ContextWindow
+
+supervisor = Supervisor(Policy(max_iterations=10, token_budget=10000))
+ctx = ContextWindow(supervisor, max_recent_turns=10, skill_name="research")
+
+# Add turns as the conversation progresses
+ctx.add_turn("user", "Search for quantum computing breakthroughs")
+ctx.add_turn("assistant", "Searching...", tool_calls=[...])
+
+# Get the full context for your LLM prompt
+prompt = ctx.to_prompt()
+
+# When context gets long, compress older turns
+result = await ctx.compress()
+prompt = result.to_prompt()
+```
+
+The context has three zones:
+
+| Zone | What it contains | Fidelity |
+|------|-----------------|----------|
+| **Anchored state** | Budget, circuit breakers, policies, confirmed tools | Always fresh from supervisor |
+| **Compressed history** | Older turns summarized by tool calls and snippets | Lossy but safe |
+| **Recent turns** | Last N turns | Full fidelity |
+
+The anchored state is never compressed — it's rebuilt from the supervisor's live state every turn. Even if the LLM "forgets" its budget limit, the supervisor still enforces it. Bring your own LLM summarizer for richer compression, or use the built-in audit-based extraction.
 
 ## OpenClaw integration
 
