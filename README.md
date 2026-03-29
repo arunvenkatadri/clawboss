@@ -26,13 +26,13 @@ Clawboss is the guardrail layer between your agent and its tools. Every tool cal
 
 ```mermaid
 flowchart TB
-    Agent["🤖 Agent"] --> Clawboss
-    subgraph Clawboss[" "]
+    Agent["🤖 Your Agent"] --> Clawboss
+    subgraph Clawboss["Clawboss Supervision Layer"]
         direction LR
-        S["Scopes"] ~~~ B["Budget"] ~~~ C["Circuit\nBreaker"] ~~~ R["Rate\nLimit"] ~~~ G["Confirm\nGate"] ~~~ T["Timeout"]
+        S["🔒 Scopes\nValidate args"] ~~~ B["💰 Budget\nToken limits"] ~~~ C["⚡ Circuit Breaker\nStop failures"] ~~~ R["🕐 Rate Limit\nCalls/minute"] ~~~ G["✋ Confirm Gate\nHuman approval"] ~~~ T["⏱️ Timeout\nKill hung calls"]
     end
-    Clawboss --> Tools["🔧 Tools"]
-    Clawboss -.-> Audit["📋 Audit"]
+    Clawboss --> Tools["🔧 Your Tools — APIs, files, email, search"]
+    Clawboss -.-> Audit["📋 Audit Log — every decision recorded"]
 ```
 
 ### No arbitrary code downloads
