@@ -26,7 +26,7 @@ from .circuit_breaker import CircuitBreaker, CircuitState
 from .context import AnchoredState, CompressedContext, CompressedHistory, ContextWindow, Turn
 from .errors import ClawbossError
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
-from .policy import Action, OnFailure, Policy
+from .policy import Action, OnFailure, Policy, ScopeRule, ToolScope
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
 from .supervisor import SupervisedResult, Supervisor
 
@@ -34,6 +34,8 @@ __all__ = [
     "Policy",
     "OnFailure",
     "Action",
+    "ScopeRule",
+    "ToolScope",
     "Supervisor",
     "SupervisedResult",
     "BudgetTracker",

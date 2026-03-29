@@ -94,6 +94,44 @@ Agents have a status (running/paused/stopped) controllable from the card control
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
 | **Context compression** | Agent forgetting its instructions mid-conversation |
+| **Tool scoping** | Agents calling tools with dangerous arguments |
+
+## Tool scoping
+
+Scopes are policies that validate tool arguments before execution. Instead of just "can this agent call write_file?" you control "can this agent call write_file *with this path*?"
+
+```python
+policy = Policy.from_dict({
+    "tool_scopes": [
+        {
+            "tool_name": "write_file",
+            "rules": [
+                {"param": "path", "constraint": "allow", "values": ["/tmp/*", "/home/user/output/*"]},
+            ],
+        },
+        {
+            "tool_name": "send_email",
+            "rules": [
+                {"param": "recipient", "constraint": "allow", "values": ["*@mycompany.com"]},
+            ],
+        },
+        {
+            "tool_name": "web_search",
+            "rules": [
+                {"param": "query", "constraint": "block", "values": ["internal", "confidential"]},
+            ],
+            "max_calls_per_minute": 10,
+        },
+    ],
+})
+```
+
+Scopes are just another type of policy. Assign them to agents the same way — a scope-only policy has zero supervision fields and one or more tool scope rules. Stack them with budget and rate-limit policies on the same agent.
+
+Constraint types:
+- **allow** — parameter must match at least one pattern (glob with `*` and `?`)
+- **block** — parameter must NOT match any pattern
+- **match** — parameter must match at least one regex
 
 ## Context compression
 
@@ -369,6 +407,18 @@ Dataclass with all configuration. Every field has a sensible default.
 - `delete(name)` — delete a skill
 - `export_poml(name)` — export a skill as POML text
 - `export_all_poml(output_dir)` — export all skills as `.poml` files
+
+### `ToolScope`
+
+- `tool_name` — name of the tool this scope applies to
+- `rules` — list of `ScopeRule` objects
+- `max_calls_per_minute` — optional rate limit for this specific tool
+
+### `ScopeRule`
+
+- `param` — parameter name to constrain
+- `constraint` — `"allow"`, `"block"`, or `"match"`
+- `values` — list of patterns or regexes to check against
 
 ### `Skill`
 

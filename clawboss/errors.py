@@ -62,3 +62,21 @@ class ClawbossError(Exception):
     @staticmethod
     def policy_denied(reason: str) -> "ClawbossError":
         return ClawbossError("policy_denied", f"Policy denied: {reason}", reason=reason)
+
+    @staticmethod
+    def scope_denied(tool: str, detail: str) -> "ClawbossError":
+        return ClawbossError(
+            "scope_denied",
+            f"Scope violation for '{tool}': {detail}",
+            tool=tool,
+            detail=detail,
+        )
+
+    @staticmethod
+    def rate_limited(tool: str, limit: int) -> "ClawbossError":
+        return ClawbossError(
+            "rate_limited",
+            f"Rate limit exceeded for '{tool}': max {limit} calls/minute",
+            tool=tool,
+            limit=limit,
+        )

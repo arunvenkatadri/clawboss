@@ -421,6 +421,42 @@
     }
     .btn-add-tool:hover { border-color: var(--accent); color: var(--accent); }
 
+    /* -- Scope editor -- */
+    .scopes-editor { margin-top: 0.25rem; }
+    .scope-entry {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+    }
+    .scope-entry-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .scope-entry-header input { flex: 1; }
+    .scope-rule-entry {
+      display: flex; gap: 0.35rem; align-items: center;
+      margin-top: 0.3rem; padding-left: 0.5rem;
+    }
+    .scope-rule-entry input { flex: 1; min-width: 0; }
+    .scope-rule-entry select { width: 90px; }
+    .scope-max-calls {
+      display: flex; gap: 0.35rem; align-items: center;
+      margin-top: 0.4rem; padding-left: 0.5rem; font-size: 0.78rem;
+    }
+    .scope-max-calls label { color: var(--muted); white-space: nowrap; }
+    .scope-max-calls input { width: 80px; }
+    .btn-add-scope {
+      padding: 0.35rem 0.65rem; border-radius: 6px;
+      border: 1px dashed var(--border); background: transparent;
+      color: var(--muted); font-size: 0.8rem; cursor: pointer;
+      width: 100%; margin-top: 0.25rem;
+    }
+    .btn-add-scope:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-add-rule {
+      background: none; border: none; color: var(--accent); cursor: pointer;
+      font-size: 0.75rem; padding: 0.2rem 0; margin-top: 0.2rem;
+    }
+    .btn-add-rule:hover { text-decoration: underline; }
+
     /* -- Modal footer -- */
     .modal-footer {
       display: flex; gap: 0.5rem; justify-content: flex-end;
@@ -886,6 +922,14 @@
       <div class="form-hint">Only checked fields will be saved to this policy</div>
     </div>
 
+    <!-- Tool Scopes -->
+    <div class="form-group">
+      <label class="form-label">Tool Scopes</label>
+      <div class="scopes-editor" id="policy-scopes-editor"></div>
+      <button class="btn-add-scope" onclick="addScopeEntry()">+ Add Scope</button>
+      <div class="form-hint">Define argument-level constraints for specific tools</div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closePolicyModal()">Cancel</button>
       <button class="btn-primary" id="btn-save-policy" onclick="savePolicy()">Create Policy</button>
@@ -964,6 +1008,42 @@ let POLICIES = [
     name: 'confirmation-required',
     description: 'Requires user confirmation for destructive operations',
     require_confirm: ['delete_file', 'write_file', 'send_email']
+  },
+  {
+    name: 'sandbox-files',
+    description: 'Restricts file writes and deletes to safe directories only',
+    tool_scopes: [
+      {
+        tool_name: 'write_file',
+        rules: [
+          { param: 'path', constraint: 'allow', values: ['/tmp/*', '/home/user/output/*'] }
+        ]
+      },
+      {
+        tool_name: 'delete_file',
+        rules: [
+          { param: 'path', constraint: 'allow', values: ['/tmp/*', '/home/user/output/*'] }
+        ]
+      }
+    ]
+  },
+  {
+    name: 'safe-outbound',
+    description: 'Restricts outbound email recipients and blocks sensitive search terms',
+    tool_scopes: [
+      {
+        tool_name: 'send_email',
+        rules: [
+          { param: 'recipient', constraint: 'allow', values: ['*@mycompany.com'] }
+        ]
+      },
+      {
+        tool_name: 'web_search',
+        rules: [
+          { param: 'query', constraint: 'block', values: ['internal', 'confidential'] }
+        ]
+      }
+    ]
   }
 ];
 
@@ -1098,7 +1178,8 @@ function getEffectivePolicy(agent) {
     token_budget: null,
     on_timeout: 'terminate',
     on_budget_exceeded: 'warn',
-    require_confirm: []
+    require_confirm: [],
+    tool_scopes: []
   };
   const policyNames = agent.assignedPolicies || [];
   policyNames.forEach(function(pName) {
@@ -1112,6 +1193,10 @@ function getEffectivePolicy(agent) {
     if (policy.require_confirm !== undefined) {
       // Concatenate arrays
       defaults.require_confirm = defaults.require_confirm.concat(policy.require_confirm);
+    }
+    if (policy.tool_scopes !== undefined) {
+      // Concatenate scope arrays (later rules take precedence by being checked last)
+      defaults.tool_scopes = defaults.tool_scopes.concat(policy.tool_scopes);
     }
   });
   // Deduplicate require_confirm
@@ -1227,6 +1312,32 @@ function renderEffectivePolicyHtml(ep) {
   if (ep.require_confirm && ep.require_confirm.length) {
     html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red)">' + ep.require_confirm.map(esc).join(', ') + '</span></div>';
   }
+  if (ep.tool_scopes && ep.tool_scopes.length) {
+    html += renderToolScopesHtml(ep.tool_scopes);
+  }
+  return html;
+}
+
+function renderToolScopesHtml(scopes) {
+  let html = '';
+  scopes.forEach(function(scope) {
+    html += '<div class="detail-row" style="flex-direction:column; align-items:flex-start;">';
+    html += '<span class="detail-label" style="font-weight:600; color:var(--orange);">Scope: ' + esc(scope.tool_name) + '</span>';
+    if (scope.rules && scope.rules.length) {
+      scope.rules.forEach(function(rule) {
+        var vals = (rule.values || []).map(esc).join(', ');
+        html += '<div style="font-size:0.75rem; padding-left:0.5rem; color:var(--muted);">';
+        html += '<span style="color:var(--accent);">' + esc(rule.param) + '</span> ';
+        html += '<span style="color:' + (rule.constraint === 'block' ? 'var(--red)' : 'var(--green)') + ';">' + esc(rule.constraint) + '</span> ';
+        html += vals;
+        html += '</div>';
+      });
+    }
+    if (scope.max_calls_per_minute !== undefined) {
+      html += '<div style="font-size:0.75rem; padding-left:0.5rem; color:var(--muted);">Max calls/min: <span style="color:var(--yellow);">' + scope.max_calls_per_minute + '</span></div>';
+    }
+    html += '</div>';
+  });
   return html;
 }
 
@@ -1250,6 +1361,7 @@ function policyFieldSummary(policy) {
   if (policy.on_timeout !== undefined) parts.push('on_timeout:' + policy.on_timeout);
   if (policy.on_budget_exceeded !== undefined) parts.push('on_budget:' + policy.on_budget_exceeded);
   if (policy.require_confirm !== undefined && policy.require_confirm.length) parts.push('confirm:' + policy.require_confirm.join(','));
+  if (policy.tool_scopes !== undefined && policy.tool_scopes.length) parts.push('scopes:' + policy.tool_scopes.map(function(s) { return s.tool_name; }).join(','));
   return parts.join(' | ');
 }
 
@@ -1373,6 +1485,7 @@ function renderPolicyCard(policy, showActions) {
   if (policy.on_timeout !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(policy.on_timeout) + '</span></div>'; }
   if (policy.on_budget_exceeded !== undefined) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(policy.on_budget_exceeded) + '</span></div>'; }
   if (policy.require_confirm !== undefined && policy.require_confirm.length) { hasFields = true; html += '<div class="detail-row"><span class="detail-label">Require confirm</span><span class="detail-value" style="color:var(--red);">' + policy.require_confirm.map(esc).join(', ') + '</span></div>'; }
+  if (policy.tool_scopes !== undefined && policy.tool_scopes.length) { hasFields = true; html += renderToolScopesHtml(policy.tool_scopes); }
 
   if (usedBy.length) {
     html += '<div style="font-size:0.75rem; color:var(--muted); margin-top:0.4rem;">Used by: ' + usedBy.map(a => '<strong>' + esc(a.name) + '</strong>').join(', ') + '</div>';
@@ -1919,6 +2032,54 @@ policyFieldIds.forEach(function(fid) {
   }
 });
 
+// -- Scope editor functions --
+function addScopeEntry(existing) {
+  var editor = document.getElementById('policy-scopes-editor');
+  var entry = document.createElement('div');
+  entry.className = 'scope-entry';
+
+  var scope = existing || { tool_name: '', rules: [], max_calls_per_minute: undefined };
+  var html = '<div class="scope-entry-header">';
+  html += '<input class="form-input scope-tool-name-input" placeholder="Tool name (e.g. write_file)" value="' + esc(scope.tool_name) + '">';
+  html += '<button class="btn-remove-tool" onclick="this.closest(\'.scope-entry\').remove()" title="Remove scope">&times;</button>';
+  html += '</div>';
+  html += '<div class="scope-rules-list">';
+  if (scope.rules && scope.rules.length) {
+    scope.rules.forEach(function(r) { html += renderScopeRuleEntry(r); });
+  }
+  html += '</div>';
+  html += '<button class="btn-add-rule" onclick="addRuleToScope(this)">+ Add Rule</button>';
+  html += '<div class="scope-max-calls">';
+  html += '<label>Max calls/min:</label>';
+  html += '<input class="form-input scope-max-calls-input" type="number" min="1" placeholder="(optional)" value="' + (scope.max_calls_per_minute !== undefined ? scope.max_calls_per_minute : '') + '">';
+  html += '</div>';
+
+  entry.innerHTML = html;
+  editor.appendChild(entry);
+}
+
+function renderScopeRuleEntry(r) {
+  var rule = r || { param: '', constraint: 'allow', values: [] };
+  var valsStr = (rule.values || []).join(', ');
+  return '<div class="scope-rule-entry">' +
+    '<input class="form-input scope-rule-param" placeholder="Parameter" value="' + esc(rule.param) + '">' +
+    '<select class="form-select scope-rule-constraint">' +
+      '<option value="allow"' + (rule.constraint === 'allow' ? ' selected' : '') + '>allow</option>' +
+      '<option value="block"' + (rule.constraint === 'block' ? ' selected' : '') + '>block</option>' +
+      '<option value="match"' + (rule.constraint === 'match' ? ' selected' : '') + '>match</option>' +
+    '</select>' +
+    '<input class="form-input scope-rule-values" placeholder="Values (comma-separated)" value="' + esc(valsStr) + '">' +
+    '<button class="btn-remove-tool" onclick="this.closest(\'.scope-rule-entry\').remove()" title="Remove rule">&times;</button>' +
+  '</div>';
+}
+
+function addRuleToScope(btn) {
+  var rulesList = btn.previousElementSibling;
+  var div = document.createElement('div');
+  div.innerHTML = renderScopeRuleEntry();
+  rulesList.appendChild(div.firstElementChild);
+}
+
 function openPolicyModal(index) {
   editingPolicyIdx = typeof index === 'number' ? index : -1;
   var isEdit = editingPolicyIdx >= 0;
@@ -1979,6 +2140,12 @@ function openPolicyModal(index) {
     }
   }
 
+  // Populate tool scopes
+  document.getElementById('policy-scopes-editor').innerHTML = '';
+  if (isEdit && policy && policy.tool_scopes && policy.tool_scopes.length) {
+    policy.tool_scopes.forEach(function(scope) { addScopeEntry(scope); });
+  }
+
   document.getElementById('policy-modal').classList.add('open');
 }
 
@@ -2012,6 +2179,31 @@ function savePolicy() {
   if (document.getElementById('pf-require-confirm-on').checked) {
     var val = document.getElementById('pf-require-confirm').value;
     data.require_confirm = val.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  // Collect tool scopes
+  var scopes = [];
+  document.querySelectorAll('#policy-scopes-editor .scope-entry').forEach(function(entry) {
+    var toolName = entry.querySelector('.scope-tool-name-input').value.trim();
+    if (!toolName) return;
+    var rules = [];
+    entry.querySelectorAll('.scope-rule-entry').forEach(function(re) {
+      var param = re.querySelector('.scope-rule-param').value.trim();
+      if (!param) return;
+      var constraint = re.querySelector('.scope-rule-constraint').value;
+      var valStr = re.querySelector('.scope-rule-values').value;
+      var values = valStr.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+      rules.push({ param: param, constraint: constraint, values: values });
+    });
+    var scopeObj = { tool_name: toolName, rules: rules };
+    var maxCalls = entry.querySelector('.scope-max-calls-input').value;
+    if (maxCalls && parseInt(maxCalls) > 0) {
+      scopeObj.max_calls_per_minute = parseInt(maxCalls);
+    }
+    scopes.push(scopeObj);
+  });
+  if (scopes.length > 0) {
+    data.tool_scopes = scopes;
   }
 
   var oldName = editingPolicyIdx >= 0 ? POLICIES[editingPolicyIdx].name : null;

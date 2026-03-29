@@ -22,7 +22,7 @@ Usage:
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Dict, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from .audit import AuditLog, AuditOutcome, AuditPhase
 from .budget import BudgetSnapshot, BudgetTracker
@@ -66,6 +66,7 @@ class Supervisor:
         self._policy = policy
         self._budget = BudgetTracker.from_policy(policy)
         self._circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self._tool_call_times: Dict[str, List[float]] = {}
         self._audit = audit or AuditLog.noop()
         self._start_time = time.monotonic()
         self._last_activity = time.monotonic()
@@ -147,6 +148,25 @@ class Supervisor:
         if tool_name in self._policy.require_confirm:
             raise ClawbossError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
 
+    def _check_scopes(self, tool_name: str, kwargs: Dict[str, Any]) -> None:
+        """Check if tool arguments satisfy scope rules."""
+        now = time.monotonic()
+        for scope in self._policy.tool_scopes:
+            if scope.tool_name == tool_name:
+                # Check argument rules
+                error_msg = scope.check_args(kwargs)
+                if error_msg:
+                    raise ClawbossError.scope_denied(tool_name, error_msg)
+                # Check rate limit
+                if scope.max_calls_per_minute is not None:
+                    times = self._tool_call_times.get(tool_name, [])
+                    cutoff = now - 60.0
+                    recent = [t for t in times if t > cutoff]
+                    if len(recent) >= scope.max_calls_per_minute:
+                        raise ClawbossError.rate_limited(tool_name, scope.max_calls_per_minute)
+                    recent.append(now)
+                    self._tool_call_times[tool_name] = recent
+
     async def call(
         self,
         tool_name: str,
@@ -171,9 +191,15 @@ class Supervisor:
             self._check_request_timeout()
             self._check_silence()
             self._check_confirm(tool_name)
+            self._check_scopes(tool_name, kwargs)
         except ClawbossError as e:
+            phase = (
+                AuditPhase.SCOPE_CHECK
+                if e.kind in ("scope_denied", "rate_limited")
+                else AuditPhase.POLICY_CHECK
+            )
             self._audit.record(
-                AuditPhase.POLICY_CHECK,
+                phase,
                 AuditOutcome.DENIED,
                 target=tool_name,
                 detail=str(e),

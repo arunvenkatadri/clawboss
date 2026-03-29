@@ -18,6 +18,7 @@ class AuditPhase(Enum):
     ITERATION_CHECK = "iteration_check"
     DEAD_MAN_SWITCH = "dead_man_switch"
     POLICY_CHECK = "policy_check"
+    SCOPE_CHECK = "scope_check"
     REQUEST_START = "request_start"
     REQUEST_END = "request_end"
 

@@ -1,5 +1,7 @@
 """Supervision policy — what limits to enforce and what to do when they're hit."""
 
+import fnmatch
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -28,6 +30,65 @@ class OnFailure:
 
     action: Action = Action.RETURN_ERROR
     retries: int = 0
+
+
+@dataclass
+class ScopeRule:
+    """A single scope constraint on a tool parameter."""
+
+    param: str  # parameter name to constrain
+    constraint: str  # "allow", "block", or "match"
+    values: List[str]  # patterns (glob-style for allow/block, regex for match)
+
+    def check(self, param_value: Any) -> bool:
+        """Returns True if the value is allowed by this rule."""
+        str_value = str(param_value)
+        if self.constraint == "allow":
+            return any(fnmatch.fnmatch(str_value, p) for p in self.values)
+        if self.constraint == "block":
+            return not any(fnmatch.fnmatch(str_value, p) for p in self.values)
+        if self.constraint == "match":
+            return any(re.search(p, str_value) for p in self.values)
+        return True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "param": self.param,
+            "constraint": self.constraint,
+            "values": list(self.values),
+        }
+
+
+@dataclass
+class ToolScope:
+    """Scoped permissions for a specific tool."""
+
+    tool_name: str
+    rules: List[ScopeRule]
+    max_calls_per_minute: Optional[int] = None  # rate limit
+
+    def check_args(self, kwargs: Dict[str, Any]) -> Optional[str]:
+        """Check if kwargs satisfy all rules.
+
+        Returns None if OK, error message if violated.
+        """
+        for rule in self.rules:
+            if rule.param in kwargs:
+                if not rule.check(kwargs[rule.param]):
+                    return (
+                        f"Parameter '{rule.param}' value "
+                        f"'{kwargs[rule.param]}' blocked by scope rule"
+                    )
+        return None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "tool_name": self.tool_name,
+            "rules": [r.to_dict() for r in self.rules],
+        }
+        if self.max_calls_per_minute is not None:
+            d["max_calls_per_minute"] = self.max_calls_per_minute
+        return d
 
 
 @dataclass
@@ -64,6 +125,9 @@ class Policy:
 
     # Confirmation gates (tool names that require user confirm)
     require_confirm: List[str] = field(default_factory=list)
+
+    # Tool scopes (parameter-level permission rules)
+    tool_scopes: List[ToolScope] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Policy":
@@ -111,5 +175,26 @@ class Policy:
 
         if "require_confirm" in d:
             kwargs["require_confirm"] = list(d["require_confirm"])
+
+        if "tool_scopes" in d:
+            scopes = []
+            for scope_dict in d["tool_scopes"]:
+                rules = []
+                for r in scope_dict.get("rules", []):
+                    rules.append(
+                        ScopeRule(
+                            param=r["param"],
+                            constraint=r.get("constraint", "allow"),
+                            values=r.get("values", []),
+                        )
+                    )
+                scopes.append(
+                    ToolScope(
+                        tool_name=scope_dict["tool_name"],
+                        rules=rules,
+                        max_calls_per_minute=scope_dict.get("max_calls_per_minute"),
+                    )
+                )
+            kwargs["tool_scopes"] = scopes
 
         return cls(**kwargs)
