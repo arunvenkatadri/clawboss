@@ -1,8 +1,9 @@
 # Clawboss
 
 
-<img width="1200" height="300" alt="clawboss_banner_fullwidth" src="https://github.com/user-attachments/assets/5b10cf2a-a50a-4d3b-b13b-233718a579be" />
 
+
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/162a4e5e-ccdd-4152-b7e4-4addd2ef5743" />
 
 
 
