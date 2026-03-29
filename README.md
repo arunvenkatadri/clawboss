@@ -25,7 +25,7 @@ Or: your agent decides to "keep researching" and burns through your entire token
 Clawboss is the guardrail layer between your agent and its tools. Every tool call goes through supervision — timeouts, budgets, circuit breakers — so you can deploy agents without white-knuckling it.
 
 ```mermaid
-flowchart LR
+flowchart TB
     Agent["🤖 Agent"] --> Clawboss
     subgraph Clawboss[" "]
         direction LR
