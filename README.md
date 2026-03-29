@@ -1,6 +1,7 @@
 # Clawboss
 
-<img width="1200" height="300" alt="clawboss_banner_fixed" src="https://github.com/user-attachments/assets/8e66e064-8385-44fe-bc7f-3454baa7cd3a" />
+
+<img width="1200" height="300" alt="clawboss_banner_fullwidth" src="https://github.com/user-attachments/assets/5b10cf2a-a50a-4d3b-b13b-233718a579be" />
 
 
 
