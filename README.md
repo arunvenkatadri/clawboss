@@ -24,16 +24,9 @@ Or: your agent decides to "keep researching" and burns through your entire token
 
 Clawboss is the guardrail layer between your agent and its tools. Every tool call goes through supervision — timeouts, budgets, circuit breakers — so you can deploy agents without white-knuckling it.
 
-```mermaid
-flowchart TB
-    Agent["🤖 Your Agent"] --> Clawboss
-    subgraph Clawboss["Clawboss Supervision Layer"]
-        direction LR
-        S["🔒 Scopes\nValidate args"] ~~~ B["💰 Budget\nToken limits"] ~~~ C["⚡ Circuit Breaker\nStop failures"] ~~~ R["🕐 Rate Limit\nCalls/minute"] ~~~ G["✋ Confirm Gate\nHuman approval"] ~~~ T["⏱️ Timeout\nKill hung calls"]
-    end
-    Clawboss --> Tools["🔧 Your Tools — APIs, files, email, search"]
-    Clawboss -.-> Audit["📋 Audit Log — every decision recorded"]
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="Clawboss architecture — agent → supervision layer → tools" width="900">
+</p>
 
 ### No arbitrary code downloads
 

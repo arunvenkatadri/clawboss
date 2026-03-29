@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" width="900" height="420">
+  <style>
+    text { font-family: -apple-system, 'Segoe UI', sans-serif; fill: #e8e8e8; }
+    .title { font-size: 15px; font-weight: 600; }
+    .label { font-size: 14px; font-weight: 500; }
+    .sublabel { font-size: 11px; fill: #868e96; }
+    .box { rx: 8; ry: 8; }
+    .arrow { stroke: #868e96; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .dash { stroke: #868e96; stroke-width: 1.5; fill: none; stroke-dasharray: 6,4; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#868e96"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="420" rx="12" fill="#1a1b1e"/>
+
+  <!-- Agent box -->
+  <rect x="375" y="20" width="150" height="50" class="box" fill="#25262b" stroke="#4dabf7" stroke-width="2"/>
+  <text x="450" y="50" text-anchor="middle" class="label">🤖  Your Agent</text>
+
+  <!-- Arrow down -->
+  <line x1="450" y1="70" x2="450" y2="110" class="arrow"/>
+
+  <!-- Supervision layer box -->
+  <rect x="30" y="110" width="840" height="150" rx="10" fill="#25262b" stroke="#373a40" stroke-width="1.5"/>
+  <text x="450" y="135" text-anchor="middle" class="title" fill="#4dabf7">Clawboss Supervision Layer</text>
+
+  <!-- 6 check boxes inside -->
+  <!-- Scopes -->
+  <rect x="50" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="110" y="178" text-anchor="middle" class="label">🔒 Scopes</text>
+  <text x="110" y="198" text-anchor="middle" class="sublabel">Validate</text>
+  <text x="110" y="213" text-anchor="middle" class="sublabel">arguments</text>
+
+  <!-- Budget -->
+  <rect x="185" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="245" y="178" text-anchor="middle" class="label">💰 Budget</text>
+  <text x="245" y="198" text-anchor="middle" class="sublabel">Token &amp;</text>
+  <text x="245" y="213" text-anchor="middle" class="sublabel">cost limits</text>
+
+  <!-- Circuit Breaker -->
+  <rect x="320" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="380" y="178" text-anchor="middle" class="label">⚡ Circuit</text>
+  <text x="380" y="198" text-anchor="middle" class="sublabel">Stop hammering</text>
+  <text x="380" y="213" text-anchor="middle" class="sublabel">failures</text>
+
+  <!-- Rate Limit -->
+  <rect x="455" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="515" y="178" text-anchor="middle" class="label">🕐 Rate Limit</text>
+  <text x="515" y="198" text-anchor="middle" class="sublabel">Calls per</text>
+  <text x="515" y="213" text-anchor="middle" class="sublabel">minute</text>
+
+  <!-- Confirm Gate -->
+  <rect x="590" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="650" y="178" text-anchor="middle" class="label">✋ Confirm</text>
+  <text x="650" y="198" text-anchor="middle" class="sublabel">Human</text>
+  <text x="650" y="213" text-anchor="middle" class="sublabel">approval</text>
+
+  <!-- Timeout -->
+  <rect x="725" y="150" width="120" height="90" class="box" fill="#2c2e33" stroke="#373a40" stroke-width="1"/>
+  <text x="785" y="178" text-anchor="middle" class="label">⏱️ Timeout</text>
+  <text x="785" y="198" text-anchor="middle" class="sublabel">Kill hung</text>
+  <text x="785" y="213" text-anchor="middle" class="sublabel">calls</text>
+
+  <!-- Arrow down to tools -->
+  <line x1="450" y1="260" x2="450" y2="300" class="arrow"/>
+
+  <!-- Tools box -->
+  <rect x="300" y="300" width="300" height="50" class="box" fill="#25262b" stroke="#51cf66" stroke-width="2"/>
+  <text x="450" y="330" text-anchor="middle" class="label">🔧  Your Tools — APIs, files, email, search</text>
+
+  <!-- Audit box -->
+  <rect x="680" y="300" width="190" height="50" class="box" fill="#25262b" stroke="#373a40" stroke-width="1"/>
+  <text x="775" y="330" text-anchor="middle" class="label">📋 Audit Log</text>
+
+  <!-- Dashed arrow to audit -->
+  <line x1="750" y1="260" x2="775" y2="300" class="dash"/>
+
+  <!-- "one pass" annotation -->
+  <text x="450" y="390" text-anchor="middle" font-size="13" fill="#868e96" font-style="italic">All checks run in a single pass — microseconds, not milliseconds</text>
+</svg>
