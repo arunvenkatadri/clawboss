@@ -1,5 +1,10 @@
 # Clawboss
 
+<img width="1200" height="300" alt="clawboss_github_banner" src="https://github.com/user-attachments/assets/beed0714-f38d-4b7d-9e42-82285228ebf2" />
+
+
+
+
 [![CI](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml/badge.svg)](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
