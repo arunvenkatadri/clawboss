@@ -200,6 +200,24 @@ curl -X POST http://localhost:8000/sessions/{id}/pause
 curl http://localhost:8000/sessions/{id}
 ```
 
+## Security model
+
+Clawboss is designed to supervise untrusted agent behavior. The stateful session layer enforces several invariants:
+
+**Policy is immutable.** The supervision policy (timeouts, budgets, confirmation gates) is frozen at `start()` and cannot be changed by the agent. `resume()` always rebuilds from the original policy — even if the stored checkpoint is tampered with, the agent cannot weaken its own supervision.
+
+**Payload is untrusted.** The `payload` field is agent-writable storage for intermediate work. It is validated for size (1 MB limit) and serializability, but its *contents* should be treated like user input. If your agent reads from payload after a resume, sanitize it.
+
+**Session IDs are cryptographic.** 128-bit random IDs via `secrets.token_hex` — not guessable or enumerable.
+
+**The REST API has no authentication.** CORS is restricted to localhost by default, but you must add your own auth layer before exposing the server to untrusted networks. Do not run `uvicorn clawboss.server:app` on a public interface without auth.
+
+**SQLite files are owner-only.** The default `SqliteStore` creates database files with `0600` permissions.
+
+**Audit logs survive crashes.** Entries are persisted to the checkpoint store on `pause()` and `stop()`, so you don't lose the trail if the process dies.
+
+**Sessions can expire.** Call `SqliteStore.delete_expired(max_age_seconds)` to clean up old sessions.
+
 ## OpenClaw integration
 
 Clawboss includes a built-in bridge for [OpenClaw](https://github.com/openclaw/openclaw). Expose your supervised tools to OpenClaw over HTTP — all supervision (timeouts, budgets, circuit breakers) applies automatically.
