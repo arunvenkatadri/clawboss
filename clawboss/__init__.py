@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.1.0"
+__version__ = "0.77.0"
 
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
 from .budget import BudgetSnapshot, BudgetTracker
@@ -27,7 +27,16 @@ from .context import AnchoredState, CompressedContext, CompressedHistory, Contex
 from .errors import ClawbossError
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
 from .policy import Action, OnFailure, Policy, ScopeRule, ToolScope
+from .session import SessionManager
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
+from .store import (
+    Checkpoint,
+    MemoryStore,
+    SessionStatus,
+    SqliteStore,
+    StateStore,
+    validate_payload,
+)
 from .supervisor import SupervisedResult, Supervisor
 
 __all__ = [
@@ -62,4 +71,11 @@ __all__ = [
     "OpenClawBridge",
     "to_openclaw_tool_schema",
     "to_openclaw_manifest",
+    "StateStore",
+    "MemoryStore",
+    "SqliteStore",
+    "Checkpoint",
+    "SessionStatus",
+    "SessionManager",
+    "validate_payload",
 ]

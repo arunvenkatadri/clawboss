@@ -30,3 +30,9 @@ openclaw-plugin/dist/
 # Environment
 .env
 .env.*
+
+# Internal docs (not for public repos)
+ROADMAP.internal.md
+
+# SQLite databases (created by clawboss sessions)
+*.db

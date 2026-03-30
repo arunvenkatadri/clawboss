@@ -19,16 +19,22 @@ Usage:
     supervisor.finish()
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 
 from .audit import AuditLog, AuditOutcome, AuditPhase
 from .budget import BudgetSnapshot, BudgetTracker
 from .circuit_breaker import CircuitBreaker
 from .errors import ClawbossError
 from .policy import Policy
+
+if TYPE_CHECKING:
+    from .store import Checkpoint, StateStore
 
 
 @dataclass
@@ -62,6 +68,9 @@ class Supervisor:
         self,
         policy: Policy,
         audit: Optional[AuditLog] = None,
+        store: Optional[StateStore] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ):
         self._policy = policy
         self._budget = BudgetTracker.from_policy(policy)
@@ -70,6 +79,12 @@ class Supervisor:
         self._audit = audit or AuditLog.noop()
         self._start_time = time.monotonic()
         self._last_activity = time.monotonic()
+        self._paused = False
+
+        # Optional durable state
+        self._store = store
+        self._session_id = session_id
+        self._agent_id = agent_id
 
         self._audit.record(
             AuditPhase.REQUEST_START,
@@ -87,13 +102,31 @@ class Supervisor:
     def policy(self) -> Policy:
         return self._policy
 
+    @property
+    def session_id(self) -> Optional[str]:
+        return self._session_id
+
+    @property
+    def agent_id(self) -> Optional[str]:
+        return self._agent_id
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @paused.setter
+    def paused(self, value: bool) -> None:
+        self._paused = value
+
     def budget(self) -> BudgetSnapshot:
         """Get current budget snapshot."""
         return self._budget.snapshot()
 
     def record_tokens(self, tokens: int) -> int:
         """Record token usage. Returns new total. Raises ClawbossError if over budget."""
-        return self._budget.record_tokens(tokens)
+        total = self._budget.record_tokens(tokens)
+        self._auto_checkpoint()
+        return total
 
     def record_iteration(self) -> int:
         """Record an iteration of the agent loop. Returns iteration count.
@@ -107,6 +140,7 @@ class Supervisor:
                 AuditOutcome.ALLOWED,
                 detail=f"Iteration {count} / {self._policy.max_iterations}",
             )
+            self._auto_checkpoint()
             return count
         except ClawbossError as e:
             self._audit.record(
@@ -142,6 +176,11 @@ class Supervisor:
         silence = time.monotonic() - self._last_activity
         if silence > self._policy.silence_timeout:
             raise ClawbossError.dead_man_switch(int(silence * 1000))
+
+    def _check_paused(self) -> None:
+        """Check if this supervisor is paused."""
+        if self._paused and self._session_id:
+            raise ClawbossError.agent_paused(self._session_id)
 
     def _check_confirm(self, tool_name: str) -> None:
         """Check if this tool requires confirmation."""
@@ -188,6 +227,7 @@ class Supervisor:
 
         # Pre-flight checks
         try:
+            self._check_paused()
             self._check_request_timeout()
             self._check_silence()
             self._check_confirm(tool_name)
@@ -309,6 +349,8 @@ class Supervisor:
             detail=f"Completed in {duration_ms}ms",
         )
 
+        self._auto_checkpoint()
+
         return SupervisedResult(
             output=output,
             succeeded=True,
@@ -362,3 +404,116 @@ class Supervisor:
             },
         )
         return snap
+
+    # ------------------------------------------------------------------
+    # Checkpoint support (opt-in via store parameter)
+    # ------------------------------------------------------------------
+
+    def to_checkpoint_data(self) -> Dict[str, Any]:
+        """Export supervisor state as a dict suitable for a Checkpoint."""
+        snap = self._budget.snapshot()
+        cb_states = {}
+        for name, cb in self._circuit_breakers.items():
+            cb_states[name] = {
+                "state": cb.state.value,
+                "consecutive_failures": cb.consecutive_failures,
+            }
+        return {
+            "iterations": snap.iterations,
+            "tokens_used": snap.tokens_used,
+            "token_limit": snap.token_limit,
+            "iteration_limit": snap.iteration_limit,
+            "circuit_breaker_states": cb_states,
+        }
+
+    @classmethod
+    def restore_from_checkpoint(
+        cls,
+        checkpoint: Checkpoint,
+        audit: Optional[AuditLog] = None,
+        store: Optional[StateStore] = None,
+        policy_override: Optional[Dict[str, Any]] = None,
+    ) -> Supervisor:
+        """Rebuild a Supervisor from a checkpoint.
+
+        Restores budget counters and circuit breaker states so the agent
+        can continue where it left off.
+
+        Args:
+            checkpoint: The checkpoint to restore from.
+            audit: Optional audit log for the restored supervisor.
+            store: Optional state store for auto-checkpointing.
+            policy_override: If provided, use this policy dict instead of the
+                           checkpoint's. This is the SECURITY mechanism —
+                           SessionManager always passes the original immutable
+                           policy here so agents cannot downgrade supervision.
+        """
+        from .store import SessionStatus
+
+        # SECURITY: prefer the override (original immutable policy) over
+        # whatever the checkpoint contains.
+        policy_dict = policy_override if policy_override is not None else checkpoint.policy_dict
+        policy = Policy.from_dict(policy_dict)
+        sv = cls(
+            policy,
+            audit=audit,
+            store=store,
+            session_id=checkpoint.session_id,
+            agent_id=checkpoint.agent_id,
+        )
+        # Restore budget counters
+        if checkpoint.tokens_used > 0:
+            sv._budget._tokens_used = checkpoint.tokens_used
+        if checkpoint.iterations > 0:
+            sv._budget._iterations = checkpoint.iterations
+        # Restore circuit breaker states
+        for name, cb_data in checkpoint.circuit_breaker_states.items():
+            from .circuit_breaker import CircuitState
+
+            cb = sv._get_circuit_breaker(name)
+            cb._consecutive_failures = cb_data.get("consecutive_failures", 0)
+            state_str = cb_data.get("state", "closed")
+            cb._state = CircuitState(state_str)
+            if cb._state == CircuitState.OPEN:
+                cb._opened_at = time.monotonic()
+        # Restore pause state
+        sv._paused = checkpoint.status == SessionStatus.PAUSED
+        return sv
+
+    def _auto_checkpoint(self) -> None:
+        """Save a checkpoint if a store is configured.
+
+        Only updates SYSTEM-CONTROLLED fields (budget counters, circuit breaker
+        states, status, timestamp). Does NOT touch payload (agent-writable) or
+        policy_dict (immutable). This preserves the trust boundary between
+        supervisor-controlled and agent-controlled data.
+        """
+        if self._store is None or self._session_id is None:
+            return
+        from .store import Checkpoint, SessionStatus
+
+        # Load existing checkpoint to preserve payload, policy, created_at, audit_log
+        existing = self._store.load_checkpoint(self._session_id)
+
+        status = SessionStatus.PAUSED if self._paused else SessionStatus.RUNNING
+        data = self.to_checkpoint_data()
+        cp = Checkpoint(
+            session_id=self._session_id,
+            agent_id=self._agent_id or "",
+            status=status,
+            iterations=data["iterations"],
+            tokens_used=data["tokens_used"],
+            token_limit=data["token_limit"],
+            iteration_limit=data["iteration_limit"],
+            circuit_breaker_states=data["circuit_breaker_states"],
+            # Preserve immutable fields from the original checkpoint
+            policy_dict=existing.policy_dict if existing else self._policy.to_dict(),
+            payload=existing.payload if existing else {},
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            created_at=existing.created_at if existing else "",
+            audit_log=existing.audit_log if existing else [],
+        )
+        try:
+            self._store.save_checkpoint(cp)
+        except Exception:
+            pass  # checkpoint must never crash the request

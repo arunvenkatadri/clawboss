@@ -1,0 +1,26 @@
+{
+  "name": "clawboss",
+  "version": "0.77.0",
+  "description": "Clawboss is a Python package. Install with: pip install clawboss",
+  "license": "Apache-2.0",
+  "author": "arunvenkatadri",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arunvenkatadri/clawboss"
+  },
+  "homepage": "https://github.com/arunvenkatadri/clawboss",
+  "keywords": [
+    "clawboss",
+    "ai-agents",
+    "supervision",
+    "guardrails",
+    "openclaw"
+  ],
+  "bin": {
+    "clawboss": "./bin/clawboss.js"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ]
+}

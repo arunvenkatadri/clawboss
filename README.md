@@ -14,7 +14,7 @@
 
 **Stop your AI agents from going rogue.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
-Zero dependencies. Works with any agent framework. First-class [OpenClaw](https://github.com/openclaw/openclaw) integration. Includes a [dashboard](#dashboard) for managing agents, skills, and conversations in one place.
+Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
 ## Why
 
@@ -85,11 +85,12 @@ Open `dashboard.html` in a browser for a full management UI:
 
 - **Agents** — create, edit, delete, pause/resume/stop agents with supervision policies
 - **Skills** — define reusable capabilities (tool collections) and assign them to agents
+- **Sessions** — live view of running agent sessions from the REST API, with pause/resume/stop controls, budget usage, and audit logs
 - **Chat** — open a conversation with any agent directly from the dashboard
 - **Costs** — track spend, set budgets with hard stops, view usage over time
 - **Policies** — see all active supervision rules at a glance
 
-Agents have a status (running/paused/stopped) controllable from the card controls. Skills are assigned to agents with a checkbox, and agents can optionally use unassigned skills via a toggle.
+The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API.
 
 <img width="1498" height="953" alt="Screenshot 2026-03-25 at 6 05 30 PM" src="https://github.com/user-attachments/assets/11a5047c-6328-43bc-a6cf-d56a9b0b45da" />
 
@@ -106,6 +107,23 @@ Agents have a status (running/paused/stopped) controllable from the card control
 | **Audit log** | Not knowing what your agent did |
 | **Context compression** | Agent forgetting its instructions mid-conversation |
 | **Tool scoping** | Agents calling tools with dangerous arguments |
+| **Durable sessions** | Agent dies mid-task, loses all progress |
+| **Crash loop protection** | Agent keeps crashing and restarting forever |
+| **REST control plane** | No way to pause/resume/stop agents remotely |
+
+## Works with any agent framework
+
+Clawboss doesn't care what framework you use. It supervises tool calls — any async or sync callable. If your agent calls tools, Clawboss can wrap them.
+
+```python
+# LangChain? Wrap your tools.
+# CrewAI? Wrap your tools.
+# AutoGen? Wrap your tools.
+# Custom loop? Wrap your tools.
+# OpenClaw? There's a built-in bridge (see below).
+
+result = await supervisor.call("my_tool", my_tool_fn, **kwargs)
+```
 
 ## Tool scoping
 
@@ -178,6 +196,173 @@ The context has three zones:
 | **Recent turns** | Last N turns | Full fidelity |
 
 The anchored state is never compressed — it's rebuilt from the supervisor's live state every turn. Even if the LLM "forgets" its budget limit, the supervisor still enforces it. Bring your own LLM summarizer for richer compression, or use the built-in audit-based extraction.
+
+## Durable sessions
+
+Long-running agents survive process restarts. Clawboss checkpoints supervisor state (iterations, token usage, circuit breaker states) to a pluggable store after every operation.
+
+```python
+from clawboss import SessionManager, SqliteStore
+
+store = SqliteStore("sessions.db")  # or MemoryStore() for testing
+mgr = SessionManager(store)
+
+# Start a session
+session_id = mgr.start("my-agent", {
+    "max_iterations": 20,
+    "tool_timeout": 30,
+    "token_budget": 50000,
+})
+
+# Get the supervisor and use it in your agent loop
+sv = mgr.get_supervisor(session_id)
+result = await sv.call("web_search", search_fn, query="python async")
+sv.record_tokens(1500)
+
+# Pause — the supervisor raises AgentPaused on next call()
+mgr.pause(session_id)
+
+# Resume later (even after a crash / restart)
+sv = mgr.resume(session_id)   # budget, iterations, circuit breakers all restored
+result = await sv.call("web_search", search_fn, query="continue research")
+
+# Stop when done
+mgr.stop(session_id)
+```
+
+### Pluggable storage
+
+Implement the `StateStore` protocol for your own backend:
+
+```python
+from clawboss import StateStore, Checkpoint
+
+class RedisStore:
+    def save_checkpoint(self, checkpoint: Checkpoint) -> None: ...
+    def load_checkpoint(self, session_id: str) -> Checkpoint | None: ...
+    def list_sessions(self) -> list[Checkpoint]: ...
+    def delete_session(self, session_id: str) -> bool: ...
+```
+
+Ships with `SqliteStore` (production default, stdlib sqlite3) and `MemoryStore` (testing).
+
+### Crash loop protection
+
+If an agent keeps crashing and being resumed, `max_resumes` stops it from looping forever. Default is 3 — after that, the session is marked as `failed` with a reason.
+
+```python
+session_id = mgr.start("my-agent", {
+    "max_iterations": 10,
+    "max_resumes": 5,     # allow up to 5 crash recoveries (default: 3)
+})
+
+# After 5 crashes and resumes, the next resume() raises:
+# ClawbossError("max_resumes_exceeded", "Crash loop: resumed 5 times (limit: 5)")
+# Session is automatically marked as FAILED.
+```
+
+Failed sessions can be restarted fresh (same policy, new session):
+
+```python
+new_session_id = mgr.restart(session_id)  # or POST /sessions/{id}/restart
+```
+
+The dashboard shows the failure reason on failed/stopped session cards and offers a Restart button.
+
+### Stateless sessions
+
+Not every agent needs crash recovery. Pass `stateless=True` to skip auto-checkpointing — you still get supervision, audit logging, and pause/stop controls, but no disk writes on each tool call and no crash recovery.
+
+```python
+# In-memory only — no checkpoints, no crash recovery
+session_id = mgr.start("quick-agent", policy_dict, stateless=True)
+```
+
+Via the REST API:
+
+```bash
+curl -X POST http://localhost:8000/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "quick-agent", "policy": {...}, "stateless": true}'
+```
+
+Stateless sessions can be paused and stopped normally. They cannot be resumed after a process restart — if the process dies, the session is gone.
+
+## REST control plane
+
+Manage agent sessions remotely over HTTP. Optional dependency — install with:
+
+```bash
+pip install clawboss[server]
+```
+
+Start the server:
+
+```bash
+uvicorn clawboss.server:app
+```
+
+With API key auth:
+
+```bash
+# Pick any string as your secret — there's no signup or external service
+CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
+```
+
+Clients pass the key as a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer my-secret-key" http://localhost:8000/sessions
+```
+
+WebSocket connections pass it as a query param: `ws://localhost:8000/sessions/{id}/events?token=my-secret-key`
+
+If `CLAWBOSS_API_KEY` is not set, auth is disabled (open access — fine for local dev). You can also pass `api_key=` directly to `create_app()` in code.
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/sessions` | Create a new agent session |
+| GET | `/sessions` | List all sessions with status |
+| GET | `/sessions/{id}` | Session detail (budget, checkpoint time, policy) |
+| POST | `/sessions/{id}/pause` | Pause an agent |
+| POST | `/sessions/{id}/resume` | Resume a paused agent |
+| POST | `/sessions/{id}/stop` | Stop an agent |
+| POST | `/sessions/{id}/restart` | Restart a stopped/failed agent (new session, same policy) |
+| GET | `/sessions/{id}/audit` | Audit log entries for this session |
+| WS | `/sessions/{id}/events` | Stream status changes and audit events |
+
+```bash
+# Create a session
+curl -X POST http://localhost:8000/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "researcher", "policy": {"max_iterations": 10, "token_budget": 50000}}'
+
+# Pause it
+curl -X POST http://localhost:8000/sessions/{id}/pause
+
+# Check status
+curl http://localhost:8000/sessions/{id}
+```
+
+## Security model
+
+Clawboss is designed to supervise untrusted agent behavior. The stateful session layer enforces several invariants:
+
+**Policy is immutable.** The supervision policy (timeouts, budgets, confirmation gates) is frozen at `start()` and cannot be changed by the agent. `resume()` always rebuilds from the original policy — even if the stored checkpoint is tampered with, the agent cannot weaken its own supervision.
+
+**Payload is untrusted.** The `payload` field is agent-writable storage for intermediate work. It is validated for size (1 MB limit) and serializability, but its *contents* should be treated like user input. If your agent reads from payload after a resume, sanitize it.
+
+**Session IDs are cryptographic.** 128-bit random IDs via `secrets.token_hex` — not guessable or enumerable.
+
+**The REST API supports API key auth.** Set `CLAWBOSS_API_KEY` to enable Bearer token authentication on all endpoints. CORS is restricted to localhost by default. Always enable auth before exposing the server to untrusted networks.
+
+**SQLite files are owner-only.** The default `SqliteStore` creates database files with `0600` permissions.
+
+**Audit logs survive crashes.** Entries are persisted to the checkpoint store on `pause()` and `stop()`, so you don't lose the trail if the process dies.
+
+**Sessions can expire.** Call `SqliteStore.delete_expired(max_age_seconds)` to clean up old sessions.
 
 ## OpenClaw integration
 
@@ -379,7 +564,7 @@ Skills are stored as JSON and can be exported to POML. The format includes:
 
 Dataclass with all configuration. Every field has a sensible default.
 
-### `Supervisor(policy, audit=None)`
+### `Supervisor(policy, audit=None, store=None, session_id=None, agent_id=None)`
 
 - `call(tool_name, fn, **kwargs)` — supervise an async tool call
 - `call_sync(tool_name, fn, **kwargs)` — supervise a sync tool call
@@ -387,6 +572,8 @@ Dataclass with all configuration. Every field has a sensible default.
 - `record_tokens(n)` — record token usage
 - `budget()` — get current `BudgetSnapshot`
 - `finish()` — mark request complete, return final snapshot
+- `to_checkpoint_data()` — export state for persistence
+- `restore_from_checkpoint(checkpoint)` — rebuild from a checkpoint
 
 ### `SupervisedResult`
 
@@ -436,6 +623,28 @@ Dataclass with all configuration. Every field has a sensible default.
 - `to_dict()` / `from_dict(d)` — serialize/deserialize
 - `to_poml()` — render as POML format
 - `to_json()` — serialize to JSON string
+
+### `SessionManager(store)`
+
+- `start(agent_id, policy_dict, payload, stateless=False)` — create a new session, returns `session_id`
+- `pause(session_id)` — pause (supervisor raises `AgentPaused` on next call)
+- `resume(session_id)` — rehydrate supervisor from last checkpoint
+- `stop(session_id)` — stop and finalize
+- `restart(session_id)` — restart a stopped/failed session (new session, same policy)
+- `status(session_id)` — get current checkpoint
+- `list_sessions()` — list all sessions
+- `get_supervisor(session_id)` — get the active supervisor
+- `get_audit_entries(session_id)` — get audit log entries
+- `update_payload(session_id, payload)` — update opaque agent payload
+
+### `StateStore` (protocol)
+
+- `save_checkpoint(checkpoint)` — persist a checkpoint
+- `load_checkpoint(session_id)` — load by ID (returns `None` if missing)
+- `list_sessions()` — list all checkpoints
+- `delete_session(session_id)` — delete a checkpoint
+
+Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 
 ## Contributing
 

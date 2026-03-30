@@ -120,6 +120,9 @@ class Policy:
     on_circuit_open: OnFailure = field(default_factory=lambda: OnFailure(Action.RETURN_ERROR))
     on_silence: OnFailure = field(default_factory=lambda: OnFailure(Action.RETURN_ERROR))
 
+    # Crash loop protection
+    max_resumes: int = 3  # max times a session can be resumed before marked failed
+
     # Audit
     audit_enabled: bool = True
 
@@ -129,6 +132,36 @@ class Policy:
     # Tool scopes (parameter-level permission rules)
     tool_scopes: List[ToolScope] = field(default_factory=list)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dictionary (round-trips with from_dict)."""
+        d: Dict[str, Any] = {
+            "tool_timeout": self.tool_timeout,
+            "max_iterations": self.max_iterations,
+            "request_timeout": self.request_timeout,
+            "circuit_breaker_threshold": self.circuit_breaker_threshold,
+            "circuit_breaker_reset": self.circuit_breaker_reset,
+            "audit_enabled": self.audit_enabled,
+        }
+        if self.token_budget is not None:
+            d["token_budget"] = self.token_budget
+        if self.silence_timeout is not None:
+            d["silence_timeout"] = self.silence_timeout
+        for key in (
+            "on_timeout",
+            "on_budget_exceeded",
+            "on_max_iterations",
+            "on_circuit_open",
+            "on_silence",
+        ):
+            val: OnFailure = getattr(self, key)
+            d[key] = {"action": val.action.value, "retries": val.retries}
+        d["max_resumes"] = self.max_resumes
+        if self.require_confirm:
+            d["require_confirm"] = list(self.require_confirm)
+        if self.tool_scopes:
+            d["tool_scopes"] = [s.to_dict() for s in self.tool_scopes]
+        return d
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Policy":
         """Create a Policy from a plain dictionary.
@@ -137,6 +170,7 @@ class Policy:
             tool_timeout, max_iterations, token_budget,
             request_timeout, silence_timeout,
             circuit_breaker_threshold, circuit_breaker_reset,
+            max_resumes,
             on_timeout, on_budget_exceeded, on_max_iterations,
             on_circuit_open, on_silence, audit_enabled, require_confirm
         """
@@ -150,6 +184,7 @@ class Policy:
             "silence_timeout",
             "circuit_breaker_threshold",
             "circuit_breaker_reset",
+            "max_resumes",
             "audit_enabled",
         ):
             if key in d:
