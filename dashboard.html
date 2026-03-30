@@ -731,13 +731,15 @@
       <h3 style="display:flex; align-items:center; justify-content:space-between;">
         Live Sessions
         <span>
-          <input class="form-input" id="sessions-api-url" placeholder="http://localhost:8000" value="http://localhost:8000" style="width:220px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;">
+          <input class="form-input" id="sessions-api-url" placeholder="http://localhost:8000" value="http://localhost:8000" style="width:180px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;">
+          <input class="form-input" id="sessions-api-key" placeholder="API key (optional)" value="" style="width:150px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;" type="password">
           <button class="btn-secondary" onclick="fetchSessions()">Refresh</button>
         </span>
       </h3>
       <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
         Live agent sessions from the Clawboss control plane. Start the server with
         <code>uvicorn clawboss.server:app</code> then refresh.
+        If you set <code>CLAWBOSS_API_KEY</code>, enter the same key above.
       </p>
     </div>
     <div id="sessions-status" style="font-size:0.82rem; color:var(--muted); margin-bottom:0.5rem;"></div>
@@ -2214,12 +2216,19 @@ function getSessionsApiBase() {
   return (el ? el.value : 'http://localhost:8000').replace(/\/+$/, '');
 }
 
+function getSessionsAuthHeaders() {
+  const key = (document.getElementById('sessions-api-key') || {}).value;
+  if (!key) return {};
+  return { 'Authorization': 'Bearer ' + key };
+}
+
 function fetchSessions() {
   const base = getSessionsApiBase();
+  const headers = getSessionsAuthHeaders();
   const statusEl = document.getElementById('sessions-status');
   statusEl.textContent = 'Loading...';
-  fetch(base + '/sessions')
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  fetch(base + '/sessions', { headers: headers })
+    .then(r => { if (r.status === 401) throw new Error('401 Unauthorized — check your API key'); if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(data => {
       sessionsData = data;
       statusEl.textContent = data.length + ' session(s) loaded';
@@ -2280,8 +2289,9 @@ function renderSessions() {
 
 function sessionAction(sessionId, action) {
   const base = getSessionsApiBase();
-  fetch(base + '/sessions/' + sessionId + '/' + action, { method: 'POST' })
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  const headers = getSessionsAuthHeaders();
+  fetch(base + '/sessions/' + sessionId + '/' + action, { method: 'POST', headers: headers })
+    .then(r => { if (r.status === 401) throw new Error('401 Unauthorized — check your API key'); if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(() => fetchSessions())
     .catch(err => alert('Action failed: ' + err.message));
 }
@@ -2291,9 +2301,10 @@ function showSessionDetail(sessionId) {
   const detailDiv = document.getElementById('session-detail');
   const card = document.getElementById('session-detail-card');
 
+  const headers = getSessionsAuthHeaders();
   Promise.all([
-    fetch(base + '/sessions/' + sessionId).then(r => r.json()),
-    fetch(base + '/sessions/' + sessionId + '/audit').then(r => r.json())
+    fetch(base + '/sessions/' + sessionId, { headers: headers }).then(r => r.json()),
+    fetch(base + '/sessions/' + sessionId + '/audit', { headers: headers }).then(r => r.json())
   ]).then(([detail, audit]) => {
     let html = '<div class="card-header">';
     html += '<div class="card-header-left"><span class="dot ' + sessionStatusDot(detail.status) + '"></span>';
