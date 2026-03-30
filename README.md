@@ -177,10 +177,19 @@ uvicorn clawboss.server:app
 With API key auth:
 
 ```bash
+# Pick any string as your secret — there's no signup or external service
 CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
 ```
 
-All endpoints then require `Authorization: Bearer my-secret-key`. WebSocket connections pass the key as `?token=my-secret-key`.
+Clients pass the key as a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer my-secret-key" http://localhost:8000/sessions
+```
+
+WebSocket connections pass it as a query param: `ws://localhost:8000/sessions/{id}/events?token=my-secret-key`
+
+If `CLAWBOSS_API_KEY` is not set, auth is disabled (open access — fine for local dev). You can also pass `api_key=` directly to `create_app()` in code.
 
 Endpoints:
 
