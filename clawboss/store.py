@@ -75,6 +75,12 @@ class Checkpoint:
     # If True, session is in-memory only — no auto-checkpointing, no crash recovery
     stateless: bool = False
 
+    # How many times this session has been resumed (system-controlled, crash loop protection)
+    resume_count: int = 0
+
+    # Human-readable reason the session ended (set on stop/fail)
+    failure_reason: str = ""
+
     # Persisted audit entries (list of dicts) — survives crashes
     audit_log: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -107,6 +113,8 @@ class Checkpoint:
             timestamp=d.get("timestamp", ""),
             created_at=d.get("created_at", d.get("timestamp", "")),
             stateless=d.get("stateless", False),
+            resume_count=d.get("resume_count", 0),
+            failure_reason=d.get("failure_reason", ""),
             audit_log=d.get("audit_log", []),
         )
 

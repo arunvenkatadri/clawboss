@@ -78,3 +78,14 @@ class ClawbossError(Exception):
             f"Session not found: {session_id}",
             session_id=session_id,
         )
+
+    @staticmethod
+    def max_resumes_exceeded(session_id: str, resume_count: int, limit: int) -> "ClawbossError":
+        return ClawbossError(
+            "max_resumes_exceeded",
+            f"Session {session_id} has been resumed {resume_count} times "
+            f"(limit: {limit}). Possible crash loop — session marked as failed.",
+            session_id=session_id,
+            resume_count=resume_count,
+            limit=limit,
+        )

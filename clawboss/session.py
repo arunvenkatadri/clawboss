@@ -162,6 +162,19 @@ class SessionManager:
                 f"Session {session_id} is stateless and cannot be resumed after a crash",
             )
 
+        # Crash loop protection: check max_resumes from the original policy
+        policy = Policy.from_dict(cp.policy_dict)
+        if cp.resume_count >= policy.max_resumes:
+            cp.status = SessionStatus.FAILED
+            cp.failure_reason = (
+                f"Crash loop: resumed {cp.resume_count} times (limit: {policy.max_resumes})"
+            )
+            self._store.save_checkpoint(cp)
+            raise ClawbossError.max_resumes_exceeded(
+                session_id, cp.resume_count, policy.max_resumes
+            )
+
+        cp.resume_count += 1
         cp.status = SessionStatus.RUNNING
         self._store.save_checkpoint(cp)
 
@@ -218,6 +231,32 @@ class SessionManager:
             self._original_policies.pop(session_id, None)
 
         self._store.save_checkpoint(cp)
+
+    def restart(self, session_id: str) -> str:
+        """Restart a stopped or failed session with the same policy and agent ID.
+
+        Creates a fresh session using the original policy from the old session.
+        The old session is preserved for audit purposes.
+
+        Returns:
+            The new session_id.
+        """
+        cp = self._store.load_checkpoint(session_id)
+        if cp is None:
+            raise ClawbossError.session_not_found(session_id)
+
+        # Clean up in-memory state for the old session if any
+        with self._lock:
+            self._supervisors.pop(session_id, None)
+            self._audit_sinks.pop(session_id, None)
+            self._original_policies.pop(session_id, None)
+            self._stateless_sessions.discard(session_id)
+
+        return self.start(
+            agent_id=cp.agent_id,
+            policy_dict=cp.policy_dict,
+            stateless=cp.stateless,
+        )
 
     def status(self, session_id: str) -> Optional[Checkpoint]:
         """Get the current checkpoint for a session."""

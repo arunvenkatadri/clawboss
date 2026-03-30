@@ -2334,6 +2334,12 @@ function renderSessions() {
     html += '<div class="card-desc" style="font-size:0.75rem; color:var(--muted);">Session: ' + esc(s.session_id) + '</div>';
     html += '<div class="detail-row"><span class="detail-label">Iterations</span><span class="detail-value">' + s.iterations + ' / ' + s.iteration_limit + '</span></div>';
     html += '<div class="detail-row"><span class="detail-label">Tokens</span><span class="detail-value">' + s.tokens_used + (s.token_limit ? ' / ' + s.token_limit : '') + '</span></div>';
+    if (s.resume_count > 0) {
+      html += '<div class="detail-row"><span class="detail-label">Resumes</span><span class="detail-value">' + s.resume_count + '</span></div>';
+    }
+    if (s.failure_reason) {
+      html += '<div style="font-size:0.75rem; color:var(--red); margin:0.3rem 0; padding:0.3rem 0.5rem; background:rgba(250,82,82,0.1); border-radius:4px;">' + esc(s.failure_reason) + '</div>';
+    }
     // Controls
     html += '<div class="card-actions">';
     if (s.status === 'running') {
@@ -2342,6 +2348,8 @@ function renderSessions() {
     } else if (s.status === 'paused') {
       html += '<button class="btn-secondary" onclick="event.stopPropagation();sessionAction(\'' + s.session_id + '\',\'resume\')">Resume</button>';
       html += '<button class="btn-danger" onclick="event.stopPropagation();sessionAction(\'' + s.session_id + '\',\'stop\')">Stop</button>';
+    } else if (s.status === 'stopped' || s.status === 'failed') {
+      html += '<button class="btn-secondary" onclick="event.stopPropagation();sessionRestart(\'' + s.session_id + '\')">Restart</button>';
     }
     html += '</div>';
     html += '</div>';
@@ -2356,6 +2364,18 @@ function sessionAction(sessionId, action) {
     .then(r => { if (r.status === 401) throw new Error('401 Unauthorized — check your API key'); if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(() => fetchSessions())
     .catch(err => alert('Action failed: ' + err.message));
+}
+
+function sessionRestart(sessionId) {
+  const base = getSessionsApiBase();
+  const headers = getSessionsAuthHeaders();
+  fetch(base + '/sessions/' + sessionId + '/restart', { method: 'POST', headers: headers })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      alert('New session created: ' + data.session_id);
+      fetchSessions();
+    })
+    .catch(err => alert('Restart failed: ' + err.message));
 }
 
 function showSessionDetail(sessionId) {

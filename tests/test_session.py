@@ -446,3 +446,106 @@ class TestStatelessSessions:
         cp = store.load_checkpoint(sid)
         assert cp.tokens_used == 0
         assert cp.iterations == 0
+
+
+# ---------------------------------------------------------------------------
+# Crash loop protection (max_resumes)
+# ---------------------------------------------------------------------------
+
+
+class TestCrashLoopProtection:
+    def test_default_max_resumes_is_3(self):
+        """Policy defaults to max_resumes=3."""
+        from clawboss.policy import Policy
+        p = Policy()
+        assert p.max_resumes == 3
+
+    def test_resume_increments_count(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        mgr.pause(sid)
+        mgr.resume(sid)
+        cp = mgr.status(sid)
+        assert cp.resume_count == 1
+
+    def test_resume_count_persists_across_crashes(self):
+        store = MemoryStore()
+        mgr1 = SessionManager(store)
+        sid = mgr1.start("agent-1", POLICY)
+        mgr1.pause(sid)
+        mgr1.resume(sid)
+        del mgr1
+
+        mgr2 = SessionManager(store)
+        mgr2.pause(sid)
+        mgr2.resume(sid)
+        cp = mgr2.status(sid)
+        assert cp.resume_count == 2
+
+    def test_max_resumes_exceeded_marks_failed(self):
+        """After max_resumes, session is marked FAILED and resume raises."""
+        store = MemoryStore()
+        policy = {"max_iterations": 5, "max_resumes": 2}
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", policy)
+
+        # Resume 1
+        mgr.pause(sid)
+        mgr.resume(sid)
+
+        # Resume 2
+        mgr.pause(sid)
+        mgr.resume(sid)
+
+        # Resume 3 — should fail (limit is 2)
+        mgr.pause(sid)
+        with pytest.raises(ClawbossError) as exc_info:
+            mgr.resume(sid)
+        assert exc_info.value.kind == "max_resumes_exceeded"
+
+        # Session is marked as failed
+        cp = mgr.status(sid)
+        assert cp.status == SessionStatus.FAILED
+
+    def test_crash_loop_after_repeated_crashes(self):
+        """Simulate an agent that keeps crashing and being resumed."""
+        store = MemoryStore()
+        policy = {"max_iterations": 5, "max_resumes": 2}
+
+        # Process 1: start, crash
+        mgr1 = SessionManager(store)
+        sid = mgr1.start("crashy-agent", policy)
+        del mgr1
+
+        # Process 2: resume, crash
+        mgr2 = SessionManager(store)
+        mgr2.resume(sid)
+        del mgr2
+
+        # Process 3: resume, crash
+        mgr3 = SessionManager(store)
+        mgr3.resume(sid)
+        del mgr3
+
+        # Process 4: resume should fail — crash loop detected
+        mgr4 = SessionManager(store)
+        with pytest.raises(ClawbossError) as exc_info:
+            mgr4.resume(sid)
+        assert exc_info.value.kind == "max_resumes_exceeded"
+        assert "crash loop" in str(exc_info.value).lower()
+
+    def test_custom_max_resumes(self):
+        store = MemoryStore()
+        policy = {"max_iterations": 5, "max_resumes": 10}
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", policy)
+        # Should allow 10 resumes
+        for _ in range(10):
+            mgr.pause(sid)
+            mgr.resume(sid)
+        # 11th should fail
+        mgr.pause(sid)
+        with pytest.raises(ClawbossError) as exc_info:
+            mgr.resume(sid)
+        assert exc_info.value.kind == "max_resumes_exceeded"

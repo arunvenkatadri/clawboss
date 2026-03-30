@@ -59,6 +59,9 @@ class Policy:
     on_circuit_open: OnFailure = field(default_factory=lambda: OnFailure(Action.RETURN_ERROR))
     on_silence: OnFailure = field(default_factory=lambda: OnFailure(Action.RETURN_ERROR))
 
+    # Crash loop protection
+    max_resumes: int = 3  # max times a session can be resumed before marked failed
+
     # Audit
     audit_enabled: bool = True
 
@@ -88,6 +91,7 @@ class Policy:
         ):
             val: OnFailure = getattr(self, key)
             d[key] = {"action": val.action.value, "retries": val.retries}
+        d["max_resumes"] = self.max_resumes
         if self.require_confirm:
             d["require_confirm"] = list(self.require_confirm)
         return d
@@ -100,6 +104,7 @@ class Policy:
             tool_timeout, max_iterations, token_budget,
             request_timeout, silence_timeout,
             circuit_breaker_threshold, circuit_breaker_reset,
+            max_resumes,
             on_timeout, on_budget_exceeded, on_max_iterations,
             on_circuit_open, on_silence, audit_enabled, require_confirm
         """
@@ -113,6 +118,7 @@ class Policy:
             "silence_timeout",
             "circuit_breaker_threshold",
             "circuit_breaker_reset",
+            "max_resumes",
             "audit_enabled",
         ):
             if key in d:

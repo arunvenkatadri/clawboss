@@ -95,6 +95,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
+| **Crash loop protection** | Agent keeps crashing and restarting forever |
 | **REST control plane** | No way to pause/resume/stop agents remotely |
 
 ## Works with any agent framework
@@ -160,6 +161,29 @@ class RedisStore:
 
 Ships with `SqliteStore` (production default, stdlib sqlite3) and `MemoryStore` (testing).
 
+### Crash loop protection
+
+If an agent keeps crashing and being resumed, `max_resumes` stops it from looping forever. Default is 3 — after that, the session is marked as `failed` with a reason.
+
+```python
+session_id = mgr.start("my-agent", {
+    "max_iterations": 10,
+    "max_resumes": 5,     # allow up to 5 crash recoveries (default: 3)
+})
+
+# After 5 crashes and resumes, the next resume() raises:
+# ClawbossError("max_resumes_exceeded", "Crash loop: resumed 5 times (limit: 5)")
+# Session is automatically marked as FAILED.
+```
+
+Failed sessions can be restarted fresh (same policy, new session):
+
+```python
+new_session_id = mgr.restart(session_id)  # or POST /sessions/{id}/restart
+```
+
+The dashboard shows the failure reason on failed/stopped session cards and offers a Restart button.
+
 ### Stateless sessions
 
 Not every agent needs crash recovery. Pass `stateless=True` to skip auto-checkpointing — you still get supervision, audit logging, and pause/stop controls, but no disk writes on each tool call and no crash recovery.
@@ -220,6 +244,7 @@ Endpoints:
 | POST | `/sessions/{id}/pause` | Pause an agent |
 | POST | `/sessions/{id}/resume` | Resume a paused agent |
 | POST | `/sessions/{id}/stop` | Stop an agent |
+| POST | `/sessions/{id}/restart` | Restart a stopped/failed agent (new session, same policy) |
 | GET | `/sessions/{id}/audit` | Audit log entries for this session |
 | WS | `/sessions/{id}/events` | Stream status changes and audit events |
 
@@ -504,10 +529,11 @@ Dataclass with all configuration. Every field has a sensible default.
 
 ### `SessionManager(store)`
 
-- `start(agent_id, policy_dict, payload)` — create a new session, returns `session_id`
+- `start(agent_id, policy_dict, payload, stateless=False)` — create a new session, returns `session_id`
 - `pause(session_id)` — pause (supervisor raises `AgentPaused` on next call)
 - `resume(session_id)` — rehydrate supervisor from last checkpoint
 - `stop(session_id)` — stop and finalize
+- `restart(session_id)` — restart a stopped/failed session (new session, same policy)
 - `status(session_id)` — get current checkpoint
 - `list_sessions()` — list all sessions
 - `get_supervisor(session_id)` — get the active supervisor

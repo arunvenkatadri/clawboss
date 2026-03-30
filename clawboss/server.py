@@ -58,6 +58,8 @@ class SessionSummary(BaseModel):
     timestamp: str = ""
     payload: Optional[Dict[str, Any]] = None
     stateless: bool = False
+    resume_count: int = 0
+    failure_reason: str = ""
 
 
 class SessionDetail(SessionSummary):
@@ -210,6 +212,17 @@ def create_app(
         cp = manager.status(session_id)
         return _checkpoint_to_summary(cp)
 
+    @app.post("/sessions/{session_id}/restart", response_model=SessionSummary, status_code=201)
+    def restart_session(session_id: str, _=Depends(auth)):
+        try:
+            new_sid = manager.restart(session_id)
+        except Exception as e:
+            if "not found" in str(e).lower():
+                raise HTTPException(status_code=404, detail="Session not found")
+            raise
+        cp = manager.status(new_sid)
+        return _checkpoint_to_summary(cp)
+
     @app.get("/sessions/{session_id}/audit")
     def get_audit(session_id: str, _=Depends(auth)):
         cp = manager.status(session_id)
@@ -283,6 +296,8 @@ def _checkpoint_to_summary(cp) -> dict:
         "timestamp": cp.timestamp,
         "payload": cp.payload,
         "stateless": cp.stateless,
+        "resume_count": cp.resume_count,
+        "failure_reason": cp.failure_reason,
     }
 
 
