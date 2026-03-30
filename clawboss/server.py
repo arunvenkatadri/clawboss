@@ -91,7 +91,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.1.0",
+        version="0.7.0",
         description=(
             "REST API for managing agent sessions. "
             "WARNING: No authentication. Do not expose to untrusted networks."
