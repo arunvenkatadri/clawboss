@@ -28,7 +28,14 @@ from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_sch
 from .policy import Action, OnFailure, Policy
 from .session import SessionManager
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
-from .store import Checkpoint, MemoryStore, SessionStatus, SqliteStore, StateStore
+from .store import (
+    Checkpoint,
+    MemoryStore,
+    SessionStatus,
+    SqliteStore,
+    StateStore,
+    validate_payload,
+)
 from .supervisor import SupervisedResult, Supervisor
 
 __all__ = [
@@ -62,4 +69,5 @@ __all__ = [
     "Checkpoint",
     "SessionStatus",
     "SessionManager",
+    "validate_payload",
 ]

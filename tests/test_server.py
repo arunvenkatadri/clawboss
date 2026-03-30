@@ -1,4 +1,4 @@
-"""Tests for clawboss.server — REST control plane endpoints."""
+"""Tests for clawboss.server — REST control plane endpoints and security."""
 
 import pytest
 
@@ -222,3 +222,49 @@ class TestFullLifecycle:
         resp = client.get(f"/sessions/{sid}")
         assert resp.status_code == 200
         assert resp.json()["status"] == "stopped"
+
+
+# ---------------------------------------------------------------------------
+# Security: CORS defaults
+# ---------------------------------------------------------------------------
+
+
+class TestCORSDefaults:
+    def test_cors_rejects_foreign_origin(self, client):
+        """Non-localhost origins should be rejected by default CORS policy."""
+        resp = client.options(
+            "/sessions",
+            headers={
+                "Origin": "https://evil.com",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        # The response should NOT include the evil origin in allow-origin
+        allow_origin = resp.headers.get("access-control-allow-origin", "")
+        assert "evil.com" not in allow_origin
+
+    def test_cors_allows_localhost(self, client):
+        """Localhost origins should be allowed."""
+        resp = client.options(
+            "/sessions",
+            headers={
+                "Origin": "http://localhost",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        allow_origin = resp.headers.get("access-control-allow-origin", "")
+        assert "localhost" in allow_origin or allow_origin == "*"
+
+
+# ---------------------------------------------------------------------------
+# Security: Session ID via REST
+# ---------------------------------------------------------------------------
+
+
+class TestSessionIdSecurity:
+    def test_session_id_high_entropy(self, client):
+        """Session IDs returned by the API should be 32 hex chars (128 bits)."""
+        resp = client.post("/sessions", json={"agent_id": "test"})
+        sid = resp.json()["session_id"]
+        assert len(sid) == 32
+        assert all(c in "0123456789abcdef" for c in sid)

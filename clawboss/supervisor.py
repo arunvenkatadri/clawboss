@@ -402,15 +402,28 @@ class Supervisor:
         checkpoint: Checkpoint,
         audit: Optional[AuditLog] = None,
         store: Optional[StateStore] = None,
+        policy_override: Optional[Dict[str, Any]] = None,
     ) -> Supervisor:
         """Rebuild a Supervisor from a checkpoint.
 
         Restores budget counters and circuit breaker states so the agent
         can continue where it left off.
+
+        Args:
+            checkpoint: The checkpoint to restore from.
+            audit: Optional audit log for the restored supervisor.
+            store: Optional state store for auto-checkpointing.
+            policy_override: If provided, use this policy dict instead of the
+                           checkpoint's. This is the SECURITY mechanism —
+                           SessionManager always passes the original immutable
+                           policy here so agents cannot downgrade supervision.
         """
         from .store import SessionStatus
 
-        policy = Policy.from_dict(checkpoint.policy_dict)
+        # SECURITY: prefer the override (original immutable policy) over
+        # whatever the checkpoint contains.
+        policy_dict = policy_override if policy_override is not None else checkpoint.policy_dict
+        policy = Policy.from_dict(policy_dict)
         sv = cls(
             policy,
             audit=audit,
@@ -438,10 +451,19 @@ class Supervisor:
         return sv
 
     def _auto_checkpoint(self) -> None:
-        """Save a checkpoint if a store is configured."""
+        """Save a checkpoint if a store is configured.
+
+        Only updates SYSTEM-CONTROLLED fields (budget counters, circuit breaker
+        states, status, timestamp). Does NOT touch payload (agent-writable) or
+        policy_dict (immutable). This preserves the trust boundary between
+        supervisor-controlled and agent-controlled data.
+        """
         if self._store is None or self._session_id is None:
             return
         from .store import Checkpoint, SessionStatus
+
+        # Load existing checkpoint to preserve payload, policy, created_at, audit_log
+        existing = self._store.load_checkpoint(self._session_id)
 
         status = SessionStatus.PAUSED if self._paused else SessionStatus.RUNNING
         data = self.to_checkpoint_data()
@@ -454,8 +476,12 @@ class Supervisor:
             token_limit=data["token_limit"],
             iteration_limit=data["iteration_limit"],
             circuit_breaker_states=data["circuit_breaker_states"],
-            policy_dict=self._policy.to_dict(),
+            # Preserve immutable fields from the original checkpoint
+            policy_dict=existing.policy_dict if existing else self._policy.to_dict(),
+            payload=existing.payload if existing else {},
             timestamp=datetime.now(timezone.utc).isoformat(),
+            created_at=existing.created_at if existing else "",
+            audit_log=existing.audit_log if existing else [],
         )
         try:
             self._store.save_checkpoint(cp)

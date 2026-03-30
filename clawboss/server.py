@@ -7,6 +7,10 @@ Run with::
     uvicorn clawboss.server:app
 
 Or use ``create_app()`` to build an app with a custom store.
+
+SECURITY WARNING: This server has NO authentication or authorization.
+Do not expose it to untrusted networks without adding your own auth layer.
+By default, CORS is restricted to localhost origins only.
 """
 
 from __future__ import annotations
@@ -59,20 +63,44 @@ class SessionDetail(SessionSummary):
 # ---------------------------------------------------------------------------
 
 
-def create_app(manager: Optional[SessionManager] = None) -> FastAPI:
+_LOCALHOST_ORIGINS = [
+    "http://localhost",
+    "http://localhost:*",
+    "http://127.0.0.1",
+    "http://127.0.0.1:*",
+]
+
+
+def create_app(
+    manager: Optional[SessionManager] = None,
+    allowed_origins: Optional[List[str]] = None,
+) -> FastAPI:
     """Build a FastAPI app wired to the given SessionManager.
 
     If no manager is supplied, one is created with a SqliteStore.
+
+    Args:
+        manager: SessionManager to use. Created with SqliteStore if None.
+        allowed_origins: CORS allowed origins. Defaults to localhost only.
+                        Pass ["*"] to allow all origins (NOT recommended
+                        for production without auth).
     """
     if manager is None:
         store = SqliteStore()
         manager = SessionManager(store)
 
-    app = FastAPI(title="Clawboss Control Plane", version="0.1.0")
+    app = FastAPI(
+        title="Clawboss Control Plane",
+        version="0.1.0",
+        description=(
+            "REST API for managing agent sessions. "
+            "WARNING: No authentication. Do not expose to untrusted networks."
+        ),
+    )
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins or _LOCALHOST_ORIGINS,
         allow_methods=["*"],
         allow_headers=["*"],
     )

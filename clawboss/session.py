@@ -2,6 +2,14 @@
 
 Wraps a Supervisor + StateStore and adds start / pause / resume / stop.
 
+Security invariants:
+- Policy is IMMUTABLE after start(). resume() always rebuilds the Supervisor
+  from the original policy stored at creation time — never from agent-controlled
+  checkpoint data. An agent cannot weaken its own supervision.
+- Payload is UNTRUSTED. It is validated for size/serializability on write, and
+  agents consuming it after resume should treat it like user input.
+- Audit entries are persisted to the store so they survive crashes.
+
 Usage:
     from clawboss import SessionManager, MemoryStore
 
@@ -23,7 +31,7 @@ from typing import Any, Dict, List, Optional
 from .audit import AuditLog, MemoryAuditSink
 from .errors import ClawbossError
 from .policy import Policy
-from .store import Checkpoint, SessionStatus, StateStore, new_session_id
+from .store import Checkpoint, SessionStatus, StateStore, new_session_id, validate_payload
 from .supervisor import Supervisor
 
 
@@ -39,6 +47,7 @@ class SessionManager:
         self._store = store
         self._supervisors: Dict[str, Supervisor] = {}
         self._audit_sinks: Dict[str, MemoryAuditSink] = {}
+        self._original_policies: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
 
     def start(
@@ -52,13 +61,19 @@ class SessionManager:
         Args:
             agent_id: Identifier for the agent type.
             policy_dict: Policy configuration (passed to Policy.from_dict).
+                         This is stored immutably — the agent can never change it.
             payload: Opaque JSON the agent can stash intermediate work in.
+                     Treated as untrusted data. Validated for size limits.
 
         Returns:
             session_id for the new session.
         """
         sid = new_session_id()
-        policy = Policy.from_dict(policy_dict or {})
+        safe_policy_dict = policy_dict or {}
+        policy = Policy.from_dict(safe_policy_dict)
+
+        # Validate payload before storing
+        safe_payload = validate_payload(payload or {})
 
         sink = MemoryAuditSink()
         audit = AuditLog(sid, sinks=[sink])
@@ -71,20 +86,24 @@ class SessionManager:
             agent_id=agent_id,
         )
 
+        # Store the ORIGINAL policy — this is immutable for the session's lifetime
+        frozen_policy = policy.to_dict()
+
         checkpoint = Checkpoint(
             session_id=sid,
             agent_id=agent_id,
             status=SessionStatus.RUNNING,
             token_limit=policy.token_budget,
             iteration_limit=policy.max_iterations,
-            policy_dict=policy.to_dict(),
-            payload=payload or {},
+            policy_dict=frozen_policy,
+            payload=safe_payload,
         )
         self._store.save_checkpoint(checkpoint)
 
         with self._lock:
             self._supervisors[sid] = sv
             self._audit_sinks[sid] = sink
+            self._original_policies[sid] = frozen_policy
 
         return sid
 
@@ -95,6 +114,8 @@ class SessionManager:
             raise ClawbossError.session_not_found(session_id)
 
         cp.status = SessionStatus.PAUSED
+        # Persist audit entries before pausing
+        self._persist_audit(session_id, cp)
         self._store.save_checkpoint(cp)
 
         with self._lock:
@@ -105,7 +126,9 @@ class SessionManager:
     def resume(self, session_id: str) -> Supervisor:
         """Resume a paused or previously-crashed session.
 
-        Rehydrates a Supervisor from the last checkpoint.
+        Rehydrates a Supervisor from the last checkpoint. Policy is always
+        rebuilt from the ORIGINAL immutable policy stored at start() — never
+        from any agent-modified data in the checkpoint.
 
         Returns:
             The restored Supervisor, ready for use.
@@ -120,12 +143,25 @@ class SessionManager:
         sink = MemoryAuditSink()
         audit = AuditLog(session_id, sinks=[sink])
 
-        sv = Supervisor.restore_from_checkpoint(cp, audit=audit, store=self._store)
+        # SECURITY: always use the original policy, not whatever the checkpoint says.
+        # The checkpoint's policy_dict IS the original (set at start()), but we also
+        # cache it in _original_policies for sessions started in this process.
+        with self._lock:
+            original = self._original_policies.get(session_id)
+        if original is None:
+            # Session was started in a previous process — use the checkpoint's policy,
+            # which was set at start() and never mutated by auto-checkpoint.
+            original = cp.policy_dict
+
+        sv = Supervisor.restore_from_checkpoint(
+            cp, audit=audit, store=self._store, policy_override=original
+        )
         sv.paused = False
 
         with self._lock:
             self._supervisors[session_id] = sv
             self._audit_sinks[session_id] = sink
+            self._original_policies[session_id] = original
 
         return sv
 
@@ -136,8 +172,7 @@ class SessionManager:
             raise ClawbossError.session_not_found(session_id)
 
         with self._lock:
-            sv = self._supervisors.pop(session_id, None)
-            self._audit_sinks.pop(session_id, None)
+            sv = self._supervisors.get(session_id)
 
         if sv is not None:
             sv.finish()
@@ -148,6 +183,15 @@ class SessionManager:
             data = sv.to_checkpoint_data()
             cp.iterations = data["iterations"]
             cp.tokens_used = data["tokens_used"]
+
+        # Persist audit entries BEFORE removing sink from memory
+        self._persist_audit(session_id, cp)
+
+        with self._lock:
+            self._supervisors.pop(session_id, None)
+            self._audit_sinks.pop(session_id, None)
+            self._original_policies.pop(session_id, None)
+
         self._store.save_checkpoint(cp)
 
     def status(self, session_id: str) -> Optional[Checkpoint]:
@@ -164,17 +208,43 @@ class SessionManager:
             return self._supervisors.get(session_id)
 
     def get_audit_entries(self, session_id: str) -> list:
-        """Get audit log entries for a session."""
+        """Get audit log entries for a session (in-memory + persisted)."""
+        # Start with persisted entries from the store
+        cp = self._store.load_checkpoint(session_id)
+        persisted = cp.audit_log if cp is not None else []
+
+        # Add in-memory entries from current process
         with self._lock:
             sink = self._audit_sinks.get(session_id)
-        if sink is None:
-            return []
-        return [e.to_dict() for e in sink.entries]
+        in_memory = [e.to_dict() for e in sink.entries] if sink is not None else []
+
+        return persisted + in_memory
 
     def update_payload(self, session_id: str, payload: Dict[str, Any]) -> None:
-        """Update the opaque payload for a session."""
+        """Update the opaque payload for a session.
+
+        The payload is validated for size limits and serializability.
+        Treat payload as UNTRUSTED — it may contain agent-controlled data.
+        """
         cp = self._store.load_checkpoint(session_id)
         if cp is None:
             raise ClawbossError.session_not_found(session_id)
-        cp.payload = payload
+        cp.payload = validate_payload(payload)
         self._store.save_checkpoint(cp)
+
+    def delete_expired(self, max_age_seconds: float) -> int:
+        """Delete sessions older than max_age_seconds.
+
+        Only works with SqliteStore. For MemoryStore, iterate list_sessions()
+        and call delete_session() manually.
+        """
+        if hasattr(self._store, "delete_expired"):
+            return self._store.delete_expired(max_age_seconds)
+        return 0
+
+    def _persist_audit(self, session_id: str, cp: Checkpoint) -> None:
+        """Flush in-memory audit entries into the checkpoint for persistence."""
+        with self._lock:
+            sink = self._audit_sinks.get(session_id)
+        if sink is not None:
+            cp.audit_log = cp.audit_log + [e.to_dict() for e in sink.entries]

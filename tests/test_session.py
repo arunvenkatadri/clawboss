@@ -1,11 +1,10 @@
-"""Tests for clawboss.session — SessionManager lifecycle."""
-
+"""Tests for clawboss.session — SessionManager lifecycle and security invariants."""
 
 import pytest
 
 from clawboss.errors import ClawbossError
 from clawboss.session import SessionManager
-from clawboss.store import MemoryStore, SessionStatus
+from clawboss.store import MAX_PAYLOAD_BYTES, MemoryStore, SessionStatus
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -208,6 +207,21 @@ class TestPayload:
         with pytest.raises(ClawbossError):
             mgr.update_payload("nope", {})
 
+    def test_oversized_payload_rejected_on_start(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        huge = {"data": "x" * (MAX_PAYLOAD_BYTES + 1)}
+        with pytest.raises(ValueError, match="maximum size"):
+            mgr.start("agent-1", POLICY, huge)
+
+    def test_oversized_payload_rejected_on_update(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        huge = {"data": "x" * (MAX_PAYLOAD_BYTES + 1)}
+        with pytest.raises(ValueError, match="maximum size"):
+            mgr.update_payload(sid, huge)
+
 
 # ---------------------------------------------------------------------------
 # Audit entries
@@ -228,3 +242,134 @@ class TestAuditEntries:
         store = MemoryStore()
         mgr = SessionManager(store)
         assert mgr.get_audit_entries("nope") == []
+
+    def test_audit_persisted_on_pause(self):
+        """Audit entries should be persisted to the store when pausing."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        mgr.pause(sid)
+        cp = store.load_checkpoint(sid)
+        assert len(cp.audit_log) > 0
+        assert any(e.get("phase") == "request_start" for e in cp.audit_log)
+
+    def test_audit_persisted_on_stop(self):
+        """Audit entries should be persisted to the store when stopping."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        mgr.stop(sid)
+        cp = store.load_checkpoint(sid)
+        assert len(cp.audit_log) > 0
+
+    def test_audit_survives_crash(self):
+        """After pause (persists audit), crash, and resume — audit is recoverable."""
+        store = MemoryStore()
+        mgr1 = SessionManager(store)
+        sid = mgr1.start("agent-1", POLICY)
+        mgr1.pause(sid)
+        del mgr1
+
+        mgr2 = SessionManager(store)
+        entries = mgr2.get_audit_entries(sid)
+        assert len(entries) > 0
+        assert any(e.get("phase") == "request_start" for e in entries)
+
+
+# ---------------------------------------------------------------------------
+# Security: Policy immutability
+# ---------------------------------------------------------------------------
+
+
+class TestPolicyImmutability:
+    def test_resume_uses_original_policy(self):
+        """Even if checkpoint policy_dict is tampered with, resume uses the original."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", {
+            "max_iterations": 3,
+            "token_budget": 1000,
+            "require_confirm": ["dangerous_tool"],
+        })
+
+        # Simulate an attacker tampering with the stored checkpoint's policy
+        cp = store.load_checkpoint(sid)
+        cp.policy_dict = {
+            "max_iterations": 9999,
+            "token_budget": 999999999,
+            "require_confirm": [],  # attacker removed confirmation gate!
+        }
+        store.save_checkpoint(cp)
+
+        # Resume should use the ORIGINAL policy, not the tampered one
+        sv = mgr.resume(sid)
+        assert sv.policy.max_iterations == 3
+        assert sv.policy.token_budget == 1000
+        assert "dangerous_tool" in sv.policy.require_confirm
+
+    def test_resume_after_crash_uses_stored_original_policy(self):
+        """After a process restart, resume uses the checkpoint's policy_dict
+        which was set at start() and never overwritten by auto-checkpoint."""
+        store = MemoryStore()
+        mgr1 = SessionManager(store)
+        sid = mgr1.start("agent-1", {
+            "max_iterations": 3,
+            "require_confirm": ["dangerous_tool"],
+        })
+        del mgr1
+
+        # New manager — no in-memory cache of original policy
+        mgr2 = SessionManager(store)
+        sv = mgr2.resume(sid)
+        assert sv.policy.max_iterations == 3
+        assert "dangerous_tool" in sv.policy.require_confirm
+
+    @pytest.mark.asyncio
+    async def test_auto_checkpoint_does_not_overwrite_policy(self):
+        """Auto-checkpoint after tool calls should not change the policy in the store."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", {
+            "max_iterations": 5,
+            "require_confirm": ["delete_file"],
+        })
+        sv = mgr.get_supervisor(sid)
+        await sv.call("search", good_tool, query="test")
+
+        # Check the stored checkpoint still has the original policy
+        cp = store.load_checkpoint(sid)
+        assert cp.policy_dict["max_iterations"] == 5
+        assert "delete_file" in cp.policy_dict["require_confirm"]
+
+    @pytest.mark.asyncio
+    async def test_auto_checkpoint_preserves_payload(self):
+        """Auto-checkpoint should not wipe the payload."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, {"important": "data"})
+        sv = mgr.get_supervisor(sid)
+        await sv.call("search", good_tool, query="test")
+
+        cp = store.load_checkpoint(sid)
+        assert cp.payload == {"important": "data"}
+
+
+# ---------------------------------------------------------------------------
+# Session ID entropy
+# ---------------------------------------------------------------------------
+
+
+class TestSessionIdSecurity:
+    def test_session_id_length(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        assert len(sid) == 32  # 128 bits of entropy
+
+    def test_session_ids_not_sequential(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        ids = [mgr.start("agent-1", POLICY) for _ in range(10)]
+        # No common prefix — crypto random
+        prefixes = {s[:8] for s in ids}
+        assert len(prefixes) == 10
