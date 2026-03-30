@@ -82,6 +82,27 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
+    def approval_pending(tool_name: str, approval_id: str) -> "ClawbossError":
+        return ClawbossError(
+            "approval_pending",
+            f"Tool '{tool_name}' requires approval (id: {approval_id})",
+            tool_name=tool_name,
+            approval_id=approval_id,
+        )
+
+    @staticmethod
+    def approval_denied(tool_name: str, reason: str = "") -> "ClawbossError":
+        msg = f"Tool '{tool_name}' was denied"
+        if reason:
+            msg += f": {reason}"
+        return ClawbossError(
+            "approval_denied",
+            msg,
+            tool_name=tool_name,
+            reason=reason,
+        )
+
+    @staticmethod
     def agent_paused(session_id: str) -> "ClawbossError":
         return ClawbossError(
             "agent_paused",

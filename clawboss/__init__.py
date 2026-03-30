@@ -19,6 +19,7 @@ Usage:
 
 __version__ = "0.77.0"
 
+from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
 from .budget import BudgetSnapshot, BudgetTracker
 from .builder import SkillBuilder
@@ -78,4 +79,7 @@ __all__ = [
     "SessionStatus",
     "SessionManager",
     "validate_payload",
+    "ApprovalQueue",
+    "ApprovalRequest",
+    "ApprovalStatus",
 ]

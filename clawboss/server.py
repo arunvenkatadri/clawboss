@@ -47,6 +47,10 @@ class CreateSessionRequest(BaseModel):
     stateless: bool = False
 
 
+class DenyRequest(BaseModel):
+    reason: str = ""
+
+
 class SessionSummary(BaseModel):
     session_id: str
     agent_id: str
@@ -223,6 +227,39 @@ def create_app(
         cp = manager.status(new_sid)
         return _checkpoint_to_summary(cp)
 
+    # ------------------------------------------------------------------
+    # Approval endpoints
+    # ------------------------------------------------------------------
+
+    @app.get("/sessions/{session_id}/approvals")
+    def list_approvals(session_id: str, _=Depends(auth)):
+        cp = manager.status(session_id)
+        if cp is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return [r.to_dict() for r in manager.approval_queue.list_all(session_id)]
+
+    @app.post("/sessions/{session_id}/approvals/{approval_id}/approve")
+    def approve_tool_call(session_id: str, approval_id: str, _=Depends(auth)):
+        req = manager.approval_queue.approve(approval_id)
+        if req is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Approval not found or already resolved",
+            )
+        return req.to_dict()
+
+    @app.post("/sessions/{session_id}/approvals/{approval_id}/deny")
+    def deny_tool_call(
+        session_id: str, approval_id: str, body: DenyRequest = DenyRequest(), _=Depends(auth)
+    ):
+        req = manager.approval_queue.deny(approval_id, reason=body.reason)
+        if req is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Approval not found or already resolved",
+            )
+        return req.to_dict()
+
     @app.get("/sessions/{session_id}/audit")
     def get_audit(session_id: str, _=Depends(auth)):
         cp = manager.status(session_id)
@@ -270,6 +307,14 @@ def create_app(
                             "iterations": cp.iterations,
                             "tokens_used": cp.tokens_used,
                         },
+                    })
+
+                # Send pending approvals
+                pending = manager.approval_queue.list_pending(session_id)
+                for req in pending:
+                    await websocket.send_json({
+                        "type": "approval_required",
+                        "data": req.to_dict(),
                     })
 
                 await asyncio.sleep(1)

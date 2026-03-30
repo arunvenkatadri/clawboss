@@ -454,6 +454,42 @@ class MyDatabaseSink(AuditSink):
         db.insert(entry.to_dict())
 ```
 
+## Confirmation gates (human-in-the-loop approval)
+
+Mark tools as requiring human approval before execution. When an agent tries to call a confirmed tool, the call is queued instead of blocked — a human can review and approve or deny it via the dashboard, REST API, or any WebSocket client.
+
+```python
+policy = Policy(
+    require_confirm=["delete_file", "send_email"],
+)
+```
+
+When the agent calls `delete_file`, instead of executing:
+
+1. The Supervisor returns `SupervisedResult(error=ClawbossError("approval_pending"))` with an `approval_id`
+2. The approval appears in the dashboard (yellow notification) and on the WebSocket events stream
+3. A human reviews and clicks Approve or Deny (or calls the REST endpoint)
+4. The agent calls `sv.execute_approved(approval_id, fn)` to run the approved tool
+
+```python
+# Agent calls a dangerous tool
+result = await sv.call("delete_file", delete_fn, path="/data")
+if result.error and result.error.kind == "approval_pending":
+    approval_id = result.error.details["approval_id"]
+    # ... wait for human to approve via dashboard/API ...
+    result = await sv.execute_approved(approval_id, delete_fn)
+```
+
+REST endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/sessions/{id}/approvals` | List all approvals for a session |
+| POST | `/sessions/{id}/approvals/{aid}/approve` | Approve a pending tool call |
+| POST | `/sessions/{id}/approvals/{aid}/deny` | Deny (with optional reason) |
+
+WebSocket clients receive `{"type": "approval_required", "data": {...}}` events for real-time notifications. This is the hook for Slack/email integrations — listen on the WebSocket and forward to your messaging tool.
+
 ## Circuit breaker
 
 Per-tool circuit breakers stop your agent from hammering a broken tool:

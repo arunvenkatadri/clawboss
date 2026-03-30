@@ -2558,6 +2558,22 @@ function sessionAction(sessionId, action) {
     .catch(err => alert('Action failed: ' + err.message));
 }
 
+function approvalAction(sessionId, approvalId, action) {
+  const base = getSessionsApiBase();
+  const headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  let body = '{}';
+  if (action === 'deny') {
+    const reason = prompt('Deny reason (optional):') || '';
+    body = JSON.stringify({ reason: reason });
+  }
+  fetch(base + '/sessions/' + sessionId + '/approvals/' + approvalId + '/' + action, {
+    method: 'POST', headers: headers, body: body
+  })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(() => { showSessionDetail(sessionId); fetchSessions(); })
+    .catch(err => alert('Action failed: ' + err.message));
+}
+
 function sessionRestart(sessionId) {
   const base = getSessionsApiBase();
   const headers = getSessionsAuthHeaders();
@@ -2578,13 +2594,44 @@ function showSessionDetail(sessionId) {
   const headers = getSessionsAuthHeaders();
   Promise.all([
     fetch(base + '/sessions/' + sessionId, { headers: headers }).then(r => r.json()),
-    fetch(base + '/sessions/' + sessionId + '/audit', { headers: headers }).then(r => r.json())
-  ]).then(([detail, audit]) => {
+    fetch(base + '/sessions/' + sessionId + '/audit', { headers: headers }).then(r => r.json()),
+    fetch(base + '/sessions/' + sessionId + '/approvals', { headers: headers }).then(r => r.json()).catch(() => [])
+  ]).then(([detail, audit, approvals]) => {
     let html = '<div class="card-header">';
     html += '<div class="card-header-left"><span class="dot ' + sessionStatusDot(detail.status) + '"></span>';
     html += '<span class="card-title">' + esc(detail.agent_id) + '</span></div>';
     html += '<div class="card-header-right"><span class="badge ' + sessionStatusBadgeClass(detail.status) + '">' + esc(detail.status) + '</span></div></div>';
     html += '<div class="card-desc" style="font-size:0.75rem; color:var(--muted); margin-bottom:0.5rem;">Session: ' + esc(detail.session_id) + '</div>';
+
+    // Pending approvals
+    var pendingApprovals = approvals.filter(function(a) { return a.status === 'pending'; });
+    if (pendingApprovals.length) {
+      html += '<h4 style="font-size:0.85rem; margin:0.5rem 0 0.3rem; color:var(--yellow);">Pending Approvals (' + pendingApprovals.length + ')</h4>';
+      pendingApprovals.forEach(function(a) {
+        html += '<div class="card" style="margin-bottom:0.4rem; border-color:var(--yellow); padding:0.6rem;">';
+        html += '<div style="font-size:0.85rem; font-weight:600;">Tool: <span style="color:var(--accent);">' + esc(a.tool_name) + '</span></div>';
+        html += '<div style="font-size:0.75rem; color:var(--muted); margin:0.2rem 0;">Args: ' + esc(JSON.stringify(a.tool_args)) + '</div>';
+        html += '<div style="font-size:0.72rem; color:var(--muted);">Requested: ' + esc(a.created_at) + '</div>';
+        html += '<div class="card-actions" style="margin-top:0.3rem;">';
+        html += '<button class="btn-secondary" style="background:var(--green); color:#fff; border-color:var(--green);" onclick="approvalAction(\'' + esc(detail.session_id) + '\',\'' + esc(a.approval_id) + '\',\'approve\')">Approve</button>';
+        html += '<button class="btn-danger" onclick="approvalAction(\'' + esc(detail.session_id) + '\',\'' + esc(a.approval_id) + '\',\'deny\')">Deny</button>';
+        html += '</div></div>';
+      });
+    }
+
+    // Past approvals
+    var resolvedApprovals = approvals.filter(function(a) { return a.status !== 'pending'; });
+    if (resolvedApprovals.length) {
+      html += '<h4 style="font-size:0.85rem; margin:0.5rem 0 0.3rem;">Approval History</h4>';
+      resolvedApprovals.forEach(function(a) {
+        var color = a.status === 'approved' ? 'var(--green)' : 'var(--red)';
+        html += '<div style="font-size:0.75rem; margin-bottom:0.2rem;">';
+        html += '<span style="color:' + color + ';">' + esc(a.status) + '</span> ';
+        html += '<span style="color:var(--accent);">' + esc(a.tool_name) + '</span>';
+        if (a.deny_reason) html += ' &mdash; ' + esc(a.deny_reason);
+        html += '</div>';
+      });
+    }
 
     // Budget usage
     html += '<h4 style="font-size:0.85rem; margin:0.5rem 0 0.3rem;">Budget</h4>';

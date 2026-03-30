@@ -34,6 +34,7 @@ from .errors import ClawbossError
 from .policy import Policy
 
 if TYPE_CHECKING:
+    from .approval import ApprovalQueue
     from .store import Checkpoint, StateStore
 
 
@@ -71,6 +72,7 @@ class Supervisor:
         store: Optional[StateStore] = None,
         session_id: Optional[str] = None,
         agent_id: Optional[str] = None,
+        approval_queue: Optional[ApprovalQueue] = None,
     ):
         self._policy = policy
         self._budget = BudgetTracker.from_policy(policy)
@@ -85,6 +87,7 @@ class Supervisor:
         self._store = store
         self._session_id = session_id
         self._agent_id = agent_id
+        self._approval_queue = approval_queue
 
         self._audit.record(
             AuditPhase.REQUEST_START,
@@ -182,10 +185,21 @@ class Supervisor:
         if self._paused and self._session_id:
             raise ClawbossError.agent_paused(self._session_id)
 
-    def _check_confirm(self, tool_name: str) -> None:
-        """Check if this tool requires confirmation."""
-        if tool_name in self._policy.require_confirm:
-            raise ClawbossError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
+    def _check_confirm(self, tool_name: str, kwargs: Dict[str, Any]) -> Optional[str]:
+        """Check if this tool requires confirmation.
+
+        If an approval queue is configured, queues the call and returns an
+        approval_id. Otherwise raises ClawbossError.
+
+        Returns:
+            approval_id if queued, None if no confirmation needed.
+        """
+        if tool_name not in self._policy.require_confirm:
+            return None
+        if self._approval_queue is not None and self._session_id:
+            req = self._approval_queue.submit(tool_name, kwargs, self._session_id)
+            return req.approval_id
+        raise ClawbossError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
 
     def _check_scopes(self, tool_name: str, kwargs: Dict[str, Any]) -> None:
         """Check if tool arguments satisfy scope rules."""
@@ -230,7 +244,21 @@ class Supervisor:
             self._check_paused()
             self._check_request_timeout()
             self._check_silence()
-            self._check_confirm(tool_name)
+            approval_id = self._check_confirm(tool_name, kwargs)
+            if approval_id is not None:
+                self._audit.record(
+                    AuditPhase.POLICY_CHECK,
+                    AuditOutcome.DENIED,
+                    target=tool_name,
+                    detail=f"Queued for approval: {approval_id}",
+                    metadata={"approval_id": approval_id},
+                )
+                return SupervisedResult(
+                    error=ClawbossError.approval_pending(tool_name, approval_id),
+                    duration_ms=int((time.monotonic() - start) * 1000),
+                    budget=self._budget.snapshot(),
+                    tool_name=tool_name,
+                )
             self._check_scopes(tool_name, kwargs)
         except ClawbossError as e:
             phase = (
@@ -359,6 +387,73 @@ class Supervisor:
             tool_name=tool_name,
         )
 
+    async def execute_approved(
+        self,
+        approval_id: str,
+        fn: Callable[..., Coroutine],
+    ) -> SupervisedResult:
+        """Execute a previously-approved tool call.
+
+        Looks up the approval in the queue, verifies it was approved,
+        then executes the tool call bypassing the confirmation check.
+
+        Args:
+            approval_id: The approval ID returned by the original call().
+            fn: The async callable to execute (same function the agent
+                originally tried to call).
+
+        Returns:
+            SupervisedResult — same as call().
+        """
+        if self._approval_queue is None:
+            return SupervisedResult(
+                error=ClawbossError.policy_denied("No approval queue configured"),
+                budget=self._budget.snapshot(),
+            )
+
+        from .approval import ApprovalStatus
+
+        req = self._approval_queue.get(approval_id)
+        if req is None:
+            return SupervisedResult(
+                error=ClawbossError.policy_denied(f"Approval {approval_id} not found"),
+                budget=self._budget.snapshot(),
+            )
+        if req.status == ApprovalStatus.DENIED:
+            return SupervisedResult(
+                error=ClawbossError.approval_denied(req.tool_name, req.deny_reason),
+                budget=self._budget.snapshot(),
+                tool_name=req.tool_name,
+            )
+        if req.status != ApprovalStatus.APPROVED:
+            return SupervisedResult(
+                error=ClawbossError.approval_pending(req.tool_name, approval_id),
+                budget=self._budget.snapshot(),
+                tool_name=req.tool_name,
+            )
+
+        # Approved — execute bypassing _check_confirm
+        self._audit.record(
+            AuditPhase.POLICY_CHECK,
+            AuditOutcome.ALLOWED,
+            target=req.tool_name,
+            detail=f"Approved (id: {approval_id}, by: {req.resolved_by})",
+            metadata={"approval_id": approval_id},
+        )
+
+        # Run through the normal execution path but skip confirmation
+        # We temporarily remove the tool from require_confirm
+        original_confirm = list(self._policy.require_confirm)
+        self._policy.require_confirm = [
+            t for t in self._policy.require_confirm if t != req.tool_name
+        ]
+        try:
+            result = await self.call(req.tool_name, fn, **req.tool_args)
+        finally:
+            self._policy.require_confirm = original_confirm
+
+        return result
+
     def call_sync(
         self,
         tool_name: str,
@@ -433,6 +528,7 @@ class Supervisor:
         audit: Optional[AuditLog] = None,
         store: Optional[StateStore] = None,
         policy_override: Optional[Dict[str, Any]] = None,
+        approval_queue: Optional[ApprovalQueue] = None,
     ) -> Supervisor:
         """Rebuild a Supervisor from a checkpoint.
 
@@ -460,6 +556,7 @@ class Supervisor:
             store=store,
             session_id=checkpoint.session_id,
             agent_id=checkpoint.agent_id,
+            approval_queue=approval_queue,
         )
         # Restore budget counters
         if checkpoint.tokens_used > 0:
