@@ -65,6 +65,33 @@ class Policy:
     # Confirmation gates (tool names that require user confirm)
     require_confirm: List[str] = field(default_factory=list)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dictionary (round-trips with from_dict)."""
+        d: Dict[str, Any] = {
+            "tool_timeout": self.tool_timeout,
+            "max_iterations": self.max_iterations,
+            "request_timeout": self.request_timeout,
+            "circuit_breaker_threshold": self.circuit_breaker_threshold,
+            "circuit_breaker_reset": self.circuit_breaker_reset,
+            "audit_enabled": self.audit_enabled,
+        }
+        if self.token_budget is not None:
+            d["token_budget"] = self.token_budget
+        if self.silence_timeout is not None:
+            d["silence_timeout"] = self.silence_timeout
+        for key in (
+            "on_timeout",
+            "on_budget_exceeded",
+            "on_max_iterations",
+            "on_circuit_open",
+            "on_silence",
+        ):
+            val: OnFailure = getattr(self, key)
+            d[key] = {"action": val.action.value, "retries": val.retries}
+        if self.require_confirm:
+            d["require_confirm"] = list(self.require_confirm)
+        return d
+
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Policy":
         """Create a Policy from a plain dictionary.

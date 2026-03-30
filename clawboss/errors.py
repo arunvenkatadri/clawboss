@@ -62,3 +62,19 @@ class ClawbossError(Exception):
     @staticmethod
     def policy_denied(reason: str) -> "ClawbossError":
         return ClawbossError("policy_denied", f"Policy denied: {reason}", reason=reason)
+
+    @staticmethod
+    def agent_paused(session_id: str) -> "ClawbossError":
+        return ClawbossError(
+            "agent_paused",
+            f"Agent is paused (session {session_id})",
+            session_id=session_id,
+        )
+
+    @staticmethod
+    def session_not_found(session_id: str) -> "ClawbossError":
+        return ClawbossError(
+            "session_not_found",
+            f"Session not found: {session_id}",
+            session_id=session_id,
+        )

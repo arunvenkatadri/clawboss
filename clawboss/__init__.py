@@ -26,7 +26,9 @@ from .circuit_breaker import CircuitBreaker, CircuitState
 from .errors import ClawbossError
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
 from .policy import Action, OnFailure, Policy
+from .session import SessionManager
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
+from .store import Checkpoint, MemoryStore, SessionStatus, SqliteStore, StateStore
 from .supervisor import SupervisedResult, Supervisor
 
 __all__ = [
@@ -54,4 +56,10 @@ __all__ = [
     "OpenClawBridge",
     "to_openclaw_tool_schema",
     "to_openclaw_manifest",
+    "StateStore",
+    "MemoryStore",
+    "SqliteStore",
+    "Checkpoint",
+    "SessionStatus",
+    "SessionManager",
 ]
