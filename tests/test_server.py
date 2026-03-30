@@ -1,4 +1,4 @@
-"""Tests for clawboss.server — REST control plane endpoints and security."""
+"""Tests for clawboss.server — REST control plane endpoints, auth, and security."""
 
 import pytest
 
@@ -21,6 +21,15 @@ def client():
     store = MemoryStore()
     manager = SessionManager(store)
     app = create_app(manager)
+    return TestClient(app)
+
+
+@pytest.fixture
+def authed_client():
+    """Client with API key auth enabled."""
+    store = MemoryStore()
+    manager = SessionManager(store)
+    app = create_app(manager, api_key="test-secret-key")
     return TestClient(app)
 
 
@@ -174,7 +183,6 @@ class TestAuditEndpoint:
         assert resp.status_code == 200
         entries = resp.json()
         assert isinstance(entries, list)
-        # Should have at least the request_start entry
         assert len(entries) >= 1
 
     def test_audit_missing(self, client):
@@ -189,7 +197,6 @@ class TestAuditEndpoint:
 
 class TestFullLifecycle:
     def test_create_pause_resume_stop(self, client):
-        # Create
         resp = client.post(
             "/sessions",
             json={
@@ -201,27 +208,79 @@ class TestFullLifecycle:
         assert resp.status_code == 201
         sid = resp.json()["session_id"]
 
-        # Verify listed
         resp = client.get("/sessions")
         ids = [s["session_id"] for s in resp.json()]
         assert sid in ids
 
-        # Pause
         resp = client.post(f"/sessions/{sid}/pause")
         assert resp.json()["status"] == "paused"
 
-        # Resume
         resp = client.post(f"/sessions/{sid}/resume")
         assert resp.json()["status"] == "running"
 
-        # Stop
         resp = client.post(f"/sessions/{sid}/stop")
         assert resp.json()["status"] == "stopped"
 
-        # Still accessible via GET
         resp = client.get(f"/sessions/{sid}")
         assert resp.status_code == 200
         assert resp.json()["status"] == "stopped"
+
+
+# ---------------------------------------------------------------------------
+# API key auth
+# ---------------------------------------------------------------------------
+
+
+class TestApiKeyAuth:
+    def test_no_key_returns_401(self, authed_client):
+        resp = authed_client.get("/sessions")
+        assert resp.status_code == 401
+
+    def test_wrong_key_returns_401(self, authed_client):
+        resp = authed_client.get(
+            "/sessions", headers={"Authorization": "Bearer wrong-key"}
+        )
+        assert resp.status_code == 401
+
+    def test_correct_key_passes(self, authed_client):
+        resp = authed_client.get(
+            "/sessions", headers={"Authorization": "Bearer test-secret-key"}
+        )
+        assert resp.status_code == 200
+
+    def test_auth_on_create(self, authed_client):
+        resp = authed_client.post(
+            "/sessions",
+            json={"agent_id": "test"},
+            headers={"Authorization": "Bearer test-secret-key"},
+        )
+        assert resp.status_code == 201
+
+    def test_auth_on_create_rejected(self, authed_client):
+        resp = authed_client.post("/sessions", json={"agent_id": "test"})
+        assert resp.status_code == 401
+
+    def test_auth_on_pause(self, authed_client):
+        headers = {"Authorization": "Bearer test-secret-key"}
+        resp = authed_client.post(
+            "/sessions", json={"agent_id": "test"}, headers=headers
+        )
+        sid = resp.json()["session_id"]
+
+        # Without auth
+        resp = authed_client.post(f"/sessions/{sid}/pause")
+        assert resp.status_code == 401
+
+        # With auth
+        resp = authed_client.post(f"/sessions/{sid}/pause", headers=headers)
+        assert resp.status_code == 200
+
+    def test_no_auth_configured_allows_all(self, client):
+        """When no API key is set, all requests pass without auth."""
+        resp = client.get("/sessions")
+        assert resp.status_code == 200
+        resp = client.post("/sessions", json={"agent_id": "test"})
+        assert resp.status_code == 201
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +290,6 @@ class TestFullLifecycle:
 
 class TestCORSDefaults:
     def test_cors_rejects_foreign_origin(self, client):
-        """Non-localhost origins should be rejected by default CORS policy."""
         resp = client.options(
             "/sessions",
             headers={
@@ -239,12 +297,10 @@ class TestCORSDefaults:
                 "Access-Control-Request-Method": "GET",
             },
         )
-        # The response should NOT include the evil origin in allow-origin
         allow_origin = resp.headers.get("access-control-allow-origin", "")
         assert "evil.com" not in allow_origin
 
     def test_cors_allows_localhost(self, client):
-        """Localhost origins should be allowed."""
         resp = client.options(
             "/sessions",
             headers={
@@ -263,7 +319,6 @@ class TestCORSDefaults:
 
 class TestSessionIdSecurity:
     def test_session_id_high_entropy(self, client):
-        """Session IDs returned by the API should be 32 hex chars (128 bits)."""
         resp = client.post("/sessions", json={"agent_id": "test"})
         sid = resp.json()["session_id"]
         assert len(sid) == 32

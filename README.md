@@ -174,6 +174,14 @@ Start the server:
 uvicorn clawboss.server:app
 ```
 
+With API key auth:
+
+```bash
+CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
+```
+
+All endpoints then require `Authorization: Bearer my-secret-key`. WebSocket connections pass the key as `?token=my-secret-key`.
+
 Endpoints:
 
 | Method | Path | Description |
@@ -210,7 +218,7 @@ Clawboss is designed to supervise untrusted agent behavior. The stateful session
 
 **Session IDs are cryptographic.** 128-bit random IDs via `secrets.token_hex` — not guessable or enumerable.
 
-**The REST API has no authentication.** CORS is restricted to localhost by default, but you must add your own auth layer before exposing the server to untrusted networks. Do not run `uvicorn clawboss.server:app` on a public interface without auth.
+**The REST API supports API key auth.** Set `CLAWBOSS_API_KEY` to enable Bearer token authentication on all endpoints. CORS is restricted to localhost by default. Always enable auth before exposing the server to untrusted networks.
 
 **SQLite files are owner-only.** The default `SqliteStore` creates database files with `0600` permissions.
 

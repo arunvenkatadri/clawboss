@@ -6,21 +6,26 @@ Run with::
 
     uvicorn clawboss.server:app
 
+Or with API key auth::
+
+    CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
+
 Or use ``create_app()`` to build an app with a custom store.
 
-SECURITY WARNING: This server has NO authentication or authorization.
-Do not expose it to untrusted networks without adding your own auth layer.
 By default, CORS is restricted to localhost origins only.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
+import secrets
 from typing import Any, Dict, List, Optional
 
 try:
-    from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+    from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
     from pydantic import BaseModel
 except ImportError as e:
     raise ImportError(
@@ -59,6 +64,32 @@ class SessionDetail(SessionSummary):
 
 
 # ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _make_auth_dependency(api_key: Optional[str]):
+    """Build a FastAPI dependency that enforces Bearer token auth.
+
+    If api_key is None, auth is disabled (all requests pass).
+    """
+
+    async def _check_auth(
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    ):
+        if api_key is None:
+            return  # auth disabled
+        if credentials is None or not secrets.compare_digest(
+            credentials.credentials, api_key
+        ):
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+    return _check_auth
+
+
+# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
@@ -74,6 +105,7 @@ _LOCALHOST_ORIGINS = [
 def create_app(
     manager: Optional[SessionManager] = None,
     allowed_origins: Optional[List[str]] = None,
+    api_key: Optional[str] = None,
 ) -> FastAPI:
     """Build a FastAPI app wired to the given SessionManager.
 
@@ -84,17 +116,30 @@ def create_app(
         allowed_origins: CORS allowed origins. Defaults to localhost only.
                         Pass ["*"] to allow all origins (NOT recommended
                         for production without auth).
+        api_key: If set, all HTTP endpoints require ``Authorization: Bearer <key>``.
+                 If None, checks the CLAWBOSS_API_KEY environment variable.
+                 If neither is set, auth is disabled (open access).
     """
     if manager is None:
         store = SqliteStore()
         manager = SessionManager(store)
 
+    # Resolve API key: explicit param > env var > disabled
+    resolved_key = api_key if api_key is not None else os.environ.get("CLAWBOSS_API_KEY")
+
+    auth = _make_auth_dependency(resolved_key)
+
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.7.0",
+        version="0.77.0",
         description=(
             "REST API for managing agent sessions. "
-            "WARNING: No authentication. Do not expose to untrusted networks."
+            + (
+                "Authentication: Bearer token required."
+                if resolved_key
+                else "WARNING: No authentication configured. "
+                "Set CLAWBOSS_API_KEY or pass api_key to create_app()."
+            )
         ),
     )
 
@@ -105,32 +150,33 @@ def create_app(
         allow_headers=["*"],
     )
 
-    # Stash manager on app state so tests can access it
+    # Stash on app state for tests
     app.state.manager = manager
+    app.state.auth_enabled = resolved_key is not None
 
     # ------------------------------------------------------------------
     # Endpoints
     # ------------------------------------------------------------------
 
     @app.post("/sessions", response_model=SessionSummary, status_code=201)
-    def create_session(req: CreateSessionRequest):
+    def create_session(req: CreateSessionRequest, _=Depends(auth)):
         sid = manager.start(req.agent_id, req.policy, req.payload)
         cp = manager.status(sid)
         return _checkpoint_to_summary(cp)
 
     @app.get("/sessions", response_model=List[SessionSummary])
-    def list_sessions():
+    def list_sessions(_=Depends(auth)):
         return [_checkpoint_to_summary(cp) for cp in manager.list_sessions()]
 
     @app.get("/sessions/{session_id}", response_model=SessionDetail)
-    def get_session(session_id: str):
+    def get_session(session_id: str, _=Depends(auth)):
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return _checkpoint_to_detail(cp)
 
     @app.post("/sessions/{session_id}/pause", response_model=SessionSummary)
-    def pause_session(session_id: str):
+    def pause_session(session_id: str, _=Depends(auth)):
         try:
             manager.pause(session_id)
         except Exception as e:
@@ -141,7 +187,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.post("/sessions/{session_id}/resume", response_model=SessionSummary)
-    def resume_session(session_id: str):
+    def resume_session(session_id: str, _=Depends(auth)):
         try:
             manager.resume(session_id)
         except Exception as e:
@@ -152,7 +198,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.post("/sessions/{session_id}/stop", response_model=SessionSummary)
-    def stop_session(session_id: str):
+    def stop_session(session_id: str, _=Depends(auth)):
         try:
             manager.stop(session_id)
         except Exception as e:
@@ -163,7 +209,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.get("/sessions/{session_id}/audit")
-    def get_audit(session_id: str):
+    def get_audit(session_id: str, _=Depends(auth)):
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -171,7 +217,18 @@ def create_app(
 
     @app.websocket("/sessions/{session_id}/events")
     async def session_events(websocket: WebSocket, session_id: str):
-        """Stream audit events and status changes for a session."""
+        """Stream audit events and status changes for a session.
+
+        WebSocket auth: pass the API key as a query param ?token=<key>
+        or in the first message after connect.
+        """
+        # WebSocket auth via query param
+        if resolved_key is not None:
+            token = websocket.query_params.get("token", "")
+            if not secrets.compare_digest(token, resolved_key):
+                await websocket.close(code=4001)
+                return
+
         cp = manager.status(session_id)
         if cp is None:
             await websocket.close(code=4004)
@@ -188,7 +245,6 @@ def create_app(
                         await websocket.send_json({"type": "audit", "data": entry})
                     last_count = len(entries)
 
-                # Also send status updates
                 cp = manager.status(session_id)
                 if cp is not None:
                     await websocket.send_json({

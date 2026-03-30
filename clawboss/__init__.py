@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.7.0"
+__version__ = "0.77.0"
 
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
 from .budget import BudgetSnapshot, BudgetTracker
