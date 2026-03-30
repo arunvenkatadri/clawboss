@@ -1,4 +1,4 @@
-# clawboss
+# clawboss-ai
 
 **This is a namespace placeholder.** Clawboss is a Python package.
 
@@ -12,7 +12,7 @@ pip install clawboss
 
 Stop your AI agents from going rogue. Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
-Zero dependencies. Works with any agent framework. First-class OpenClaw integration.
+Zero dependencies. Works with any agent framework. Durable sessions, REST control plane, human-in-the-loop approvals.
 
 ## Links
 
