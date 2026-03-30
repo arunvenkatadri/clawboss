@@ -132,6 +132,12 @@ class Policy:
     # Tool scopes (parameter-level permission rules)
     tool_scopes: List[ToolScope] = field(default_factory=list)
 
+    # Privacy shielding — PII redaction categories
+    # Options: "email", "phone", "ssn", "credit_card", "api_key", "ip_address"
+    # Empty list = no redaction. None = redact all categories.
+    redact: Optional[List[str]] = field(default_factory=list)
+    redact_direction: str = "both"  # "inbound", "outbound", or "both"
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to a plain dictionary (round-trips with from_dict)."""
         d: Dict[str, Any] = {
@@ -160,6 +166,11 @@ class Policy:
             d["require_confirm"] = list(self.require_confirm)
         if self.tool_scopes:
             d["tool_scopes"] = [s.to_dict() for s in self.tool_scopes]
+        if self.redact is not None and self.redact:
+            d["redact"] = list(self.redact)
+        elif self.redact is None:
+            d["redact"] = None
+        d["redact_direction"] = self.redact_direction
         return d
 
     @classmethod
@@ -231,5 +242,10 @@ class Policy:
                     )
                 )
             kwargs["tool_scopes"] = scopes
+
+        if "redact" in d:
+            kwargs["redact"] = d["redact"]  # None or list of strings
+        if "redact_direction" in d:
+            kwargs["redact_direction"] = d["redact_direction"]
 
         return cls(**kwargs)

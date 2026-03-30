@@ -32,9 +32,11 @@ from .budget import BudgetSnapshot, BudgetTracker
 from .circuit_breaker import CircuitBreaker
 from .errors import ClawbossError
 from .policy import Policy
+from .redact import Redactor
 
 if TYPE_CHECKING:
     from .approval import ApprovalQueue
+    from .observe import Observer
     from .store import Checkpoint, StateStore
 
 
@@ -73,6 +75,7 @@ class Supervisor:
         session_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         approval_queue: Optional[ApprovalQueue] = None,
+        observer: Optional[Observer] = None,
     ):
         self._policy = policy
         self._budget = BudgetTracker.from_policy(policy)
@@ -88,6 +91,15 @@ class Supervisor:
         self._session_id = session_id
         self._agent_id = agent_id
         self._approval_queue = approval_queue
+        self._observer = observer
+
+        # Privacy shielding
+        redact_cats = policy.redact
+        if redact_cats is None or (isinstance(redact_cats, list) and len(redact_cats) > 0):
+            self._redactor = Redactor(categories=redact_cats)
+        else:
+            self._redactor = None
+        self._redact_direction = policy.redact_direction
 
         self._audit.record(
             AuditPhase.REQUEST_START,
@@ -297,17 +309,29 @@ class Supervisor:
                 tool_name=tool_name,
             )
 
+        # Outbound PII redaction — clean args before they reach the tool
+        exec_kwargs = kwargs
+        if self._redactor and self._redact_direction in ("outbound", "both"):
+            exec_kwargs, redact_count = self._redactor.redact_dict(kwargs)
+            if redact_count > 0:
+                self._audit.record(
+                    AuditPhase.POLICY_CHECK,
+                    AuditOutcome.INFO,
+                    target=tool_name,
+                    detail=f"Redacted {redact_count} PII value(s) from outbound args",
+                )
+
         # Execute with timeout
         self._audit.record(
             AuditPhase.TOOL_CALL,
             AuditOutcome.ALLOWED,
             target=tool_name,
-            metadata={"args": {k: str(v)[:100] for k, v in kwargs.items()}},
+            metadata={"args": {k: str(v)[:100] for k, v in exec_kwargs.items()}},
         )
 
         try:
             output = await asyncio.wait_for(
-                fn(**kwargs),
+                fn(**exec_kwargs),
                 timeout=self._policy.tool_timeout,
             )
         except asyncio.TimeoutError:
@@ -319,12 +343,14 @@ class Supervisor:
                 target=tool_name,
                 detail=str(error),
             )
-            return SupervisedResult(
+            r = SupervisedResult(
                 error=error,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 budget=self._budget.snapshot(),
                 tool_name=tool_name,
             )
+            self._observe_call(r)
+            return r
         except Exception as e:
             cb.record_failure()
             error = ClawbossError.tool_error(str(e))
@@ -334,17 +360,42 @@ class Supervisor:
                 target=tool_name,
                 detail=str(e),
             )
-            return SupervisedResult(
+            r = SupervisedResult(
                 error=error,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 budget=self._budget.snapshot(),
                 tool_name=tool_name,
             )
+            self._observe_call(r)
+            return r
 
         # Success
         cb.record_success()
         duration_ms = int((time.monotonic() - start) * 1000)
         self._last_activity = time.monotonic()
+
+        # Inbound PII redaction — clean output before agent sees it
+        if self._redactor and self._redact_direction in ("inbound", "both"):
+            if isinstance(output, str):
+                result = self._redactor.redact(output)
+                if result.redacted_count > 0:
+                    self._audit.record(
+                        AuditPhase.POLICY_CHECK,
+                        AuditOutcome.INFO,
+                        target=tool_name,
+                        detail=f"Redacted {result.redacted_count} PII value(s) from output",
+                    )
+                    output = result.text
+            elif isinstance(output, dict):
+                cleaned, count = self._redactor.redact_dict(output)
+                if count > 0:
+                    self._audit.record(
+                        AuditPhase.POLICY_CHECK,
+                        AuditOutcome.INFO,
+                        target=tool_name,
+                        detail=f"Redacted {count} PII value(s) from output",
+                    )
+                    output = cleaned
 
         # Record token usage if output includes it
         tokens = 0
@@ -379,13 +430,15 @@ class Supervisor:
 
         self._auto_checkpoint()
 
-        return SupervisedResult(
+        result = SupervisedResult(
             output=output,
             succeeded=True,
             duration_ms=duration_ms,
             budget=self._budget.snapshot(),
             tool_name=tool_name,
         )
+        self._observe_call(result)
+        return result
 
     async def execute_approved(
         self,
@@ -529,6 +582,7 @@ class Supervisor:
         store: Optional[StateStore] = None,
         policy_override: Optional[Dict[str, Any]] = None,
         approval_queue: Optional[ApprovalQueue] = None,
+        observer: Optional[Observer] = None,
     ) -> Supervisor:
         """Rebuild a Supervisor from a checkpoint.
 
@@ -557,6 +611,7 @@ class Supervisor:
             session_id=checkpoint.session_id,
             agent_id=checkpoint.agent_id,
             approval_queue=approval_queue,
+            observer=observer,
         )
         # Restore budget counters
         if checkpoint.tokens_used > 0:
@@ -576,6 +631,19 @@ class Supervisor:
         # Restore pause state
         sv._paused = checkpoint.status == SessionStatus.PAUSED
         return sv
+
+    def _observe_call(self, result: SupervisedResult) -> None:
+        """Record a tool call with the observer if configured."""
+        if self._observer is None or result.tool_name is None:
+            return
+        self._observer.record_tool_call(
+            tool_name=result.tool_name,
+            duration_ms=result.duration_ms,
+            succeeded=result.succeeded,
+            tokens=result.budget.tokens_used if result.budget else 0,
+            session_id=self._session_id or "",
+            error_kind=result.error.kind if result.error else "",
+        )
 
     def _auto_checkpoint(self) -> None:
         """Save a checkpoint if a store is configured.

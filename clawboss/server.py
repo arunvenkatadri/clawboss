@@ -139,7 +139,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.78.0",
+        version="0.79.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -266,6 +266,25 @@ def create_app(
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return manager.get_audit_entries(session_id)
+
+    # ------------------------------------------------------------------
+    # Observability endpoints
+    # ------------------------------------------------------------------
+
+    @app.get("/metrics/tools")
+    def get_tool_metrics(_=Depends(auth)):
+        return manager.observer.all_tools_summary()
+
+    @app.get("/metrics/sessions/{session_id}")
+    def get_session_metrics(session_id: str, _=Depends(auth)):
+        cp = manager.status(session_id)
+        if cp is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return manager.observer.session_summary(session_id)
+
+    @app.get("/metrics/recent")
+    def get_recent_calls(limit: int = 50, _=Depends(auth)):
+        return manager.observer.recent_calls(limit=min(limit, 200))
 
     @app.websocket("/sessions/{session_id}/events")
     async def session_events(websocket: WebSocket, session_id: str):

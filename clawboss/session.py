@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 from .approval import ApprovalQueue
 from .audit import AuditLog, MemoryAuditSink
 from .errors import ClawbossError
+from .observe import Observer
 from .policy import Policy
 from .store import Checkpoint, SessionStatus, StateStore, new_session_id, validate_payload
 from .supervisor import Supervisor
@@ -51,12 +52,18 @@ class SessionManager:
         self._original_policies: Dict[str, Dict[str, Any]] = {}
         self._stateless_sessions: set = set()
         self._approval_queue = ApprovalQueue()
+        self._observer = Observer()
         self._lock = threading.Lock()
 
     @property
     def approval_queue(self) -> ApprovalQueue:
         """The shared approval queue for all sessions."""
         return self._approval_queue
+
+    @property
+    def observer(self) -> Observer:
+        """The shared observer for all sessions."""
+        return self._observer
 
     def start(
         self,
@@ -99,6 +106,7 @@ class SessionManager:
             session_id=sid,
             agent_id=agent_id,
             approval_queue=self._approval_queue,
+            observer=self._observer,
         )
 
         # Store the ORIGINAL policy — this is immutable for the session's lifetime
@@ -201,7 +209,7 @@ class SessionManager:
 
         sv = Supervisor.restore_from_checkpoint(
             cp, audit=audit, store=self._store, policy_override=original,
-            approval_queue=self._approval_queue,
+            approval_queue=self._approval_queue, observer=self._observer,
         )
         sv.paused = False
 

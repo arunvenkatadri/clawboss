@@ -105,6 +105,8 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Dead man's switch** | Agent going silent (no activity for N seconds) |
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
+| **Privacy shielding** | PII leaking through tool calls to LLMs or APIs |
+| **Observability** | No visibility into tool latency, error rates, cost |
 | **Context compression** | Agent forgetting its instructions mid-conversation |
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
@@ -454,6 +456,32 @@ class MyDatabaseSink(AuditSink):
         db.insert(entry.to_dict())
 ```
 
+## Privacy shielding (PII redaction)
+
+Automatically detect and mask sensitive data flowing through tool calls. Configure which categories to redact in the policy:
+
+```python
+policy = Policy(
+    redact=["email", "phone", "ssn", "api_key", "credit_card", "ip_address"],
+    redact_direction="both",  # "inbound", "outbound", or "both"
+)
+```
+
+**Outbound:** Before a tool executes, args are scanned and PII is replaced with placeholders (`[EMAIL]`, `[PHONE]`, etc.) so sensitive data never reaches external services.
+
+**Inbound:** After a tool returns, output is scanned before the agent sees it — preventing PII from web scrapes or API responses from leaking into the LLM context.
+
+```python
+# Standalone usage
+from clawboss import Redactor
+
+r = Redactor(categories=["email", "phone"])
+result = r.redact("Contact bob@example.com or call 555-123-4567")
+print(result.text)  # "Contact [EMAIL] or call [PHONE]"
+```
+
+Categories: `email`, `phone`, `ssn`, `credit_card`, `api_key`, `ip_address`. Pass `redact=None` to enable all. Regex-based — fast, zero dependencies, catches accidental leakage.
+
 ## Confirmation gates (human-in-the-loop approval)
 
 Mark tools as requiring human approval before execution. When an agent tries to call a confirmed tool, the call is queued instead of blocked — a human can review and approve or deny it via the dashboard, REST API, or any WebSocket client.
@@ -681,6 +709,53 @@ Dataclass with all configuration. Every field has a sensible default.
 - `delete_session(session_id)` — delete a checkpoint
 
 Implementations: `SqliteStore(db_path)`, `MemoryStore()`
+
+## Observability
+
+Structured telemetry for agent behavior — latency, success rates, token cost per tool, per session. Optional OpenTelemetry export for Datadog, Grafana, Honeycomb, etc.
+
+```python
+from clawboss import Observer
+
+# Standalone
+obs = Observer()
+obs.record_tool_call("web_search", duration_ms=120, succeeded=True, tokens=500)
+print(obs.tool_summary("web_search"))
+# {"calls": 1, "successes": 1, "avg_latency_ms": 120.0, ...}
+```
+
+When using `SessionManager`, the observer is wired in automatically — every tool call is recorded:
+
+```python
+mgr = SessionManager(store)
+sid = mgr.start("agent-1", policy_dict)
+sv = mgr.get_supervisor(sid)
+await sv.call("search", search_fn, query="test")
+
+# Per-tool metrics
+mgr.observer.tool_summary("search")
+
+# Per-session metrics
+mgr.observer.session_summary(sid)
+
+# Recent call log
+mgr.observer.recent_calls(limit=50)
+```
+
+REST endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/metrics/tools` | Aggregated metrics for all tools |
+| GET | `/metrics/sessions/{id}` | Metrics for a specific session |
+| GET | `/metrics/recent` | Recent tool call log |
+
+OpenTelemetry export (optional — requires `opentelemetry-sdk`):
+
+```python
+obs = Observer(otlp_endpoint="http://localhost:4317")
+# Spans and metrics exported automatically to your collector
+```
 
 ## Contributing
 

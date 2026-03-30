@@ -2475,6 +2475,8 @@ function submitCreateSession() {
     .catch(err => alert('Failed to create session: ' + err.message));
 }
 
+let liveWebSockets = {};
+
 function fetchSessions() {
   const base = getSessionsApiBase();
   const headers = getSessionsAuthHeaders();
@@ -2486,12 +2488,56 @@ function fetchSessions() {
       sessionsData = data;
       statusEl.textContent = data.length + ' session(s) loaded';
       renderSessions();
+      connectLiveUpdates();
     })
     .catch(err => {
       statusEl.textContent = 'Could not reach API: ' + err.message;
       document.getElementById('sessions-grid').innerHTML =
         '<div class="card"><div class="card-desc">Start the server with <code>uvicorn clawboss.server:app</code></div></div>';
     });
+}
+
+function connectLiveUpdates() {
+  // Close stale connections
+  Object.keys(liveWebSockets).forEach(function(sid) {
+    if (!sessionsData.find(function(s) { return s.session_id === sid && s.status === 'running'; })) {
+      if (liveWebSockets[sid]) { liveWebSockets[sid].close(); delete liveWebSockets[sid]; }
+    }
+  });
+  // Open WebSocket for each running session
+  var base = getSessionsApiBase().replace(/^http/, 'ws');
+  var key = (document.getElementById('sessions-api-key') || {}).value || '';
+  sessionsData.forEach(function(s) {
+    if (s.status !== 'running' && s.status !== 'paused') return;
+    if (liveWebSockets[s.session_id]) return; // already connected
+    var url = base + '/sessions/' + s.session_id + '/events';
+    if (key) url += '?token=' + encodeURIComponent(key);
+    try {
+      var ws = new WebSocket(url);
+      ws.onmessage = function(evt) {
+        var msg = JSON.parse(evt.data);
+        if (msg.type === 'status') {
+          // Update session data in place
+          var idx = sessionsData.findIndex(function(x) { return x.session_id === msg.data.session_id; });
+          if (idx >= 0) {
+            sessionsData[idx].status = msg.data.status;
+            sessionsData[idx].iterations = msg.data.iterations;
+            sessionsData[idx].tokens_used = msg.data.tokens_used;
+            renderSessions();
+          }
+        } else if (msg.type === 'approval_required') {
+          // Flash the status bar
+          var statusEl = document.getElementById('sessions-status');
+          statusEl.textContent = 'Approval needed: ' + msg.data.tool_name + ' (session ' + msg.data.session_id.slice(0,8) + '...)';
+          statusEl.style.color = 'var(--yellow)';
+          setTimeout(function() { statusEl.style.color = ''; }, 5000);
+        }
+      };
+      ws.onclose = function() { delete liveWebSockets[s.session_id]; };
+      ws.onerror = function() { ws.close(); };
+      liveWebSockets[s.session_id] = ws;
+    } catch(e) { /* WebSocket not available */ }
+  });
 }
 
 function sessionStatusBadgeClass(status) {
