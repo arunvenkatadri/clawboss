@@ -373,3 +373,76 @@ class TestSessionIdSecurity:
         # No common prefix — crypto random
         prefixes = {s[:8] for s in ids}
         assert len(prefixes) == 10
+
+
+# ---------------------------------------------------------------------------
+# Stateless sessions
+# ---------------------------------------------------------------------------
+
+
+class TestStatelessSessions:
+    @pytest.mark.asyncio
+    async def test_stateless_session_works(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, stateless=True)
+        sv = mgr.get_supervisor(sid)
+        result = await sv.call("search", good_tool, query="test")
+        assert result.succeeded is True
+
+    def test_stateless_flag_stored_in_checkpoint(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, stateless=True)
+        cp = mgr.status(sid)
+        assert cp.stateless is True
+
+    def test_stateful_flag_default(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY)
+        cp = mgr.status(sid)
+        assert cp.stateless is False
+
+    def test_stateless_pause_and_unpause_in_memory(self):
+        """Stateless sessions can be paused/resumed while still in memory."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, stateless=True)
+        mgr.pause(sid)
+        sv = mgr.resume(sid)
+        assert sv.paused is False
+
+    def test_stateless_cannot_resume_after_crash(self):
+        """Stateless sessions cannot be recovered after the manager is gone."""
+        store = MemoryStore()
+        mgr1 = SessionManager(store)
+        sid = mgr1.start("agent-1", POLICY, stateless=True)
+        del mgr1
+
+        mgr2 = SessionManager(store)
+        with pytest.raises(ClawbossError) as exc_info:
+            mgr2.resume(sid)
+        assert exc_info.value.kind == "session_not_recoverable"
+
+    def test_stateless_stop_works(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, stateless=True)
+        mgr.stop(sid)
+        cp = mgr.status(sid)
+        assert cp.status == SessionStatus.STOPPED
+
+    @pytest.mark.asyncio
+    async def test_stateless_no_auto_checkpoint(self):
+        """Stateless sessions should not update checkpoint on every tool call."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        sid = mgr.start("agent-1", POLICY, stateless=True)
+        sv = mgr.get_supervisor(sid)
+        sv.record_tokens(500)
+        await sv.call("search", good_tool, query="test")
+        # The checkpoint should still have 0 tokens (no auto-checkpoint)
+        cp = store.load_checkpoint(sid)
+        assert cp.tokens_used == 0
+        assert cp.iterations == 0

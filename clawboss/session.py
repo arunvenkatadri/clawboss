@@ -48,6 +48,7 @@ class SessionManager:
         self._supervisors: Dict[str, Supervisor] = {}
         self._audit_sinks: Dict[str, MemoryAuditSink] = {}
         self._original_policies: Dict[str, Dict[str, Any]] = {}
+        self._stateless_sessions: set = set()
         self._lock = threading.Lock()
 
     def start(
@@ -55,6 +56,7 @@ class SessionManager:
         agent_id: str,
         policy_dict: Optional[Dict[str, Any]] = None,
         payload: Optional[Dict[str, Any]] = None,
+        stateless: bool = False,
     ) -> str:
         """Start a new agent session.
 
@@ -64,6 +66,9 @@ class SessionManager:
                          This is stored immutably — the agent can never change it.
             payload: Opaque JSON the agent can stash intermediate work in.
                      Treated as untrusted data. Validated for size limits.
+            stateless: If True, the session lives in memory only — no
+                       checkpoints written to the store, no crash recovery.
+                       You still get supervision, audit, and pause/stop controls.
 
         Returns:
             session_id for the new session.
@@ -78,10 +83,12 @@ class SessionManager:
         sink = MemoryAuditSink()
         audit = AuditLog(sid, sinks=[sink])
 
+        # Stateless sessions don't wire up the store on the Supervisor,
+        # so no auto-checkpointing happens on each call/record.
         sv = Supervisor(
             policy,
             audit=audit,
-            store=self._store,
+            store=None if stateless else self._store,
             session_id=sid,
             agent_id=agent_id,
         )
@@ -97,13 +104,18 @@ class SessionManager:
             iteration_limit=policy.max_iterations,
             policy_dict=frozen_policy,
             payload=safe_payload,
+            stateless=stateless,
         )
+        # Always save the initial checkpoint so list/status/pause/stop work,
+        # but stateless sessions won't auto-checkpoint after each tool call.
         self._store.save_checkpoint(checkpoint)
 
         with self._lock:
             self._supervisors[sid] = sv
             self._audit_sinks[sid] = sink
             self._original_policies[sid] = frozen_policy
+            if stateless:
+                self._stateless_sessions.add(sid)
 
         return sid
 
@@ -130,12 +142,25 @@ class SessionManager:
         rebuilt from the ORIGINAL immutable policy stored at start() — never
         from any agent-modified data in the checkpoint.
 
+        Stateless sessions cannot be resumed after a crash — their state
+        only exists in memory.
+
         Returns:
             The restored Supervisor, ready for use.
         """
         cp = self._store.load_checkpoint(session_id)
         if cp is None:
             raise ClawbossError.session_not_found(session_id)
+
+        # Stateless sessions can be unpaused (supervisor still in memory)
+        # but cannot be recovered after a crash
+        with self._lock:
+            in_memory = session_id in self._supervisors
+        if cp.stateless and not in_memory:
+            raise ClawbossError(
+                "session_not_recoverable",
+                f"Session {session_id} is stateless and cannot be resumed after a crash",
+            )
 
         cp.status = SessionStatus.RUNNING
         self._store.save_checkpoint(cp)

@@ -44,6 +44,7 @@ class CreateSessionRequest(BaseModel):
     agent_id: str
     policy: Optional[Dict[str, Any]] = None
     payload: Optional[Dict[str, Any]] = None
+    stateless: bool = False
 
 
 class SessionSummary(BaseModel):
@@ -56,6 +57,7 @@ class SessionSummary(BaseModel):
     iteration_limit: int = 5
     timestamp: str = ""
     payload: Optional[Dict[str, Any]] = None
+    stateless: bool = False
 
 
 class SessionDetail(SessionSummary):
@@ -160,7 +162,7 @@ def create_app(
 
     @app.post("/sessions", response_model=SessionSummary, status_code=201)
     def create_session(req: CreateSessionRequest, _=Depends(auth)):
-        sid = manager.start(req.agent_id, req.policy, req.payload)
+        sid = manager.start(req.agent_id, req.policy, req.payload, stateless=req.stateless)
         cp = manager.status(sid)
         return _checkpoint_to_summary(cp)
 
@@ -280,6 +282,7 @@ def _checkpoint_to_summary(cp) -> dict:
         "iteration_limit": cp.iteration_limit,
         "timestamp": cp.timestamp,
         "payload": cp.payload,
+        "stateless": cp.stateless,
     }
 
 

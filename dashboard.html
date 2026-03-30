@@ -742,6 +742,43 @@
         If you set <code>CLAWBOSS_API_KEY</code>, enter the same key above.
       </p>
     </div>
+    <!-- Create session form -->
+    <div class="card" id="create-session-form" style="margin-bottom:0.75rem; display:none;">
+      <div class="card-header"><span class="card-title">New Session</span>
+        <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display='none'" style="font-size:0.75rem;">&times; Cancel</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.5rem;">
+        <div>
+          <label style="font-size:0.75rem; color:var(--muted);">Agent ID</label>
+          <input class="form-input" id="new-session-agent-id" placeholder="e.g. researcher" style="font-size:0.82rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--muted);">Max Iterations</label>
+          <input class="form-input" id="new-session-max-iter" type="number" value="10" style="font-size:0.82rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--muted);">Tool Timeout (s)</label>
+          <input class="form-input" id="new-session-timeout" type="number" value="30" style="font-size:0.82rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--muted);">Token Budget</label>
+          <input class="form-input" id="new-session-budget" type="number" placeholder="unlimited" style="font-size:0.82rem;">
+        </div>
+      </div>
+      <div style="margin-top:0.5rem; display:flex; align-items:center; gap:1rem;">
+        <label style="font-size:0.82rem; display:flex; align-items:center; gap:0.3rem; cursor:pointer;">
+          <input type="checkbox" id="new-session-stateless"> Make this agent stateless
+        </label>
+        <span style="font-size:0.72rem; color:var(--muted);">No checkpoints, no crash recovery &mdash; in-memory only</span>
+      </div>
+      <div class="card-actions" style="margin-top:0.5rem;">
+        <button class="btn-secondary" onclick="submitCreateSession()" style="background:var(--accent); color:#fff; border-color:var(--accent);">Create Session</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:0.5rem;">
+      <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display='block'">+ New Session</button>
+    </div>
     <div id="sessions-status" style="font-size:0.82rem; color:var(--muted); margin-bottom:0.5rem;"></div>
     <div class="card-grid" id="sessions-grid"></div>
     <!-- Session detail panel -->
@@ -2222,6 +2259,30 @@ function getSessionsAuthHeaders() {
   return { 'Authorization': 'Bearer ' + key };
 }
 
+function submitCreateSession() {
+  const base = getSessionsApiBase();
+  const headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  const agentId = document.getElementById('new-session-agent-id').value.trim();
+  if (!agentId) { alert('Agent ID is required'); return; }
+  const maxIter = parseInt(document.getElementById('new-session-max-iter').value) || 10;
+  const timeout = parseInt(document.getElementById('new-session-timeout').value) || 30;
+  const budgetVal = document.getElementById('new-session-budget').value.trim();
+  const stateless = document.getElementById('new-session-stateless').checked;
+  const policy = { max_iterations: maxIter, tool_timeout: timeout };
+  if (budgetVal) policy.token_budget = parseInt(budgetVal);
+  fetch(base + '/sessions', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ agent_id: agentId, policy: policy, stateless: stateless })
+  })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      document.getElementById('create-session-form').style.display = 'none';
+      fetchSessions();
+    })
+    .catch(err => alert('Failed to create session: ' + err.message));
+}
+
 function fetchSessions() {
   const base = getSessionsApiBase();
   const headers = getSessionsAuthHeaders();
@@ -2268,6 +2329,7 @@ function renderSessions() {
     html += '</div>';
     html += '<div class="card-header-right">';
     html += '<span class="badge ' + sessionStatusBadgeClass(s.status) + '">' + esc(s.status) + '</span>';
+    if (s.stateless) html += ' <span class="badge badge-yellow">stateless</span>';
     html += '</div></div>';
     html += '<div class="card-desc" style="font-size:0.75rem; color:var(--muted);">Session: ' + esc(s.session_id) + '</div>';
     html += '<div class="detail-row"><span class="detail-label">Iterations</span><span class="detail-value">' + s.iterations + ' / ' + s.iteration_limit + '</span></div>';

@@ -160,6 +160,25 @@ class RedisStore:
 
 Ships with `SqliteStore` (production default, stdlib sqlite3) and `MemoryStore` (testing).
 
+### Stateless sessions
+
+Not every agent needs crash recovery. Pass `stateless=True` to skip auto-checkpointing — you still get supervision, audit logging, and pause/stop controls, but no disk writes on each tool call and no crash recovery.
+
+```python
+# In-memory only — no checkpoints, no crash recovery
+session_id = mgr.start("quick-agent", policy_dict, stateless=True)
+```
+
+Via the REST API:
+
+```bash
+curl -X POST http://localhost:8000/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "quick-agent", "policy": {...}, "stateless": true}'
+```
+
+Stateless sessions can be paused and stopped normally. They cannot be resumed after a process restart — if the process dies, the session is gone.
+
 ## REST control plane
 
 Manage agent sessions remotely over HTTP. Optional dependency — install with:

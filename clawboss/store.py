@@ -72,6 +72,9 @@ class Checkpoint:
     timestamp: str = ""
     created_at: str = ""  # set once at creation, used for expiry
 
+    # If True, session is in-memory only — no auto-checkpointing, no crash recovery
+    stateless: bool = False
+
     # Persisted audit entries (list of dicts) — survives crashes
     audit_log: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -103,6 +106,7 @@ class Checkpoint:
             payload=d.get("payload", {}),
             timestamp=d.get("timestamp", ""),
             created_at=d.get("created_at", d.get("timestamp", "")),
+            stateless=d.get("stateless", False),
             audit_log=d.get("audit_log", []),
         )
 
