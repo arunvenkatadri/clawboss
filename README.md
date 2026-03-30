@@ -7,7 +7,7 @@
 
 **Stop your AI agents from going rogue.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
-Zero dependencies. Works with any agent framework. First-class [OpenClaw](https://github.com/openclaw/openclaw) integration. Includes a [dashboard](#dashboard) for managing agents, skills, and conversations in one place.
+Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
 ## Why
 
@@ -74,11 +74,12 @@ Open `dashboard.html` in a browser for a full management UI:
 
 - **Agents** — create, edit, delete, pause/resume/stop agents with supervision policies
 - **Skills** — define reusable capabilities (tool collections) and assign them to agents
+- **Sessions** — live view of running agent sessions from the REST API, with pause/resume/stop controls, budget usage, and audit logs
 - **Chat** — open a conversation with any agent directly from the dashboard
 - **Costs** — track spend, set budgets with hard stops, view usage over time
 - **Policies** — see all active supervision rules at a glance
 
-Agents have a status (running/paused/stopped) controllable from the card controls. Skills are assigned to agents with a checkbox, and agents can optionally use unassigned skills via a toggle.
+The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API.
 
 <img width="1498" height="953" alt="Screenshot 2026-03-25 at 6 05 30 PM" src="https://github.com/user-attachments/assets/11a5047c-6328-43bc-a6cf-d56a9b0b45da" />
 
@@ -93,6 +94,111 @@ Agents have a status (running/paused/stopped) controllable from the card control
 | **Dead man's switch** | Agent going silent (no activity for N seconds) |
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
+| **Durable sessions** | Agent dies mid-task, loses all progress |
+| **REST control plane** | No way to pause/resume/stop agents remotely |
+
+## Works with any agent framework
+
+Clawboss doesn't care what framework you use. It supervises tool calls — any async or sync callable. If your agent calls tools, Clawboss can wrap them.
+
+```python
+# LangChain? Wrap your tools.
+# CrewAI? Wrap your tools.
+# AutoGen? Wrap your tools.
+# Custom loop? Wrap your tools.
+# OpenClaw? There's a built-in bridge (see below).
+
+result = await supervisor.call("my_tool", my_tool_fn, **kwargs)
+```
+
+## Durable sessions
+
+Long-running agents survive process restarts. Clawboss checkpoints supervisor state (iterations, token usage, circuit breaker states) to a pluggable store after every operation.
+
+```python
+from clawboss import SessionManager, SqliteStore
+
+store = SqliteStore("sessions.db")  # or MemoryStore() for testing
+mgr = SessionManager(store)
+
+# Start a session
+session_id = mgr.start("my-agent", {
+    "max_iterations": 20,
+    "tool_timeout": 30,
+    "token_budget": 50000,
+})
+
+# Get the supervisor and use it in your agent loop
+sv = mgr.get_supervisor(session_id)
+result = await sv.call("web_search", search_fn, query="python async")
+sv.record_tokens(1500)
+
+# Pause — the supervisor raises AgentPaused on next call()
+mgr.pause(session_id)
+
+# Resume later (even after a crash / restart)
+sv = mgr.resume(session_id)   # budget, iterations, circuit breakers all restored
+result = await sv.call("web_search", search_fn, query="continue research")
+
+# Stop when done
+mgr.stop(session_id)
+```
+
+### Pluggable storage
+
+Implement the `StateStore` protocol for your own backend:
+
+```python
+from clawboss import StateStore, Checkpoint
+
+class RedisStore:
+    def save_checkpoint(self, checkpoint: Checkpoint) -> None: ...
+    def load_checkpoint(self, session_id: str) -> Checkpoint | None: ...
+    def list_sessions(self) -> list[Checkpoint]: ...
+    def delete_session(self, session_id: str) -> bool: ...
+```
+
+Ships with `SqliteStore` (production default, stdlib sqlite3) and `MemoryStore` (testing).
+
+## REST control plane
+
+Manage agent sessions remotely over HTTP. Optional dependency — install with:
+
+```bash
+pip install clawboss[server]
+```
+
+Start the server:
+
+```bash
+uvicorn clawboss.server:app
+```
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/sessions` | Create a new agent session |
+| GET | `/sessions` | List all sessions with status |
+| GET | `/sessions/{id}` | Session detail (budget, checkpoint time, policy) |
+| POST | `/sessions/{id}/pause` | Pause an agent |
+| POST | `/sessions/{id}/resume` | Resume a paused agent |
+| POST | `/sessions/{id}/stop` | Stop an agent |
+| GET | `/sessions/{id}/audit` | Audit log entries for this session |
+| WS | `/sessions/{id}/events` | Stream status changes and audit events |
+
+```bash
+# Create a session
+curl -X POST http://localhost:8000/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "researcher", "policy": {"max_iterations": 10, "token_budget": 50000}}'
+
+# Pause it
+curl -X POST http://localhost:8000/sessions/{id}/pause
+
+# Check status
+curl http://localhost:8000/sessions/{id}
+```
 
 ## OpenClaw integration
 
@@ -294,7 +400,7 @@ Skills are stored as JSON and can be exported to POML. The format includes:
 
 Dataclass with all configuration. Every field has a sensible default.
 
-### `Supervisor(policy, audit=None)`
+### `Supervisor(policy, audit=None, store=None, session_id=None, agent_id=None)`
 
 - `call(tool_name, fn, **kwargs)` — supervise an async tool call
 - `call_sync(tool_name, fn, **kwargs)` — supervise a sync tool call
@@ -302,6 +408,8 @@ Dataclass with all configuration. Every field has a sensible default.
 - `record_tokens(n)` — record token usage
 - `budget()` — get current `BudgetSnapshot`
 - `finish()` — mark request complete, return final snapshot
+- `to_checkpoint_data()` — export state for persistence
+- `restore_from_checkpoint(checkpoint)` — rebuild from a checkpoint
 
 ### `SupervisedResult`
 
@@ -339,6 +447,27 @@ Dataclass with all configuration. Every field has a sensible default.
 - `to_dict()` / `from_dict(d)` — serialize/deserialize
 - `to_poml()` — render as POML format
 - `to_json()` — serialize to JSON string
+
+### `SessionManager(store)`
+
+- `start(agent_id, policy_dict, payload)` — create a new session, returns `session_id`
+- `pause(session_id)` — pause (supervisor raises `AgentPaused` on next call)
+- `resume(session_id)` — rehydrate supervisor from last checkpoint
+- `stop(session_id)` — stop and finalize
+- `status(session_id)` — get current checkpoint
+- `list_sessions()` — list all sessions
+- `get_supervisor(session_id)` — get the active supervisor
+- `get_audit_entries(session_id)` — get audit log entries
+- `update_payload(session_id, payload)` — update opaque agent payload
+
+### `StateStore` (protocol)
+
+- `save_checkpoint(checkpoint)` — persist a checkpoint
+- `load_checkpoint(session_id)` — load by ID (returns `None` if missing)
+- `list_sessions()` — list all checkpoints
+- `delete_session(session_id)` — delete a checkpoint
+
+Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 
 ## Contributing
 
