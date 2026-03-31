@@ -290,17 +290,13 @@ class SqliteStore:
     def list_sessions(self) -> List[Checkpoint]:
         with self._lock:
             with self._connect() as conn:
-                rows = conn.execute(
-                    "SELECT * FROM checkpoints ORDER BY timestamp DESC"
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM checkpoints ORDER BY timestamp DESC").fetchall()
                 return [self._row_to_checkpoint(r) for r in rows]
 
     def delete_session(self, session_id: str) -> bool:
         with self._lock:
             with self._connect() as conn:
-                cursor = conn.execute(
-                    "DELETE FROM checkpoints WHERE session_id = ?", (session_id,)
-                )
+                cursor = conn.execute("DELETE FROM checkpoints WHERE session_id = ?", (session_id,))
                 return cursor.rowcount > 0
 
     def delete_expired(self, max_age_seconds: float) -> int:

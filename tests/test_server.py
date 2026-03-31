@@ -237,15 +237,11 @@ class TestApiKeyAuth:
         assert resp.status_code == 401
 
     def test_wrong_key_returns_401(self, authed_client):
-        resp = authed_client.get(
-            "/sessions", headers={"Authorization": "Bearer wrong-key"}
-        )
+        resp = authed_client.get("/sessions", headers={"Authorization": "Bearer wrong-key"})
         assert resp.status_code == 401
 
     def test_correct_key_passes(self, authed_client):
-        resp = authed_client.get(
-            "/sessions", headers={"Authorization": "Bearer test-secret-key"}
-        )
+        resp = authed_client.get("/sessions", headers={"Authorization": "Bearer test-secret-key"})
         assert resp.status_code == 200
 
     def test_auth_on_create(self, authed_client):
@@ -262,9 +258,7 @@ class TestApiKeyAuth:
 
     def test_auth_on_pause(self, authed_client):
         headers = {"Authorization": "Bearer test-secret-key"}
-        resp = authed_client.post(
-            "/sessions", json={"agent_id": "test"}, headers=headers
-        )
+        resp = authed_client.post("/sessions", json={"agent_id": "test"}, headers=headers)
         sid = resp.json()["session_id"]
 
         # Without auth

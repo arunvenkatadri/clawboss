@@ -191,9 +191,7 @@ class StoreContractTests:
     def test_circuit_breaker_states_round_trip(self):
         store = self.make_store()
         cp = _make_checkpoint()
-        cp.circuit_breaker_states = {
-            "flaky_tool": {"state": "open", "consecutive_failures": 3}
-        }
+        cp.circuit_breaker_states = {"flaky_tool": {"state": "open", "consecutive_failures": 3}}
         store.save_checkpoint(cp)
         loaded = store.load_checkpoint("sess-1")
         assert loaded.circuit_breaker_states["flaky_tool"]["state"] == "open"

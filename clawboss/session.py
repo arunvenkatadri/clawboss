@@ -208,8 +208,12 @@ class SessionManager:
             original = cp.policy_dict
 
         sv = Supervisor.restore_from_checkpoint(
-            cp, audit=audit, store=self._store, policy_override=original,
-            approval_queue=self._approval_queue, observer=self._observer,
+            cp,
+            audit=audit,
+            store=self._store,
+            policy_override=original,
+            approval_queue=self._approval_queue,
+            observer=self._observer,
         )
         sv.paused = False
 

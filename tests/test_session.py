@@ -286,11 +286,14 @@ class TestPolicyImmutability:
         """Even if checkpoint policy_dict is tampered with, resume uses the original."""
         store = MemoryStore()
         mgr = SessionManager(store)
-        sid = mgr.start("agent-1", {
-            "max_iterations": 3,
-            "token_budget": 1000,
-            "require_confirm": ["dangerous_tool"],
-        })
+        sid = mgr.start(
+            "agent-1",
+            {
+                "max_iterations": 3,
+                "token_budget": 1000,
+                "require_confirm": ["dangerous_tool"],
+            },
+        )
 
         # Simulate an attacker tampering with the stored checkpoint's policy
         cp = store.load_checkpoint(sid)
@@ -312,10 +315,13 @@ class TestPolicyImmutability:
         which was set at start() and never overwritten by auto-checkpoint."""
         store = MemoryStore()
         mgr1 = SessionManager(store)
-        sid = mgr1.start("agent-1", {
-            "max_iterations": 3,
-            "require_confirm": ["dangerous_tool"],
-        })
+        sid = mgr1.start(
+            "agent-1",
+            {
+                "max_iterations": 3,
+                "require_confirm": ["dangerous_tool"],
+            },
+        )
         del mgr1
 
         # New manager — no in-memory cache of original policy
@@ -329,10 +335,13 @@ class TestPolicyImmutability:
         """Auto-checkpoint after tool calls should not change the policy in the store."""
         store = MemoryStore()
         mgr = SessionManager(store)
-        sid = mgr.start("agent-1", {
-            "max_iterations": 5,
-            "require_confirm": ["delete_file"],
-        })
+        sid = mgr.start(
+            "agent-1",
+            {
+                "max_iterations": 5,
+                "require_confirm": ["delete_file"],
+            },
+        )
         sv = mgr.get_supervisor(sid)
         await sv.call("search", good_tool, query="test")
 
@@ -457,6 +466,7 @@ class TestCrashLoopProtection:
     def test_default_max_resumes_is_3(self):
         """Policy defaults to max_resumes=3."""
         from clawboss.policy import Policy
+
         p = Policy()
         assert p.max_resumes == 3
 

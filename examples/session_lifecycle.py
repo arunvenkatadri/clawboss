@@ -10,7 +10,6 @@ import asyncio
 
 from clawboss import MemoryStore, SessionManager
 
-
 # -- Simulated tools --
 
 
@@ -58,8 +57,10 @@ async def main():
 
     # Check budget
     snap = sv.budget()
-    print(f"Budget: {snap.tokens_used}/{snap.token_limit} tokens, "
-          f"{snap.iterations}/{snap.iteration_limit} iterations")
+    print(
+        f"Budget: {snap.tokens_used}/{snap.token_limit} tokens, "
+        f"{snap.iterations}/{snap.iteration_limit} iterations"
+    )
 
     # -- 3. Pause --
     print("\n=== Pausing ===")
@@ -81,8 +82,10 @@ async def main():
 
     # Budget state is restored
     snap = sv2.budget()
-    print(f"Restored budget: {snap.tokens_used}/{snap.token_limit} tokens, "
-          f"{snap.iterations}/{snap.iteration_limit} iterations")
+    print(
+        f"Restored budget: {snap.tokens_used}/{snap.token_limit} tokens, "
+        f"{snap.iterations}/{snap.iteration_limit} iterations"
+    )
 
     # Payload is preserved
     cp = mgr2.status(sid)

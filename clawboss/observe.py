@@ -150,9 +150,7 @@ class Observer:
             self._otel_tracer = trace.get_tracer("clawboss")
 
             # Metrics
-            reader = PeriodicExportingMetricReader(
-                OTLPMetricExporter(endpoint=endpoint)
-            )
+            reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=endpoint))
             meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
             metrics.set_meter_provider(meter_provider)
             self._otel_meter = metrics.get_meter("clawboss")
@@ -182,9 +180,7 @@ class Observer:
 
         # Export to OpenTelemetry if configured
         if self._otel_tracer:
-            with self._otel_tracer.start_as_current_span(
-                f"tool_call.{tool_name}"
-            ) as span:
+            with self._otel_tracer.start_as_current_span(f"tool_call.{tool_name}") as span:
                 span.set_attribute("tool.name", tool_name)
                 span.set_attribute("tool.duration_ms", duration_ms)
                 span.set_attribute("tool.succeeded", succeeded)

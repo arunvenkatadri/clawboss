@@ -28,9 +28,7 @@ try:
     from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
     from pydantic import BaseModel
 except ImportError as e:
-    raise ImportError(
-        "clawboss[server] extras required: pip install clawboss[server]"
-    ) from e
+    raise ImportError("clawboss[server] extras required: pip install clawboss[server]") from e
 
 from .session import SessionManager
 from .store import SqliteStore
@@ -89,9 +87,7 @@ def _make_auth_dependency(api_key: Optional[str]):
     ):
         if api_key is None:
             return  # auth disabled
-        if credentials is None or not secrets.compare_digest(
-            credentials.credentials, api_key
-        ):
+        if credentials is None or not secrets.compare_digest(credentials.credentials, api_key):
             raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
     return _check_auth
@@ -318,23 +314,27 @@ def create_app(
 
                 cp = manager.status(session_id)
                 if cp is not None:
-                    await websocket.send_json({
-                        "type": "status",
-                        "data": {
-                            "session_id": cp.session_id,
-                            "status": cp.status.value,
-                            "iterations": cp.iterations,
-                            "tokens_used": cp.tokens_used,
-                        },
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "status",
+                            "data": {
+                                "session_id": cp.session_id,
+                                "status": cp.status.value,
+                                "iterations": cp.iterations,
+                                "tokens_used": cp.tokens_used,
+                            },
+                        }
+                    )
 
                 # Send pending approvals
                 pending = manager.approval_queue.list_pending(session_id)
                 for req in pending:
-                    await websocket.send_json({
-                        "type": "approval_required",
-                        "data": req.to_dict(),
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "approval_required",
+                            "data": req.to_dict(),
+                        }
+                    )
 
                 await asyncio.sleep(1)
         except WebSocketDisconnect:
