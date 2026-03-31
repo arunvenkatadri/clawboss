@@ -1,4 +1,4 @@
-# Clawboss
+# Clawboss 
 
 
 
@@ -12,7 +12,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 
-**Stop your AI agents from going rogue.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
+**Stop your AI agents from going rogue and set your long acting agents up for success** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
 Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
