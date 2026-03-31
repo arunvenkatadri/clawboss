@@ -126,18 +126,22 @@ class Observer:
     def _init_otel(self, endpoint: str) -> None:
         """Initialize OpenTelemetry tracer and meter. Fails silently if not installed."""
         try:
-            from opentelemetry import metrics, trace
-            from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
+            from opentelemetry import metrics, trace  # type: ignore[import-not-found]
+            from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # type: ignore[import-not-found]
                 OTLPMetricExporter,
             )
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]
                 OTLPSpanExporter,
             )
-            from opentelemetry.sdk.metrics import MeterProvider
-            from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-            from opentelemetry.sdk.resources import Resource
-            from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-not-found]
+            from opentelemetry.sdk.metrics.export import (  # type: ignore[import-not-found]
+                PeriodicExportingMetricReader,
+            )
+            from opentelemetry.sdk.resources import Resource  # type: ignore[import-not-found]
+            from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
+            from opentelemetry.sdk.trace.export import (  # type: ignore[import-not-found]
+                BatchSpanProcessor,
+            )
 
             resource = Resource.create({"service.name": "clawboss"})
 

@@ -324,7 +324,8 @@ class SessionManager:
         and call delete_session() manually.
         """
         if hasattr(self._store, "delete_expired"):
-            return self._store.delete_expired(max_age_seconds)
+            count: int = self._store.delete_expired(max_age_seconds)
+            return count
         return 0
 
     def _persist_audit(self, session_id: str, cp: Checkpoint) -> None:

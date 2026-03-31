@@ -137,7 +137,8 @@ def validate_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
             f"Got {len(serialized.encode('utf-8'))} bytes."
         )
     # Re-parse to strip any non-JSON-serializable objects that default=str masked
-    return json.loads(serialized)
+    result: Dict[str, Any] = json.loads(serialized)
+    return result
 
 
 # ---------------------------------------------------------------------------

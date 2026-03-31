@@ -95,10 +95,9 @@ class Supervisor:
 
         # Privacy shielding
         redact_cats = policy.redact
+        self._redactor: Optional[Redactor] = None
         if redact_cats is None or (isinstance(redact_cats, list) and len(redact_cats) > 0):
             self._redactor = Redactor(categories=redact_cats)
-        else:
-            self._redactor = None
         self._redact_direction = policy.redact_direction
 
         self._audit.record(
@@ -377,15 +376,15 @@ class Supervisor:
         # Inbound PII redaction — clean output before agent sees it
         if self._redactor and self._redact_direction in ("inbound", "both"):
             if isinstance(output, str):
-                result = self._redactor.redact(output)
-                if result.redacted_count > 0:
+                redaction = self._redactor.redact(output)
+                if redaction.redacted_count > 0:
                     self._audit.record(
                         AuditPhase.POLICY_CHECK,
                         AuditOutcome.INFO,
                         target=tool_name,
-                        detail=f"Redacted {result.redacted_count} PII value(s) from output",
+                        detail=f"Redacted {redaction.redacted_count} PII value(s) from output",
                     )
-                    output = result.text
+                    output = redaction.text
             elif isinstance(output, dict):
                 cleaned, count = self._redactor.redact_dict(output)
                 if count > 0:

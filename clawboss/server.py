@@ -23,10 +23,19 @@ import secrets
 from typing import Any, Dict, List, Optional
 
 try:
-    from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-    from pydantic import BaseModel
+    from fastapi import (  # type: ignore[import-not-found]
+        Depends,
+        FastAPI,
+        HTTPException,
+        WebSocket,
+        WebSocketDisconnect,
+    )
+    from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+    from fastapi.security import (  # type: ignore[import-not-found]
+        HTTPAuthorizationCredentials,
+        HTTPBearer,
+    )
+    from pydantic import BaseModel  # type: ignore[import-not-found]
 except ImportError as e:
     raise ImportError("clawboss[server] extras required: pip install clawboss[server]") from e
 
