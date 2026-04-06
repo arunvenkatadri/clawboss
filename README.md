@@ -12,7 +12,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 
-**Stop your AI agents from going rogue and set your long acting agents up for success** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
+**Stop your AI agents from going rogue and set your long acting agents up for success.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
 Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
@@ -319,7 +319,7 @@ curl -H "Authorization: Bearer my-secret-key" http://localhost:8000/sessions
 
 WebSocket connections pass it as a query param: `ws://localhost:8000/sessions/{id}/events?token=my-secret-key`
 
-If `CLAWBOSS_API_KEY` is not set and no OAuth is configured, the default `app` rejects all requests. For local dev, use `create_app()` directly without `require_auth`.
+The default `uvicorn clawboss.server:app` rejects all requests unless `CLAWBOSS_API_KEY` or OAuth is configured. For local dev without auth, create the app in code: `create_app()` (no `require_auth`).
 
 ### OAuth2 (GitHub, Google)
 
@@ -346,7 +346,13 @@ Endpoints:
 | POST | `/sessions/{id}/stop` | Stop an agent |
 | POST | `/sessions/{id}/restart` | Restart a stopped/failed agent (new session, same policy) |
 | GET | `/sessions/{id}/audit` | Audit log entries for this session |
-| WS | `/sessions/{id}/events` | Stream status changes and audit events |
+| GET | `/sessions/{id}/approvals` | List pending/resolved approval requests |
+| POST | `/sessions/{id}/approvals/{aid}/approve` | Approve a pending tool call |
+| POST | `/sessions/{id}/approvals/{aid}/deny` | Deny a pending tool call |
+| GET | `/metrics/tools` | Aggregated metrics for all tools |
+| GET | `/metrics/sessions/{id}` | Metrics for a specific session |
+| GET | `/metrics/recent` | Recent tool call log |
+| WS | `/sessions/{id}/events` | Stream status changes, audit, and approvals |
 
 ```bash
 # Create a session
@@ -657,6 +663,7 @@ Dataclass with all configuration. Every field has a sensible default.
 
 - `call(tool_name, fn, **kwargs)` — supervise an async tool call
 - `call_sync(tool_name, fn, **kwargs)` — supervise a sync tool call
+- `execute_approved(approval_id, fn)` — run a previously-approved tool call
 - `record_iteration()` — record an agent loop iteration
 - `record_tokens(n)` — record token usage
 - `budget()` — get current `BudgetSnapshot`
@@ -734,6 +741,27 @@ Dataclass with all configuration. Every field has a sensible default.
 - `delete_session(session_id)` — delete a checkpoint
 
 Implementations: `SqliteStore(db_path)`, `MemoryStore()`
+
+### `Redactor(categories=None, use_nlp=False)`
+
+- `redact(text)` — redact PII from a string, returns `RedactionResult`
+- `redact_dict(d)` — redact all string values in a dict
+
+### `Observer(otlp_endpoint=None)`
+
+- `record_tool_call(tool_name, ...)` — record a tool call observation
+- `tool_summary(tool_name)` — aggregated metrics for one tool
+- `session_summary(session_id)` — aggregated metrics for one session
+- `all_tools_summary()` — metrics for all tools
+- `recent_calls(limit=50)` — recent call log
+
+### `ApprovalQueue()`
+
+- `submit(tool_name, tool_args, session_id)` — queue a tool call for approval
+- `approve(approval_id)` — approve a pending request
+- `deny(approval_id, reason="")` — deny a pending request
+- `list_pending(session_id=None)` — list pending approvals
+- `list_all(session_id=None)` — list all approvals
 
 ## Observability
 
