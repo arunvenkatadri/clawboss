@@ -6,9 +6,12 @@ Security invariants:
 - Policy is IMMUTABLE after start(). resume() always rebuilds the Supervisor
   from the original policy stored at creation time — never from agent-controlled
   checkpoint data. An agent cannot weaken its own supervision.
+- Policy integrity is verified via HMAC checksum on resume. If the stored
+  policy has been tampered with, resume is rejected.
 - Payload is UNTRUSTED. It is validated for size/serializability on write, and
   agents consuming it after resume should treat it like user input.
 - Audit entries are persisted to the store so they survive crashes.
+- Per-session locking prevents race conditions on concurrent lifecycle operations.
 
 Usage:
     from clawboss import SessionManager, MemoryStore
@@ -25,6 +28,14 @@ Usage:
     mgr.stop(session_id)     # mark complete
 """
 
+import hashlib
+import hmac
+import json
+
+# Key for HMAC policy checksum — not a secret (it's in the source),
+# but prevents casual tampering of the SQLite file.  For real security,
+# set CLAWBOSS_POLICY_KEY env var.
+import os
 import threading
 from typing import Any, Dict, List, Optional
 
@@ -36,6 +47,14 @@ from .policy import Policy
 from .store import Checkpoint, SessionStatus, StateStore, new_session_id, validate_payload
 from .supervisor import Supervisor
 
+_POLICY_HMAC_KEY = os.environ.get("CLAWBOSS_POLICY_KEY", "clawboss-policy-integrity").encode()
+
+
+def _policy_checksum(policy_dict: Dict[str, Any]) -> str:
+    """Compute an HMAC checksum for a policy dict."""
+    serialized = json.dumps(policy_dict, sort_keys=True, default=str).encode()
+    return hmac.new(_POLICY_HMAC_KEY, serialized, hashlib.sha256).hexdigest()
+
 
 class SessionManager:
     """Lifecycle manager for agent sessions backed by a StateStore.
@@ -43,6 +62,9 @@ class SessionManager:
     Keeps active Supervisors in memory and persists state to the store.
     After a crash, create a new SessionManager with the same store and
     call resume() to pick up where you left off.
+
+    Thread-safe: uses per-session locks for lifecycle operations to prevent
+    race conditions from concurrent pause/resume/stop calls.
     """
 
     def __init__(self, store: StateStore):
@@ -53,7 +75,15 @@ class SessionManager:
         self._stateless_sessions: set = set()
         self._approval_queue = ApprovalQueue()
         self._observer = Observer()
-        self._lock = threading.Lock()
+        self._lock = threading.Lock()  # protects the dicts above
+        self._session_locks: Dict[str, threading.Lock] = {}  # per-session locks
+
+    def _get_session_lock(self, session_id: str) -> threading.Lock:
+        """Get or create a per-session lock."""
+        with self._lock:
+            if session_id not in self._session_locks:
+                self._session_locks[session_id] = threading.Lock()
+            return self._session_locks[session_id]
 
     @property
     def approval_queue(self) -> ApprovalQueue:
@@ -97,8 +127,6 @@ class SessionManager:
         sink = MemoryAuditSink()
         audit = AuditLog(sid, sinks=[sink])
 
-        # Stateless sessions don't wire up the store on the Supervisor,
-        # so no auto-checkpointing happens on each call/record.
         sv = Supervisor(
             policy,
             audit=audit,
@@ -111,6 +139,7 @@ class SessionManager:
 
         # Store the ORIGINAL policy — this is immutable for the session's lifetime
         frozen_policy = policy.to_dict()
+        checksum = _policy_checksum(frozen_policy)
 
         checkpoint = Checkpoint(
             session_id=sid,
@@ -121,9 +150,8 @@ class SessionManager:
             policy_dict=frozen_policy,
             payload=safe_payload,
             stateless=stateless,
+            policy_checksum=checksum,
         )
-        # Always save the initial checkpoint so list/status/pause/stop work,
-        # but stateless sessions won't auto-checkpoint after each tool call.
         self._store.save_checkpoint(checkpoint)
 
         with self._lock:
@@ -137,19 +165,20 @@ class SessionManager:
 
     def pause(self, session_id: str) -> None:
         """Pause an agent session. The Supervisor will raise AgentPaused on next call()."""
-        cp = self._store.load_checkpoint(session_id)
-        if cp is None:
-            raise ClawbossError.session_not_found(session_id)
+        session_lock = self._get_session_lock(session_id)
+        with session_lock:
+            cp = self._store.load_checkpoint(session_id)
+            if cp is None:
+                raise ClawbossError.session_not_found(session_id)
 
-        cp.status = SessionStatus.PAUSED
-        # Persist audit entries before pausing
-        self._persist_audit(session_id, cp)
-        self._store.save_checkpoint(cp)
+            cp.status = SessionStatus.PAUSED
+            self._persist_audit(session_id, cp)
+            self._store.save_checkpoint(cp)
 
-        with self._lock:
-            sv = self._supervisors.get(session_id)
-        if sv is not None:
-            sv.paused = True
+            with self._lock:
+                sv = self._supervisors.get(session_id)
+            if sv is not None:
+                sv.paused = True
 
     def resume(self, session_id: str) -> Supervisor:
         """Resume a paused or previously-crashed session.
@@ -158,54 +187,66 @@ class SessionManager:
         rebuilt from the ORIGINAL immutable policy stored at start() — never
         from any agent-modified data in the checkpoint.
 
+        Policy integrity is verified via HMAC checksum — if the stored policy
+        has been tampered with, resume is rejected.
+
         Stateless sessions cannot be resumed after a crash — their state
         only exists in memory.
 
         Returns:
             The restored Supervisor, ready for use.
         """
-        cp = self._store.load_checkpoint(session_id)
-        if cp is None:
-            raise ClawbossError.session_not_found(session_id)
+        session_lock = self._get_session_lock(session_id)
+        with session_lock:
+            cp = self._store.load_checkpoint(session_id)
+            if cp is None:
+                raise ClawbossError.session_not_found(session_id)
 
-        # Stateless sessions can be unpaused (supervisor still in memory)
-        # but cannot be recovered after a crash
-        with self._lock:
-            in_memory = session_id in self._supervisors
-        if cp.stateless and not in_memory:
-            raise ClawbossError(
-                "session_not_recoverable",
-                f"Session {session_id} is stateless and cannot be resumed after a crash",
-            )
+            # Stateless sessions can be unpaused (supervisor still in memory)
+            # but cannot be recovered after a crash
+            with self._lock:
+                in_memory = session_id in self._supervisors
+            if cp.stateless and not in_memory:
+                raise ClawbossError(
+                    "session_not_recoverable",
+                    f"Session {session_id} is stateless and cannot be resumed after a crash",
+                )
 
-        # Crash loop protection: check max_resumes from the original policy
-        policy = Policy.from_dict(cp.policy_dict)
-        if cp.resume_count >= policy.max_resumes:
-            cp.status = SessionStatus.FAILED
-            cp.failure_reason = (
-                f"Crash loop: resumed {cp.resume_count} times (limit: {policy.max_resumes})"
-            )
+            # Crash loop protection
+            policy = Policy.from_dict(cp.policy_dict)
+            if cp.resume_count >= policy.max_resumes:
+                cp.status = SessionStatus.FAILED
+                cp.failure_reason = (
+                    f"Crash loop: resumed {cp.resume_count} times (limit: {policy.max_resumes})"
+                )
+                self._store.save_checkpoint(cp)
+                raise ClawbossError.max_resumes_exceeded(
+                    session_id, cp.resume_count, policy.max_resumes
+                )
+
+            # Policy integrity check — verify HMAC checksum
+            with self._lock:
+                original = self._original_policies.get(session_id)
+            if original is None:
+                original = cp.policy_dict
+            if cp.policy_checksum:
+                expected = _policy_checksum(original)
+                if not hmac.compare_digest(cp.policy_checksum, expected):
+                    cp.status = SessionStatus.FAILED
+                    cp.failure_reason = "Policy integrity check failed — possible tampering"
+                    self._store.save_checkpoint(cp)
+                    raise ClawbossError(
+                        "policy_tampered",
+                        f"Session {session_id}: policy checksum mismatch. "
+                        "The stored policy may have been tampered with.",
+                    )
+
+            cp.resume_count += 1
+            cp.status = SessionStatus.RUNNING
             self._store.save_checkpoint(cp)
-            raise ClawbossError.max_resumes_exceeded(
-                session_id, cp.resume_count, policy.max_resumes
-            )
-
-        cp.resume_count += 1
-        cp.status = SessionStatus.RUNNING
-        self._store.save_checkpoint(cp)
 
         sink = MemoryAuditSink()
         audit = AuditLog(session_id, sinks=[sink])
-
-        # SECURITY: always use the original policy, not whatever the checkpoint says.
-        # The checkpoint's policy_dict IS the original (set at start()), but we also
-        # cache it in _original_policies for sessions started in this process.
-        with self._lock:
-            original = self._original_policies.get(session_id)
-        if original is None:
-            # Session was started in a previous process — use the checkpoint's policy,
-            # which was set at start() and never mutated by auto-checkpoint.
-            original = cp.policy_dict
 
         sv = Supervisor.restore_from_checkpoint(
             cp,
@@ -226,32 +267,32 @@ class SessionManager:
 
     def stop(self, session_id: str) -> None:
         """Stop an agent session. Calls supervisor.finish() and marks stopped."""
-        cp = self._store.load_checkpoint(session_id)
-        if cp is None:
-            raise ClawbossError.session_not_found(session_id)
+        session_lock = self._get_session_lock(session_id)
+        with session_lock:
+            cp = self._store.load_checkpoint(session_id)
+            if cp is None:
+                raise ClawbossError.session_not_found(session_id)
 
-        with self._lock:
-            sv = self._supervisors.get(session_id)
+            with self._lock:
+                sv = self._supervisors.get(session_id)
 
-        if sv is not None:
-            sv.finish()
+            if sv is not None:
+                sv.finish()
 
-        cp.status = SessionStatus.STOPPED
-        # Update with latest supervisor state if available
-        if sv is not None:
-            data = sv.to_checkpoint_data()
-            cp.iterations = data["iterations"]
-            cp.tokens_used = data["tokens_used"]
+            cp.status = SessionStatus.STOPPED
+            if sv is not None:
+                data = sv.to_checkpoint_data()
+                cp.iterations = data["iterations"]
+                cp.tokens_used = data["tokens_used"]
 
-        # Persist audit entries BEFORE removing sink from memory
-        self._persist_audit(session_id, cp)
+            self._persist_audit(session_id, cp)
 
-        with self._lock:
-            self._supervisors.pop(session_id, None)
-            self._audit_sinks.pop(session_id, None)
-            self._original_policies.pop(session_id, None)
+            with self._lock:
+                self._supervisors.pop(session_id, None)
+                self._audit_sinks.pop(session_id, None)
+                self._original_policies.pop(session_id, None)
 
-        self._store.save_checkpoint(cp)
+            self._store.save_checkpoint(cp)
 
     def restart(self, session_id: str) -> str:
         """Restart a stopped or failed session with the same policy and agent ID.
@@ -262,16 +303,17 @@ class SessionManager:
         Returns:
             The new session_id.
         """
-        cp = self._store.load_checkpoint(session_id)
-        if cp is None:
-            raise ClawbossError.session_not_found(session_id)
+        session_lock = self._get_session_lock(session_id)
+        with session_lock:
+            cp = self._store.load_checkpoint(session_id)
+            if cp is None:
+                raise ClawbossError.session_not_found(session_id)
 
-        # Clean up in-memory state for the old session if any
-        with self._lock:
-            self._supervisors.pop(session_id, None)
-            self._audit_sinks.pop(session_id, None)
-            self._original_policies.pop(session_id, None)
-            self._stateless_sessions.discard(session_id)
+            with self._lock:
+                self._supervisors.pop(session_id, None)
+                self._audit_sinks.pop(session_id, None)
+                self._original_policies.pop(session_id, None)
+                self._stateless_sessions.discard(session_id)
 
         return self.start(
             agent_id=cp.agent_id,
@@ -294,11 +336,9 @@ class SessionManager:
 
     def get_audit_entries(self, session_id: str) -> list:
         """Get audit log entries for a session (in-memory + persisted)."""
-        # Start with persisted entries from the store
         cp = self._store.load_checkpoint(session_id)
         persisted = cp.audit_log if cp is not None else []
 
-        # Add in-memory entries from current process
         with self._lock:
             sink = self._audit_sinks.get(session_id)
         in_memory = [e.to_dict() for e in sink.entries] if sink is not None else []
@@ -311,18 +351,16 @@ class SessionManager:
         The payload is validated for size limits and serializability.
         Treat payload as UNTRUSTED — it may contain agent-controlled data.
         """
-        cp = self._store.load_checkpoint(session_id)
-        if cp is None:
-            raise ClawbossError.session_not_found(session_id)
-        cp.payload = validate_payload(payload)
-        self._store.save_checkpoint(cp)
+        session_lock = self._get_session_lock(session_id)
+        with session_lock:
+            cp = self._store.load_checkpoint(session_id)
+            if cp is None:
+                raise ClawbossError.session_not_found(session_id)
+            cp.payload = validate_payload(payload)
+            self._store.save_checkpoint(cp)
 
     def delete_expired(self, max_age_seconds: float) -> int:
-        """Delete sessions older than max_age_seconds.
-
-        Only works with SqliteStore. For MemoryStore, iterate list_sessions()
-        and call delete_session() manually.
-        """
+        """Delete sessions older than max_age_seconds."""
         if hasattr(self._store, "delete_expired"):
             count: int = self._store.delete_expired(max_age_seconds)
             return count

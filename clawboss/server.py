@@ -31,14 +31,11 @@ try:
         WebSocketDisconnect,
     )
     from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
-    from fastapi.security import (  # type: ignore[import-not-found]
-        HTTPAuthorizationCredentials,
-        HTTPBearer,
-    )
     from pydantic import BaseModel  # type: ignore[import-not-found]
 except ImportError as e:
     raise ImportError("clawboss[server] extras required: pip install clawboss[server]") from e
 
+from .auth import make_auth_dependency, register_oauth_routes
 from .session import SessionManager
 from .store import SqliteStore
 
@@ -79,30 +76,6 @@ class SessionDetail(SessionSummary):
 
 
 # ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
-
-_bearer_scheme = HTTPBearer(auto_error=False)
-
-
-def _make_auth_dependency(api_key: Optional[str]):
-    """Build a FastAPI dependency that enforces Bearer token auth.
-
-    If api_key is None, auth is disabled (all requests pass).
-    """
-
-    async def _check_auth(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
-    ):
-        if api_key is None:
-            return  # auth disabled
-        if credentials is None or not secrets.compare_digest(credentials.credentials, api_key):
-            raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
-    return _check_auth
-
-
-# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
@@ -119,6 +92,7 @@ def create_app(
     manager: Optional[SessionManager] = None,
     allowed_origins: Optional[List[str]] = None,
     api_key: Optional[str] = None,
+    require_auth: bool = False,
 ) -> FastAPI:
     """Build a FastAPI app wired to the given SessionManager.
 
@@ -131,7 +105,9 @@ def create_app(
                         for production without auth).
         api_key: If set, all HTTP endpoints require ``Authorization: Bearer <key>``.
                  If None, checks the CLAWBOSS_API_KEY environment variable.
-                 If neither is set, auth is disabled (open access).
+        require_auth: If True and no API key is configured, ALL requests
+                     are rejected with 401. The default module-level ``app``
+                     sets this to True — set CLAWBOSS_API_KEY to use it.
     """
     if manager is None:
         store = SqliteStore()
@@ -140,11 +116,21 @@ def create_app(
     # Resolve API key: explicit param > env var > disabled
     resolved_key = api_key if api_key is not None else os.environ.get("CLAWBOSS_API_KEY")
 
-    auth = _make_auth_dependency(resolved_key)
+    # If require_auth is set and no key is configured, reject all requests
+    if require_auth and resolved_key is None:
+        resolved_key = "__REJECT_ALL__"  # sentinel — no valid token can match this
+
+    # OAuth config from env vars
+    oauth_provider = os.environ.get("CLAWBOSS_OAUTH_PROVIDER")
+    oauth_client_id = os.environ.get("CLAWBOSS_OAUTH_CLIENT_ID", "")
+    oauth_client_secret = os.environ.get("CLAWBOSS_OAUTH_CLIENT_SECRET", "")
+    oauth_enabled = bool(oauth_provider and oauth_client_id and oauth_client_secret)
+
+    auth = make_auth_dependency(api_key=resolved_key, oauth_enabled=oauth_enabled)
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.79.0",
+        version="0.80.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -165,7 +151,11 @@ def create_app(
 
     # Stash on app state for tests
     app.state.manager = manager
-    app.state.auth_enabled = resolved_key is not None
+    app.state.auth_enabled = resolved_key is not None or oauth_enabled
+
+    # Register OAuth routes if configured
+    if oauth_enabled and oauth_provider:
+        register_oauth_routes(app, oauth_provider, oauth_client_id, oauth_client_secret)
 
     # ------------------------------------------------------------------
     # Endpoints
@@ -385,4 +375,4 @@ def _checkpoint_to_detail(cp) -> dict:
 # Default app instance for ``uvicorn clawboss.server:app``
 # ---------------------------------------------------------------------------
 
-app = create_app()
+app = create_app(require_auth=True)

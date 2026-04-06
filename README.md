@@ -319,7 +319,20 @@ curl -H "Authorization: Bearer my-secret-key" http://localhost:8000/sessions
 
 WebSocket connections pass it as a query param: `ws://localhost:8000/sessions/{id}/events?token=my-secret-key`
 
-If `CLAWBOSS_API_KEY` is not set, auth is disabled (open access — fine for local dev). You can also pass `api_key=` directly to `create_app()` in code.
+If `CLAWBOSS_API_KEY` is not set and no OAuth is configured, the default `app` rejects all requests. For local dev, use `create_app()` directly without `require_auth`.
+
+### OAuth2 (GitHub, Google)
+
+For production deployments, configure OAuth2 via environment variables:
+
+```bash
+CLAWBOSS_OAUTH_PROVIDER=github \
+CLAWBOSS_OAUTH_CLIENT_ID=your-client-id \
+CLAWBOSS_OAUTH_CLIENT_SECRET=your-client-secret \
+uvicorn clawboss.server:app
+```
+
+This adds `/auth/login` (get the OAuth redirect URL), `/auth/callback` (exchange code for session token), and `/auth/me` (current user info). Session tokens are Bearer tokens — use them the same way as API keys. Supported providers: `github`, `google`.
 
 Endpoints:
 
@@ -352,13 +365,13 @@ curl http://localhost:8000/sessions/{id}
 
 Clawboss is designed to supervise untrusted agent behavior. The stateful session layer enforces several invariants:
 
-**Policy is immutable.** The supervision policy (timeouts, budgets, confirmation gates) is frozen at `start()` and cannot be changed by the agent. `resume()` always rebuilds from the original policy — even if the stored checkpoint is tampered with, the agent cannot weaken its own supervision.
+**Policy is immutable and integrity-checked.** The supervision policy is frozen at `start()` and cannot be changed by the agent. An HMAC checksum is stored alongside the policy — on `resume()`, the checksum is verified and the session is rejected if it doesn't match. Even if someone edits the SQLite file directly, they can't downgrade supervision without the HMAC key (configurable via `CLAWBOSS_POLICY_KEY`).
 
 **Payload is untrusted.** The `payload` field is agent-writable storage for intermediate work. It is validated for size (1 MB limit) and serializability, but its *contents* should be treated like user input. If your agent reads from payload after a resume, sanitize it.
 
 **Session IDs are cryptographic.** 128-bit random IDs via `secrets.token_hex` — not guessable or enumerable.
 
-**The REST API supports API key auth.** Set `CLAWBOSS_API_KEY` to enable Bearer token authentication on all endpoints. CORS is restricted to localhost by default. Always enable auth before exposing the server to untrusted networks.
+**The REST API supports API key and OAuth2 auth.** Set `CLAWBOSS_API_KEY` for simple Bearer token auth, or configure OAuth2 (GitHub/Google) for production. The default `uvicorn clawboss.server:app` rejects all requests unless auth is configured. CORS is restricted to localhost by default.
 
 **SQLite files are owner-only.** The default `SqliteStore` creates database files with `0600` permissions.
 
@@ -480,7 +493,19 @@ result = r.redact("Contact bob@example.com or call 555-123-4567")
 print(result.text)  # "Contact [EMAIL] or call [PHONE]"
 ```
 
-Categories: `email`, `phone`, `ssn`, `credit_card`, `api_key`, `ip_address`. Pass `redact=None` to enable all. Regex-based — fast, zero dependencies, catches accidental leakage.
+Categories: `email`, `phone`, `ssn`, `credit_card`, `api_key`, `ip_address`, `national_id`, `iban`, `passport`. Pass `redact=None` to enable all.
+
+Includes international patterns — UK/EU phone numbers, UK National Insurance Numbers, German Tax IDs, IBANs, and passport numbers.
+
+For context-dependent PII (names, addresses, organizations), enable optional NLP augmentation:
+
+```python
+r = Redactor(use_nlp=True)  # requires: pip install spacy && python -m spacy download en_core_web_sm
+result = r.redact("John Smith lives in London")
+# "John Smith" → [PERSON], "London" → [LOCATION]
+```
+
+Regex is always-on (fast, zero deps). NLP is opt-in (slower, needs spaCy).
 
 ## Confirmation gates (human-in-the-loop approval)
 

@@ -84,6 +84,39 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
         ),
         "[IP_ADDR]",
     ),
+    # -- International patterns --
+    (
+        "phone",  # international phone numbers: +XX XXXX XXXXXX etc.
+        re.compile(
+            r"(?<!\d)"
+            r"\+(?:44|49|33|61|81|86|91|7|34|39|55|82|65|852)"  # country codes
+            r"[-.\s]?\d{1,5}[-.\s]?\d{3,5}[-.\s]?\d{3,5}"
+            r"(?!\d)"
+        ),
+        "[PHONE]",
+    ),
+    (
+        "national_id",  # UK National Insurance Number
+        re.compile(r"\b[A-CEGHJ-PR-TW-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D]\b"),
+        "[NATIONAL_ID]",
+    ),
+    (
+        "national_id",  # German Tax ID (Steuerliche Identifikationsnummer)
+        re.compile(r"\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b"),
+        "[NATIONAL_ID]",
+    ),
+    (
+        "iban",  # International Bank Account Number
+        re.compile(
+            r"\b[A-Z]{2}\d{2}[\s]?[\dA-Z]{4}[\s]?[\dA-Z]{4}[\s]?[\dA-Z]{4}(?:[\s]?[\dA-Z]{1,4}){0,5}\b"
+        ),
+        "[IBAN]",
+    ),
+    (
+        "passport",  # Common passport number patterns
+        re.compile(r"\b[A-Z]{1,2}\d{6,9}\b"),
+        "[PASSPORT]",
+    ),
 ]
 
 # All known category names
@@ -105,20 +138,36 @@ class RedactionResult:
 
 
 class Redactor:
-    """PII redactor with configurable categories.
+    """PII redactor with configurable categories and optional NLP augmentation.
 
     Args:
         categories: Which PII types to detect. Defaults to all.
                    Options: "email", "phone", "ssn", "credit_card",
-                   "api_key", "ip_address"
+                   "api_key", "ip_address", "national_id", "iban", "passport"
+        use_nlp: If True, augment regex with spaCy NER for names, locations,
+                 and other context-dependent PII. Requires spacy + a model.
+                 Install with: pip install spacy && python -m spacy download en_core_web_sm
     """
 
-    def __init__(self, categories: Optional[List[str]] = None):
+    def __init__(self, categories: Optional[List[str]] = None, use_nlp: bool = False):
         if categories is None:
             self._patterns = _PATTERNS
         else:
             cats = set(categories)
             self._patterns = [(n, p, r) for n, p, r in _PATTERNS if n in cats]
+
+        self._nlp = None
+        if use_nlp:
+            self._init_nlp()
+
+    def _init_nlp(self) -> None:
+        """Load spaCy model for NER. Fails silently if not installed."""
+        try:
+            import spacy  # type: ignore[import-not-found]
+
+            self._nlp = spacy.load("en_core_web_sm")
+        except (ImportError, OSError):
+            pass  # spaCy not installed or model not downloaded
 
     @property
     def categories(self) -> List[str]:
@@ -145,11 +194,54 @@ class Redactor:
                     found_categories.append(name)
                 result_text = new_text
 
+        # NLP augmentation — catch names, locations, orgs that regex misses
+        if self._nlp is not None:
+            nlp_text, nlp_count, nlp_cats = self._nlp_redact(result_text)
+            if nlp_count > 0:
+                result_text = nlp_text
+                total_count += nlp_count
+                for cat in nlp_cats:
+                    if cat not in found_categories:
+                        found_categories.append(cat)
+
         return RedactionResult(
             text=result_text,
             redacted_count=total_count,
             categories_found=found_categories,
         )
+
+    # NER entity label → placeholder mapping
+    _NER_LABELS = {
+        "PERSON": "[PERSON]",
+        "GPE": "[LOCATION]",
+        "LOC": "[LOCATION]",
+        "ORG": "[ORG]",
+        "NORP": "[GROUP]",
+    }
+
+    def _nlp_redact(self, text: str) -> Tuple[str, int, List[str]]:
+        """Apply spaCy NER to catch context-dependent PII."""
+        if self._nlp is None:
+            return text, 0, []
+        doc = self._nlp(text)
+        replacements = []
+        categories: List[str] = []
+        for ent in doc.ents:
+            if ent.label_ in self._NER_LABELS:
+                replacements.append((ent.start_char, ent.end_char, self._NER_LABELS[ent.label_]))
+                cat = self._NER_LABELS[ent.label_].strip("[]").lower()
+                if cat not in categories:
+                    categories.append(cat)
+
+        if not replacements:
+            return text, 0, []
+
+        # Apply replacements in reverse order to preserve offsets
+        result = text
+        for start, end, placeholder in sorted(replacements, reverse=True):
+            result = result[:start] + placeholder + result[end:]
+
+        return result, len(replacements), categories
 
     def redact_dict(self, d: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         """Redact PII from all string values in a dict (shallow).

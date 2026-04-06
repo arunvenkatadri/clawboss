@@ -213,11 +213,11 @@ class TestSupervisorIterations:
 class TestSupervisorRequestTimeout:
     @pytest.mark.asyncio
     async def test_request_timeout_triggers(self):
-        # Set request_timeout to something tiny
-        policy = Policy(request_timeout=0.01, tool_timeout=5.0)
+        # Set request_timeout generous enough that sleep imprecision doesn't matter
+        policy = Policy(request_timeout=0.05, tool_timeout=5.0)
         sv = Supervisor(policy)
-        # Wait for the request to expire
-        await asyncio.sleep(0.05)
+        # Wait well past the request timeout
+        await asyncio.sleep(0.2)
         result = await sv.call("search", good_tool)
         assert result.succeeded is False
         assert result.error.kind == "timeout"

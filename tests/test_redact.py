@@ -115,3 +115,72 @@ class TestRedactDict:
         cleaned, _ = r.redact_dict({"count": 42, "flag": True})
         assert cleaned["count"] == 42
         assert cleaned["flag"] is True
+
+
+# ---------------------------------------------------------------------------
+# International PII patterns
+# ---------------------------------------------------------------------------
+
+
+class TestInternationalPhone:
+    def test_uk_phone(self):
+        r = Redactor(["phone"])
+        result = r.redact("Call +44 20 7946 0958")
+        assert "[PHONE]" in result.text
+        assert "7946" not in result.text
+
+    def test_german_phone(self):
+        r = Redactor(["phone"])
+        result = r.redact("Ring +49 30 1234 5678")
+        assert "[PHONE]" in result.text
+
+    def test_japan_phone(self):
+        r = Redactor(["phone"])
+        result = r.redact("Call +81 3 1234 5678")
+        assert "[PHONE]" in result.text
+
+    def test_india_phone(self):
+        r = Redactor(["phone"])
+        result = r.redact("Call +91 98765 43210")
+        assert "[PHONE]" in result.text
+
+    def test_australia_phone(self):
+        r = Redactor(["phone"])
+        result = r.redact("Ring +61 2 1234 5678")
+        assert "[PHONE]" in result.text
+
+
+class TestNationalId:
+    def test_uk_national_insurance(self):
+        r = Redactor(["national_id"])
+        result = r.redact("NIN: AB 12 34 56 C")
+        assert "[NATIONAL_ID]" in result.text
+
+    def test_uk_nin_no_spaces(self):
+        r = Redactor(["national_id"])
+        result = r.redact("NIN: AB123456C")
+        assert "[NATIONAL_ID]" in result.text
+
+
+class TestIBAN:
+    def test_german_iban(self):
+        r = Redactor(["iban"])
+        result = r.redact("IBAN: DE89 3704 0044 0532 0130 00")
+        assert "[IBAN]" in result.text
+        assert "3704" not in result.text
+
+    def test_uk_iban(self):
+        r = Redactor(["iban"])
+        result = r.redact("Account: GB29 NWBK 6016 1331 9268 19")
+        assert "[IBAN]" in result.text
+
+
+class TestNlpRedaction:
+    """NLP tests — skip if spaCy is not installed."""
+
+    def test_nlp_not_installed_is_fine(self):
+        """Redactor with use_nlp=True should not crash if spaCy is missing."""
+        r = Redactor(use_nlp=True)
+        result = r.redact("John Smith lives in London")
+        # May or may not redact depending on spaCy availability
+        assert isinstance(result.text, str)

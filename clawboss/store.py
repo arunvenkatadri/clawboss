@@ -81,6 +81,9 @@ class Checkpoint:
     # Human-readable reason the session ended (set on stop/fail)
     failure_reason: str = ""
 
+    # HMAC checksum of the original policy — verified on resume
+    policy_checksum: str = ""
+
     # Persisted audit entries (list of dicts) — survives crashes
     audit_log: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -115,6 +118,7 @@ class Checkpoint:
             stateless=d.get("stateless", False),
             resume_count=d.get("resume_count", 0),
             failure_reason=d.get("failure_reason", ""),
+            policy_checksum=d.get("policy_checksum", ""),
             audit_log=d.get("audit_log", []),
         )
 

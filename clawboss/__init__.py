@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.79.0"
+__version__ = "0.80.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
