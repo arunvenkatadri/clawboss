@@ -113,6 +113,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
 | **Crash loop protection** | Agent keeps crashing and restarting forever |
+| **Triggers & scheduling** | No way to run agents on schedule or on data events |
 | **Pipeline orchestration** | No structured way to chain tool calls |
 | **REST control plane** | No way to pause/resume/stop agents remotely |
 
@@ -352,6 +353,53 @@ pipeline = await builder.create("Show me total revenue by region")
 ```
 
 The REST endpoint `GET /pipelines/schema` returns the schema for all registered connectors. The dashboard shows it in the pipeline editor.
+
+## Triggers and scheduling
+
+Run pipelines on a schedule, on webhook, or when data changes.
+
+```python
+from clawboss import Scheduler, WebhookTrigger
+
+scheduler = Scheduler()
+
+# Every 15 minutes
+scheduler.add_interval("check-alerts", pipeline.run, minutes=15)
+
+# Cron schedule (every day at 9am)
+scheduler.add_cron("morning-report", pipeline.run, cron="0 9 * * *")
+
+# When a database condition fires
+scheduler.add_db_watch(
+    "new-orders",
+    pipeline.run,
+    connector=sql,
+    query="SELECT count(*) as cnt FROM orders WHERE processed=false",
+    condition=lambda r: r["rows"][0]["cnt"] > 0,
+    poll_seconds=60,
+)
+
+scheduler.start()  # runs in background thread
+```
+
+Webhooks fire when an HTTP endpoint is called:
+
+```bash
+curl -X POST http://localhost:8000/triggers/deploy-notify/fire
+```
+
+REST endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/triggers` | List all triggers |
+| GET | `/triggers/history` | Trigger firing history |
+| POST | `/triggers/{name}/fire` | Fire a webhook trigger |
+| POST | `/triggers/{name}/enable` | Enable a trigger |
+| POST | `/triggers/{name}/disable` | Disable a trigger |
+| DELETE | `/triggers/{name}` | Remove a trigger |
+
+The dashboard shows trigger mode selection in the agent creation flow — on-demand, interval, cron, webhook, or DB watch.
 
 ## Durable sessions
 

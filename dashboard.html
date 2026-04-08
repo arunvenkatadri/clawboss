@@ -808,6 +808,57 @@
         <span style="font-size:0.72rem; color:var(--muted);">No checkpoints, no crash recovery &mdash; in-memory only</span>
       </div>
 
+      <!-- When to run -->
+      <div style="margin-top:0.75rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.4rem; display:block;">When to run</label>
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.4rem;">
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;" onclick="setTriggerMode('ondemand')" id="btn-trigger-ondemand">On-demand</button>
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;" onclick="setTriggerMode('interval')" id="btn-trigger-interval">Interval</button>
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;" onclick="setTriggerMode('cron')" id="btn-trigger-cron">Cron</button>
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;" onclick="setTriggerMode('webhook')" id="btn-trigger-webhook">Webhook</button>
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.6rem;" onclick="setTriggerMode('dbwatch')" id="btn-trigger-dbwatch">DB Watch</button>
+        </div>
+        <div id="trigger-ondemand-opts" style="display:none; font-size:0.75rem; color:var(--muted);">Run manually via the API or dashboard.</div>
+        <div id="trigger-interval-opts" style="display:none;">
+          <div style="display:flex; gap:0.4rem; align-items:center;">
+            <span style="font-size:0.78rem;">Every</span>
+            <input class="form-input" id="trigger-interval-value" type="number" value="15" min="1" style="width:60px; font-size:0.78rem;">
+            <select class="form-input" id="trigger-interval-unit" style="width:90px; font-size:0.78rem;">
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="seconds">seconds</option>
+            </select>
+          </div>
+        </div>
+        <div id="trigger-cron-opts" style="display:none;">
+          <input class="form-input" id="trigger-cron-expr" placeholder="0 9 * * * (every day at 9am)" style="font-size:0.78rem; width:100%; font-family:monospace;">
+          <div style="font-size:0.68rem; color:var(--muted); margin-top:0.2rem;">Format: minute hour day-of-month month day-of-week</div>
+        </div>
+        <div id="trigger-webhook-opts" style="display:none;">
+          <div style="font-size:0.78rem; color:var(--muted);">A webhook URL will be generated after creation. Fire it with: <code>POST /triggers/{name}/fire</code></div>
+        </div>
+        <div id="trigger-dbwatch-opts" style="display:none;">
+          <div style="margin-bottom:0.3rem;">
+            <label style="font-size:0.72rem; color:var(--muted);">SQL query to watch</label>
+            <input class="form-input" id="trigger-dbwatch-query" placeholder="SELECT count(*) as cnt FROM alerts WHERE seen=false" style="font-size:0.78rem; width:100%; font-family:monospace;">
+          </div>
+          <div style="display:flex; gap:0.4rem; align-items:center;">
+            <span style="font-size:0.78rem;">Fire when result</span>
+            <select class="form-input" id="trigger-dbwatch-op" style="width:50px; font-size:0.78rem;">
+              <option value=">">></option>
+              <option value=">=">>=</option>
+              <option value="<"><</option>
+              <option value="==">==</option>
+              <option value="!=">!=</option>
+            </select>
+            <input class="form-input" id="trigger-dbwatch-threshold" type="number" value="0" style="width:70px; font-size:0.78rem;">
+            <span style="font-size:0.78rem;">poll every</span>
+            <input class="form-input" id="trigger-dbwatch-poll" type="number" value="60" min="5" style="width:60px; font-size:0.78rem;">
+            <span style="font-size:0.78rem;">sec</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Pipeline editor -->
       <div style="margin-top:0.75rem; border-top:1px solid var(--border); padding-top:0.75rem;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem;">
@@ -2501,6 +2552,29 @@ function getSessionsAuthHeaders() {
   if (!key) return {};
   return { 'Authorization': 'Bearer ' + key };
 }
+
+// ---------------------------------------------------------------------------
+// Trigger mode
+// ---------------------------------------------------------------------------
+
+var triggerMode = 'ondemand';
+
+function setTriggerMode(mode) {
+  triggerMode = mode;
+  var modes = ['ondemand', 'interval', 'cron', 'webhook', 'dbwatch'];
+  modes.forEach(function(m) {
+    var opts = document.getElementById('trigger-' + m + '-opts');
+    var btn = document.getElementById('btn-trigger-' + m);
+    if (opts) opts.style.display = m === mode ? 'block' : 'none';
+    if (btn) {
+      btn.style.background = m === mode ? 'var(--accent)' : '';
+      btn.style.color = m === mode ? '#fff' : '';
+    }
+  });
+}
+
+// Initialize
+setTriggerMode('ondemand');
 
 // ---------------------------------------------------------------------------
 // Pipeline editor

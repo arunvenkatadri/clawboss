@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.85.0"
+__version__ = "0.86.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -44,6 +44,7 @@ from .store import (
     validate_payload,
 )
 from .supervisor import SupervisedResult, Supervisor
+from .triggers import DbWatchEntry, Scheduler, WebhookTrigger
 
 __all__ = [
     "Policy",
@@ -97,4 +98,7 @@ __all__ = [
     "parse_pipeline_poml",
     "SqlConnector",
     "MongoConnector",
+    "Scheduler",
+    "WebhookTrigger",
+    "DbWatchEntry",
 ]

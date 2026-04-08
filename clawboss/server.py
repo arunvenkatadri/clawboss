@@ -152,7 +152,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.85.0",
+        version="0.86.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -431,6 +431,63 @@ def create_app(
             "error": result.error,
             "total_duration_ms": result.total_duration_ms,
         }
+
+    # ------------------------------------------------------------------
+    # Trigger endpoints
+    # ------------------------------------------------------------------
+
+    from .triggers import Scheduler, WebhookTrigger
+
+    scheduler = Scheduler()
+    webhooks: Dict[str, WebhookTrigger] = {}
+    app.state.scheduler = scheduler
+    app.state.webhooks = webhooks
+
+    @app.get("/triggers")
+    def list_triggers(_=Depends(auth)):
+        """List all registered triggers."""
+        triggers = scheduler.list_triggers()
+        for name, wh in webhooks.items():
+            triggers.append({"name": name, "type": "webhook", "enabled": True})
+        return triggers
+
+    @app.get("/triggers/history")
+    def get_trigger_history(limit: int = 50, _=Depends(auth)):
+        """Get trigger firing history."""
+        history = scheduler.history(limit)
+        for wh in webhooks.values():
+            history.extend(wh.history(limit))
+        history.sort(key=lambda r: r.get("fired_at", ""), reverse=True)
+        return history[:limit]
+
+    @app.post("/triggers/{trigger_name}/fire")
+    async def fire_webhook(trigger_name: str, _=Depends(auth)):
+        """Fire a webhook trigger manually."""
+        wh = webhooks.get(trigger_name)
+        if wh is None:
+            raise HTTPException(status_code=404, detail=f"Webhook '{trigger_name}' not found")
+        record = await wh.fire()
+        return record.to_dict()
+
+    @app.post("/triggers/{trigger_name}/enable")
+    def enable_trigger(trigger_name: str, _=Depends(auth)):
+        scheduler.enable(trigger_name)
+        return {"name": trigger_name, "enabled": True}
+
+    @app.post("/triggers/{trigger_name}/disable")
+    def disable_trigger(trigger_name: str, _=Depends(auth)):
+        scheduler.disable(trigger_name)
+        return {"name": trigger_name, "enabled": False}
+
+    @app.delete("/triggers/{trigger_name}")
+    def remove_trigger(trigger_name: str, _=Depends(auth)):
+        removed = scheduler.remove(trigger_name)
+        if trigger_name in webhooks:
+            del webhooks[trigger_name]
+            removed = True
+        if not removed:
+            raise HTTPException(status_code=404, detail="Trigger not found")
+        return {"removed": trigger_name}
 
     @app.websocket("/sessions/{session_id}/events")
     async def session_events(websocket: WebSocket, session_id: str):
