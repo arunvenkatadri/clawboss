@@ -725,6 +725,12 @@
           <input class="form-input" id="new-session-budget" type="number" placeholder="unlimited" style="font-size:0.82rem;">
         </div>
       </div>
+      <!-- Assign policies -->
+      <div style="margin-top:0.5rem;">
+        <label style="font-size:0.78rem; color:var(--muted); display:block; margin-bottom:0.3rem;">Assign policies</label>
+        <div id="new-session-policies" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+      </div>
+
       <div style="margin-top:0.5rem; display:flex; align-items:center; gap:1rem;">
         <label style="font-size:0.82rem; display:flex; align-items:center; gap:0.3rem; cursor:pointer;">
           <input type="checkbox" id="new-session-stateless"> Make this agent stateless
@@ -973,9 +979,36 @@
       </div>
     </div>
 
+    <!-- When to run (triggers) -->
+    <div class="form-group">
+      <label class="form-label">When to run</label>
+      <select class="form-input" id="agent-trigger-mode" style="font-size:0.82rem;">
+        <option value="ondemand">On-demand</option>
+        <option value="interval">Interval</option>
+        <option value="cron">Cron schedule</option>
+        <option value="webhook">Webhook</option>
+      </select>
+      <div id="agent-trigger-interval-opts" style="display:none; margin-top:0.3rem;">
+        <div style="display:flex; gap:0.3rem; align-items:center;">
+          <span style="font-size:0.78rem;">Every</span>
+          <input class="form-input" id="agent-trigger-interval" type="number" value="15" min="1" style="width:60px; font-size:0.78rem;">
+          <span style="font-size:0.78rem;">minutes</span>
+        </div>
+      </div>
+      <div id="agent-trigger-cron-opts" style="display:none; margin-top:0.3rem;">
+        <input class="form-input" id="agent-trigger-cron" placeholder="0 9 * * *" style="font-size:0.78rem; font-family:monospace;">
+      </div>
+    </div>
+
+    <!-- Pipeline POML -->
+    <div class="form-group">
+      <label class="form-label">Pipeline POML <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional)</span></label>
+      <textarea class="form-textarea" id="agent-pipeline-poml" rows="4" placeholder="&lt;pipeline&gt;&#10;  &lt;step tool=&quot;search&quot;&gt;...&lt;/step&gt;&#10;&lt;/pipeline&gt;" style="font-family:monospace; font-size:0.78rem;"></textarea>
+    </div>
+
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeAgentModal()">Cancel</button>
-      <button class="btn-primary" id="btn-save-agent" onclick="saveAgent()">Create Agent</button>
+      <button class="btn-primary" id="btn-save-agent" onclick="saveAgent()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1979,24 +2012,47 @@ document.getElementById('btn-create-agent-nl').addEventListener('click', () => {
   if (!desc) return;
 
   status.className = 'builder-status';
-  status.textContent = 'Generating agent...';
+  status.textContent = 'Creating agent...';
 
-  setTimeout(() => {
-    const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
-    AGENTS.push({
-      name: name || 'custom-agent',
-      description: desc,
-      triggers: [],
-      assignedSkills: [],
-      allowUnassignedSkills: false,
-      status: 'stopped',
-      assignedPolicies: ['rate-limiter']
+  const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') || 'custom-agent';
+  const base = getSessionsApiBase();
+  const headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+
+  // Create via REST API so it persists
+  fetch(base + '/sessions', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({
+      agent_id: name,
+      policy: { max_iterations: 5, tool_timeout: 15 },
+    })
+  })
+    .then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })
+    .then(data => {
+      status.className = 'builder-status success';
+      status.textContent = 'Created: ' + name;
+      input.value = '';
+      renderAll();
+    })
+    .catch(err => {
+      // Fallback to local if API not available
+      AGENTS.push({
+        name: name,
+        description: desc,
+        triggers: [],
+        assignedSkills: [],
+        allowUnassignedSkills: false,
+        status: 'running',
+        assignedPolicies: ['rate-limiter']
+      });
+      status.className = 'builder-status success';
+      status.textContent = 'Created: ' + name + ' (local only)';
+      input.value = '';
+      renderAll();
     });
-    status.className = 'builder-status success';
-    status.textContent = 'Created: ' + (name || 'custom-agent');
-    input.value = '';
-    renderAll();
-  }, 800);
 });
 
 // -- Natural language skill builder --
@@ -2075,6 +2131,18 @@ function openAgentModal(index) {
 
   // Effective policy preview
   updateAgentEffectivePolicyPreview();
+
+  // Trigger mode
+  document.getElementById('agent-trigger-mode').value = 'ondemand';
+  document.getElementById('agent-trigger-interval-opts').style.display = 'none';
+  document.getElementById('agent-trigger-cron-opts').style.display = 'none';
+  document.getElementById('agent-pipeline-poml').value = '';
+
+  document.getElementById('agent-trigger-mode').onchange = function() {
+    var mode = this.value;
+    document.getElementById('agent-trigger-interval-opts').style.display = mode === 'interval' ? 'block' : 'none';
+    document.getElementById('agent-trigger-cron-opts').style.display = mode === 'cron' ? 'block' : 'none';
+  };
 
   document.getElementById('agent-modal').classList.add('open');
 }
@@ -2661,6 +2729,21 @@ function setTriggerMode(mode) {
 // Initialize
 setTriggerMode('ondemand');
 
+// Populate policy checkboxes in creation form
+function renderPolicyCheckboxes() {
+  var container = document.getElementById('new-session-policies');
+  if (!container) return;
+  container.innerHTML = POLICIES.map(function(p) {
+    var summary = policyFieldSummary(p);
+    return '<label style="font-size:0.75rem; display:flex; align-items:center; gap:0.3rem; cursor:pointer; background:var(--bg); padding:0.2rem 0.5rem; border-radius:4px; border:1px solid var(--border);">' +
+      '<input type="checkbox" class="new-session-policy-cb" value="' + esc(p.name) + '"> ' +
+      '<span style="color:var(--orange); font-weight:500;">' + esc(p.name) + '</span>' +
+      (summary ? ' <span style="color:var(--muted); font-size:0.68rem;">' + esc(summary) + '</span>' : '') +
+      '</label>';
+  }).join('');
+}
+renderPolicyCheckboxes();
+
 // ---------------------------------------------------------------------------
 // Pipeline editor
 // ---------------------------------------------------------------------------
@@ -2882,6 +2965,19 @@ function getSessionPolicy() {
   var budgetVal = document.getElementById('new-session-budget').value.trim();
   var policy = { max_iterations: maxIter, tool_timeout: timeout };
   if (budgetVal) policy.token_budget = parseInt(budgetVal);
+
+  // Merge selected policies
+  var checkboxes = document.querySelectorAll('.new-session-policy-cb:checked');
+  var confirmTools = [];
+  checkboxes.forEach(function(cb) {
+    var p = POLICIES.find(function(pol) { return pol.name === cb.value; });
+    if (!p) return;
+    if (p.max_iterations !== undefined) policy.max_iterations = p.max_iterations;
+    if (p.tool_timeout !== undefined) policy.tool_timeout = p.tool_timeout;
+    if (p.token_budget !== undefined) policy.token_budget = p.token_budget;
+    if (p.require_confirm) confirmTools = confirmTools.concat(p.require_confirm);
+  });
+  if (confirmTools.length) policy.require_confirm = Array.from(new Set(confirmTools));
   return policy;
 }
 
