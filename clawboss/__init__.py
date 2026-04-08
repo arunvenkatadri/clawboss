@@ -17,13 +17,14 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.81.0"
+__version__ = "0.82.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
 from .budget import BudgetSnapshot, BudgetTracker
 from .builder import SkillBuilder
 from .circuit_breaker import CircuitBreaker, CircuitState
+from .connectors import MongoConnector, SqlConnector
 from .context import AnchoredState, CompressedContext, CompressedHistory, ContextWindow, Turn
 from .errors import ClawbossError
 from .observe import Observer, ToolCallRecord, ToolMetrics
@@ -91,4 +92,6 @@ __all__ = [
     "ToolMetrics",
     "Pipeline",
     "PipelineResult",
+    "SqlConnector",
+    "MongoConnector",
 ]

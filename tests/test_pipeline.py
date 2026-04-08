@@ -1,5 +1,7 @@
 """Tests for clawboss.pipeline — sequential supervised orchestration."""
 
+from typing import Any
+
 import pytest
 
 from clawboss.pipeline import Pipeline
@@ -270,3 +272,211 @@ class TestPipelineApproval:
         assert result.completed is False
         assert "approval" in result.error.lower()
         assert len(result.steps) == 2  # search + dangerous (pending)
+
+
+# ---------------------------------------------------------------------------
+# Conditional routing (Level 2)
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineCondition:
+    @pytest.mark.asyncio
+    async def test_condition_takes_then_branch(self):
+        async def high_action(input: str = "") -> str:
+            return "took high path"
+
+        async def low_action(input: str = "") -> str:
+            return "took low path"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("search", search, query="data")
+            .add_condition(
+                lambda output: "results" in output,
+                then_step=("high", high_action),
+                else_step=("low", low_action),
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "took high path"
+        assert result.steps[-1].branch == "then"
+
+    @pytest.mark.asyncio
+    async def test_condition_takes_else_branch(self):
+        async def high_action(input: str = "") -> str:
+            return "took high path"
+
+        async def low_action(input: str = "") -> str:
+            return "took low path"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("search", search, query="data")
+            .add_condition(
+                lambda output: "NOTFOUND" in output,
+                then_step=("high", high_action),
+                else_step=("low", low_action),
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "took low path"
+        assert result.steps[-1].branch == "else"
+
+    @pytest.mark.asyncio
+    async def test_condition_else_none_skips(self):
+        """If else_step is None and predicate is False, skip and keep previous output."""
+        store = MemoryStore()
+        mgr = SessionManager(store)
+
+        async def action(input: str = "") -> str:
+            return "should not run"
+
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("search", search, query="data")
+            .add_condition(
+                lambda output: False,
+                then_step=("action", action),
+                else_step=None,
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "results for data"  # unchanged
+
+    @pytest.mark.asyncio
+    async def test_condition_predicate_error(self):
+        store = MemoryStore()
+        mgr = SessionManager(store)
+
+        async def dummy(input: str = "") -> str:
+            return "x"
+
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("search", search, query="test")
+            .add_condition(
+                lambda output: 1 / 0,  # will raise
+                then_step=("dummy", dummy),
+            )
+            .run()
+        )
+        assert result.completed is False
+        assert "predicate failed" in result.error.lower()
+
+
+class TestPipelineThreshold:
+    @pytest.mark.asyncio
+    async def test_above_threshold(self):
+        async def get_data() -> dict:
+            return {"rows": [{"cnt": 15}]}
+
+        async def escalate(input: Any = None) -> str:
+            return "escalated"
+
+        async def skip(input: Any = None) -> str:
+            return "skipped"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("check", get_data, chain_input=False)
+            .add_threshold(
+                key="rows.0.cnt",
+                threshold=10,
+                above_step=("escalate", escalate),
+                below_step=("skip", skip),
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "escalated"
+
+    @pytest.mark.asyncio
+    async def test_below_threshold(self):
+        async def get_data() -> dict:
+            return {"rows": [{"cnt": 3}]}
+
+        async def escalate(input: Any = None) -> str:
+            return "escalated"
+
+        async def skip(input: Any = None) -> str:
+            return "all clear"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("check", get_data, chain_input=False)
+            .add_threshold(
+                key="rows.0.cnt",
+                threshold=10,
+                above_step=("escalate", escalate),
+                below_step=("skip", skip),
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "all clear"
+
+    @pytest.mark.asyncio
+    async def test_threshold_below_no_else(self):
+        """Below threshold with no below_step — skip."""
+
+        async def get_data() -> dict:
+            return {"rows": [{"cnt": 3}]}
+
+        async def escalate(input: Any = None) -> str:
+            return "escalated"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("check", get_data, chain_input=False)
+            .add_threshold(
+                key="rows.0.cnt",
+                threshold=10,
+                above_step=("escalate", escalate),
+            )
+            .run()
+        )
+        assert result.completed is True
+        # Previous output preserved since threshold wasn't met
+        assert result.final_output == {"rows": [{"cnt": 3}]}
+
+    @pytest.mark.asyncio
+    async def test_threshold_bad_key(self):
+        """Invalid key path returns False (takes else branch)."""
+
+        async def get_data() -> dict:
+            return {"something": "else"}
+
+        async def above(input: Any = None) -> str:
+            return "above"
+
+        async def below(input: Any = None) -> str:
+            return "below"
+
+        store = MemoryStore()
+        mgr = SessionManager(store)
+        result = await (
+            Pipeline(mgr, "test-agent", POLICY)
+            .add_step("check", get_data, chain_input=False)
+            .add_threshold(
+                key="rows.0.cnt",
+                threshold=10,
+                above_step=("above", above),
+                below_step=("below", below),
+            )
+            .run()
+        )
+        assert result.completed is True
+        assert result.final_output == "below"

@@ -225,6 +225,57 @@ print(result.total_duration_ms)
 
 Pipelines stop early if a step fails, the budget is exceeded, or a tool needs approval. Each step is recorded in the observer, audit trail, and session payload.
 
+### Conditional routing
+
+Add branching logic — route to different steps based on the previous output:
+
+```python
+result = await (
+    Pipeline(mgr, "monitor", policy)
+    .add_step("check_alerts", sql.query, sql="SELECT count(*) as cnt FROM alerts")
+    .add_condition(
+        lambda output: output["rows"][0]["cnt"] > 10,
+        then_step=("escalate", escalate_fn),
+        else_step=("log_ok", log_fn),
+    )
+    .run()
+)
+```
+
+Or use the threshold shorthand:
+
+```python
+pipeline.add_threshold(
+    key="rows.0.cnt",     # dot-notation path into previous output
+    threshold=10,
+    above_step=("escalate", escalate_fn),
+    below_step=("log_ok", log_fn),  # or None to skip
+)
+```
+
+### Database connectors
+
+Query SQL and NoSQL databases as supervised tool calls. Results flow through PII redaction, audit logging, and observability like any other tool.
+
+```python
+from clawboss.connectors import SqlConnector
+
+sql = SqlConnector("sqlite:///data.db")  # also: postgresql://, mysql://
+
+# In a pipeline
+result = await (
+    Pipeline(mgr, "analyst", policy)
+    .add_step("get_orders", sql.query, sql="SELECT * FROM orders")
+    .add_step("analyze", analyze_fn)
+    .add_step("report", write_fn)
+    .run()
+)
+```
+
+Read-only by default — `SqlConnector("...", allow_write=True)` to enable writes. Supports parameterized queries and configurable `max_rows`.
+
+Also ships `MongoConnector` for MongoDB (`find`, `insert`).
+
 ## Durable sessions
 
 Long-running agents survive process restarts. Clawboss checkpoints supervisor state (iterations, token usage, circuit breaker states) to a pluggable store after every operation.
@@ -792,7 +843,20 @@ Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 ### `Pipeline(manager, agent_id, policy_dict=None)`
 
 - `add_step(tool_name, fn, **kwargs)` — add a step (returns self for chaining)
+- `add_condition(predicate, then_step, else_step)` — conditional branch
+- `add_threshold(key, threshold, above_step, below_step)` — threshold branch
 - `run()` — execute all steps, returns `PipelineResult`
+
+### `SqlConnector(connection_string, allow_write=False, max_rows=1000)`
+
+- `query(sql, params)` — execute a query, returns `{"rows": [...], "row_count": N}`
+- `execute(sql, params)` — execute a write statement
+- Supports: `sqlite:///path`, `postgresql://...`, `mysql://...`
+
+### `MongoConnector(uri, database, allow_write=False)`
+
+- `find(collection, filter, projection, sort, limit)` — query documents
+- `insert(collection, documents)` — insert documents (requires `allow_write`)
 
 ### `PipelineResult`
 

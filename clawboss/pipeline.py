@@ -1,8 +1,7 @@
-"""Pipeline orchestration — supervised sequential tool chains.
+"""Pipeline orchestration — supervised sequential and conditional tool chains.
 
-Define a series of steps. Each step is a tool call supervised by Clawboss.
-Output from one step feeds into the next. The pipeline stops early if a
-step fails, the budget is exceeded, or an approval is pending.
+Level 1: Sequential steps with output chaining.
+Level 2: Conditional branching — if/else/threshold routing.
 
 Usage:
     from clawboss import Pipeline, SessionManager, MemoryStore
@@ -10,19 +9,27 @@ Usage:
     store = MemoryStore()
     mgr = SessionManager(store)
 
+    # Sequential
     pipeline = Pipeline(mgr, "my-agent", policy_dict={...})
-
     pipeline.add_step("search", search_fn, query="quantum computing")
-    pipeline.add_step("summarize", summarize_fn)  # receives previous output
-    pipeline.add_step("write_report", write_fn)
+    pipeline.add_step("summarize", summarize_fn)
+    results = await pipeline.run()
 
+    # Conditional
+    pipeline = Pipeline(mgr, "analyst", policy_dict={...})
+    pipeline.add_step("check_metric", sql.query, sql="SELECT count(*) as cnt FROM alerts")
+    pipeline.add_condition(
+        lambda output: output["rows"][0]["cnt"] > 10,
+        then_step=("escalate", escalate_fn),
+        else_step=("log_ok", log_fn),
+    )
     results = await pipeline.run()
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, Union
 
 from .session import SessionManager
 from .supervisor import SupervisedResult
@@ -36,10 +43,22 @@ class Step:
     tool_name: str
     fn: Callable[..., Coroutine]
     kwargs: Dict[str, Any] = field(default_factory=dict)
-    # If True, the output of the previous step is passed as the first kwarg
     chain_input: bool = True
-    # Name of the kwarg to pass the previous output as (default: "input")
     input_key: str = "input"
+
+
+@dataclass
+class Condition:
+    """A conditional branch in the pipeline."""
+
+    name: str
+    predicate: Callable[[Any], bool]
+    then_step: Step
+    else_step: Optional[Step] = None  # None = skip (do nothing)
+
+
+# A pipeline node is either a Step or a Condition
+PipelineNode = Union[Step, Condition]
 
 
 @dataclass
@@ -50,6 +69,7 @@ class StepResult:
     tool_name: str
     result: SupervisedResult
     step_index: int = 0
+    branch: str = ""  # "then", "else", or "" for non-conditional
 
 
 @dataclass
@@ -59,7 +79,7 @@ class PipelineResult:
     session_id: str
     steps: List[StepResult] = field(default_factory=list)
     completed: bool = False
-    stopped_at: Optional[str] = None  # step name where it stopped
+    stopped_at: Optional[str] = None
     error: Optional[str] = None
 
     @property
@@ -76,11 +96,10 @@ class PipelineResult:
 
 
 class Pipeline:
-    """Supervised sequential pipeline — chain tool calls with full Clawboss supervision.
+    """Supervised pipeline with sequential steps and conditional branching.
 
-    Each step runs through the Supervisor with all policy enforcement
+    Every step and branch runs through the Supervisor with full policy enforcement
     (timeouts, budgets, circuit breakers, PII redaction, approvals).
-    Output flows from one step to the next.
 
     Args:
         manager: SessionManager to create the session with.
@@ -103,7 +122,7 @@ class Pipeline:
         self._policy_dict = policy_dict
         self._payload = payload
         self._stateless = stateless
-        self._steps: List[Step] = []
+        self._nodes: List[PipelineNode] = []
 
     def add_step(
         self,
@@ -114,7 +133,7 @@ class Pipeline:
         input_key: str = "input",
         **kwargs: Any,
     ) -> "Pipeline":
-        """Add a step to the pipeline.
+        """Add a sequential step to the pipeline.
 
         Args:
             tool_name: Name of the tool (for supervision and audit).
@@ -125,11 +144,11 @@ class Pipeline:
             **kwargs: Additional arguments passed to fn.
 
         Returns:
-            self, for chaining: pipeline.add_step(...).add_step(...)
+            self, for chaining.
         """
-        self._steps.append(
+        self._nodes.append(
             Step(
-                name=name or f"{len(self._steps) + 1}_{tool_name}",
+                name=name or f"{len(self._nodes) + 1}_{tool_name}",
                 tool_name=tool_name,
                 fn=fn,
                 kwargs=kwargs,
@@ -139,13 +158,116 @@ class Pipeline:
         )
         return self
 
-    async def run(self) -> PipelineResult:
-        """Execute all steps in sequence.
+    def add_condition(
+        self,
+        predicate: Callable[[Any], bool],
+        then_step: Tuple[str, Callable[..., Coroutine]],
+        else_step: Optional[Tuple[str, Callable[..., Coroutine]]] = None,
+        name: Optional[str] = None,
+        then_kwargs: Optional[Dict[str, Any]] = None,
+        else_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> "Pipeline":
+        """Add a conditional branch.
 
-        Stops early if:
-        - A step fails (error, timeout, circuit breaker)
-        - Budget is exceeded
-        - An approval is pending (returns so caller can handle it)
+        Evaluates ``predicate(previous_output)`` and routes to the
+        appropriate step. Both branches are fully supervised.
+
+        Args:
+            predicate: Function that takes the previous step's output and
+                      returns True (take then_step) or False (take else_step).
+            then_step: Tuple of (tool_name, fn) to execute if predicate is True.
+            else_step: Tuple of (tool_name, fn) if predicate is False.
+                      If None, the condition is skipped when False.
+            name: Human-readable name for the condition.
+            then_kwargs: Extra kwargs for the then_step.
+            else_kwargs: Extra kwargs for the else_step.
+
+        Returns:
+            self, for chaining.
+        """
+        then = Step(
+            name=f"{then_step[0]}_then",
+            tool_name=then_step[0],
+            fn=then_step[1],
+            kwargs=then_kwargs or {},
+            chain_input=True,
+        )
+        else_s = None
+        if else_step is not None:
+            else_s = Step(
+                name=f"{else_step[0]}_else",
+                tool_name=else_step[0],
+                fn=else_step[1],
+                kwargs=else_kwargs or {},
+                chain_input=True,
+            )
+        self._nodes.append(
+            Condition(
+                name=name or f"{len(self._nodes) + 1}_condition",
+                predicate=predicate,
+                then_step=then,
+                else_step=else_s,
+            )
+        )
+        return self
+
+    def add_threshold(
+        self,
+        key: str,
+        threshold: float,
+        above_step: Tuple[str, Callable[..., Coroutine]],
+        below_step: Optional[Tuple[str, Callable[..., Coroutine]]] = None,
+        name: Optional[str] = None,
+        above_kwargs: Optional[Dict[str, Any]] = None,
+        below_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> "Pipeline":
+        """Add a threshold-based branch — sugar for add_condition.
+
+        Extracts a numeric value from the previous step's output and
+        routes based on whether it's above or below the threshold.
+
+        Args:
+            key: Dot-notation key to extract from previous output.
+                 e.g., "rows.0.cnt" extracts output["rows"][0]["cnt"]
+            threshold: The threshold value.
+            above_step: (tool_name, fn) if value >= threshold.
+            below_step: (tool_name, fn) if value < threshold. None = skip.
+            name: Name for the condition.
+            above_kwargs: Extra kwargs for above_step.
+            below_kwargs: Extra kwargs for below_step.
+
+        Returns:
+            self, for chaining.
+        """
+
+        def _extract(output: Any) -> bool:
+            val = output
+            for part in key.split("."):
+                if isinstance(val, dict):
+                    val = val.get(part)
+                elif isinstance(val, (list, tuple)):
+                    try:
+                        val = val[int(part)]
+                    except (IndexError, ValueError):
+                        return False
+                else:
+                    return False
+            try:
+                return float(val) >= threshold  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return False
+
+        return self.add_condition(
+            predicate=_extract,
+            then_step=above_step,
+            else_step=below_step,
+            name=name or f"threshold_{key}_{threshold}",
+            then_kwargs=above_kwargs,
+            else_kwargs=below_kwargs,
+        )
+
+    async def run(self) -> PipelineResult:
+        """Execute the pipeline — steps and conditions in sequence.
 
         Returns:
             PipelineResult with all step results and the final output.
@@ -158,62 +280,96 @@ class Pipeline:
         )
         sv = self._manager.get_supervisor(sid)
         if sv is None:
-            return PipelineResult(
-                session_id=sid,
-                error="Failed to create supervisor",
-            )
+            return PipelineResult(session_id=sid, error="Failed to create supervisor")
 
         pipeline_result = PipelineResult(session_id=sid)
         previous_output: Any = None
 
-        for i, step in enumerate(self._steps):
+        for i, node in enumerate(self._nodes):
             sv.record_iteration()
 
-            # Build kwargs — chain previous output if configured
-            call_kwargs = dict(step.kwargs)
-            if step.chain_input and previous_output is not None:
-                call_kwargs[step.input_key] = previous_output
+            if isinstance(node, Step):
+                result, step_result = await self._run_step(sv, node, previous_output, i)
+                pipeline_result.steps.append(step_result)
 
-            # Execute the step through the supervisor
-            result = await sv.call(step.tool_name, step.fn, **call_kwargs)
+                if not result.succeeded:
+                    pipeline_result.stopped_at = node.name
+                    error_kind = result.error.kind if result.error else "unknown"
+                    if error_kind == "approval_pending":
+                        err = result.error
+                        aid = err.details.get("approval_id", "") if err else ""
+                        pipeline_result.error = f"Step '{node.name}' awaiting approval: {aid}"
+                    else:
+                        pipeline_result.error = f"Step '{node.name}' failed: {error_kind}"
+                        self._manager.stop(sid)
+                    return pipeline_result
 
-            step_result = StepResult(
-                name=step.name,
-                tool_name=step.tool_name,
-                result=result,
-                step_index=i,
-            )
-            pipeline_result.steps.append(step_result)
+                previous_output = result.output
+
+            elif isinstance(node, Condition):
+                # Evaluate the predicate
+                try:
+                    take_then = node.predicate(previous_output)
+                except Exception as e:
+                    pipeline_result.stopped_at = node.name
+                    pipeline_result.error = f"Condition '{node.name}' predicate failed: {e}"
+                    self._manager.stop(sid)
+                    return pipeline_result
+
+                chosen = node.then_step if take_then else node.else_step
+                branch = "then" if take_then else "else"
+
+                if chosen is None:
+                    # else_step is None — skip, keep previous output
+                    continue
+
+                result, step_result = await self._run_step(
+                    sv, chosen, previous_output, i, branch=branch
+                )
+                pipeline_result.steps.append(step_result)
+
+                if not result.succeeded:
+                    pipeline_result.stopped_at = chosen.name
+                    error_kind = result.error.kind if result.error else "unknown"
+                    pipeline_result.error = f"Step '{chosen.name}' ({branch}) failed: {error_kind}"
+                    self._manager.stop(sid)
+                    return pipeline_result
+
+                previous_output = result.output
 
             # Update payload with progress
             self._manager.update_payload(
                 sid,
                 {
                     "pipeline_step": i,
-                    "pipeline_step_name": step.name,
-                    "pipeline_total_steps": len(self._steps),
+                    "pipeline_total_steps": len(self._nodes),
                 },
             )
 
-            if not result.succeeded:
-                pipeline_result.stopped_at = step.name
-                error_kind = result.error.kind if result.error else "unknown"
-                pipeline_result.error = f"Step '{step.name}' failed: {error_kind}"
-
-                # If approval is pending, don't stop the session — caller handles it
-                if error_kind == "approval_pending":
-                    err = result.error
-                    approval_id = err.details.get("approval_id", "") if err else ""
-                    pipeline_result.error = f"Step '{step.name}' awaiting approval: {approval_id}"
-                    return pipeline_result
-
-                # For other failures, stop the session
-                self._manager.stop(sid)
-                return pipeline_result
-
-            previous_output = result.output
-
-        # All steps completed
         pipeline_result.completed = True
         self._manager.stop(sid)
         return pipeline_result
+
+    async def _run_step(
+        self,
+        sv: Any,
+        step: Step,
+        previous_output: Any,
+        index: int,
+        branch: str = "",
+    ) -> Tuple[SupervisedResult, StepResult]:
+        """Execute a single step through the supervisor."""
+        call_kwargs = dict(step.kwargs)
+        if step.chain_input and previous_output is not None:
+            call_kwargs[step.input_key] = previous_output
+
+        result = await sv.call(step.tool_name, step.fn, **call_kwargs)
+
+        step_result = StepResult(
+            name=step.name,
+            tool_name=step.tool_name,
+            result=result,
+            step_index=index,
+            branch=branch,
+        )
+        return result, step_result

@@ -130,7 +130,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.81.0",
+        version="0.82.0",
         description=(
             "REST API for managing agent sessions. "
             + (
