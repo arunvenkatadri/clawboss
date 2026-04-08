@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 try:
     from fastapi import (  # type: ignore[import-not-found]
@@ -73,6 +73,26 @@ class CreatePipelineSessionRequest(BaseModel):
     policy: Optional[Dict[str, Any]] = None
     payload: Optional[Dict[str, Any]] = None
     stateless: bool = False
+
+
+class CreateTriggerRequest(BaseModel):
+    name: str
+    trigger_type: str  # "interval", "cron", "webhook", "db_watch"
+    # Interval
+    seconds: Optional[float] = None
+    minutes: Optional[float] = None
+    hours: Optional[float] = None
+    # Cron
+    cron: Optional[str] = None
+    # DB watch
+    query: Optional[str] = None
+    threshold: Optional[float] = None
+    operator: Optional[str] = ">"  # >, >=, <, ==, !=
+    poll_seconds: Optional[float] = 60
+    # Pipeline to run (POML)
+    poml: Optional[str] = None
+    agent_id: Optional[str] = None
+    policy: Optional[Dict[str, Any]] = None
 
 
 class SessionSummary(BaseModel):
@@ -442,6 +462,112 @@ def create_app(
     webhooks: Dict[str, WebhookTrigger] = {}
     app.state.scheduler = scheduler
     app.state.webhooks = webhooks
+
+    @app.post("/triggers", status_code=201)
+    async def create_trigger(req: CreateTriggerRequest, _=Depends(auth)):
+        """Create a new trigger."""
+
+        async def _make_pipeline_runner():
+            """Build a pipeline runner from the trigger's POML."""
+            if not req.poml or not req.agent_id:
+                return None
+            from .pipeline_poml import parse_pipeline_poml
+
+            async def run_pipeline():
+                pipeline = parse_pipeline_poml(
+                    req.poml,
+                    tools,
+                    manager,
+                    req.agent_id or "triggered",
+                    policy_dict=req.policy,
+                )
+                return await pipeline.run()
+
+            return run_pipeline
+
+        pipeline_fn = await _make_pipeline_runner()
+
+        if req.trigger_type == "interval":
+            total = (req.seconds or 0) + (req.minutes or 0) * 60 + (req.hours or 0) * 3600
+            if total <= 0:
+                raise HTTPException(status_code=400, detail="Interval must be > 0")
+            if pipeline_fn is None:
+                raise HTTPException(status_code=400, detail="Pipeline POML required")
+            scheduler.add_interval(req.name, pipeline_fn, seconds=total)
+            if not scheduler._running:
+                scheduler.start()
+
+        elif req.trigger_type == "cron":
+            if not req.cron:
+                raise HTTPException(status_code=400, detail="Cron expression required")
+            if pipeline_fn is None:
+                raise HTTPException(status_code=400, detail="Pipeline POML required")
+            scheduler.add_cron(req.name, pipeline_fn, cron=req.cron)
+            if not scheduler._running:
+                scheduler.start()
+
+        elif req.trigger_type == "webhook":
+            if pipeline_fn is None:
+
+                async def noop():
+                    return None
+
+                pipeline_fn = noop
+            wh = WebhookTrigger(req.name, pipeline_fn)
+            webhooks[req.name] = wh
+
+        elif req.trigger_type == "db_watch":
+            if not req.query:
+                raise HTTPException(status_code=400, detail="SQL query required")
+            if pipeline_fn is None:
+                raise HTTPException(status_code=400, detail="Pipeline POML required")
+            # Find a sql connector in tools
+            sql_conn = None
+            for fn_ref in tools.values():
+                if hasattr(fn_ref, "discover_schema"):
+                    sql_conn = fn_ref
+                    break
+                if hasattr(fn_ref, "__self__") and hasattr(fn_ref.__self__, "discover_schema"):
+                    sql_conn = fn_ref.__self__
+                    break
+            if sql_conn is None:
+                raise HTTPException(status_code=400, detail="No SQL connector registered")
+
+            op = req.operator or ">"
+            threshold = req.threshold or 0
+            ops = {
+                ">": lambda v, t: v > t,
+                ">=": lambda v, t: v >= t,
+                "<": lambda v, t: v < t,
+                "==": lambda v, t: v == t,
+                "!=": lambda v, t: v != t,
+            }
+            cmp_fn = ops.get(op, ops[">"])
+
+            def make_condition(cmp: Any, thresh: float) -> Callable[[Dict], bool]:
+                def condition(r: Dict) -> bool:
+                    try:
+                        val = r["rows"][0][list(r["rows"][0].keys())[0]]
+                        return bool(cmp(float(val), thresh))
+                    except (IndexError, KeyError, TypeError, ValueError):
+                        return False
+
+                return condition
+
+            scheduler.add_db_watch(
+                req.name,
+                pipeline_fn,
+                connector=sql_conn,
+                query=req.query,
+                condition=make_condition(cmp_fn, threshold),
+                poll_seconds=req.poll_seconds or 60,
+            )
+            if not scheduler._running:
+                scheduler.start()
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown trigger type: {req.trigger_type}")
+
+        return {"name": req.name, "type": req.trigger_type, "created": True}
 
     @app.get("/triggers")
     def list_triggers(_=Depends(auth)):

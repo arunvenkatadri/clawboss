@@ -2791,28 +2791,75 @@ function runPipelineNow() {
     .catch(function(err) { alert('Pipeline failed: ' + err.message); });
 }
 
-function submitCreateSession() {
-  const base = getSessionsApiBase();
-  const headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
-  const agentId = document.getElementById('new-session-agent-id').value.trim();
-  if (!agentId) { alert('Agent ID is required'); return; }
-  const maxIter = parseInt(document.getElementById('new-session-max-iter').value) || 10;
-  const timeout = parseInt(document.getElementById('new-session-timeout').value) || 30;
-  const budgetVal = document.getElementById('new-session-budget').value.trim();
-  const stateless = document.getElementById('new-session-stateless').checked;
-  const policy = { max_iterations: maxIter, tool_timeout: timeout };
+function getSessionPolicy() {
+  var maxIter = parseInt(document.getElementById('new-session-max-iter').value) || 10;
+  var timeout = parseInt(document.getElementById('new-session-timeout').value) || 30;
+  var budgetVal = document.getElementById('new-session-budget').value.trim();
+  var policy = { max_iterations: maxIter, tool_timeout: timeout };
   if (budgetVal) policy.token_budget = parseInt(budgetVal);
+  return policy;
+}
+
+function buildTriggerPayload(agentId, policy) {
+  var trigger = { name: agentId + '-trigger', trigger_type: triggerMode };
+  trigger.agent_id = agentId;
+  trigger.policy = policy;
+  var poml = getSessionPoml();
+  if (poml) trigger.poml = poml;
+
+  if (triggerMode === 'interval') {
+    var val = parseInt(document.getElementById('trigger-interval-value').value) || 15;
+    var unit = document.getElementById('trigger-interval-unit').value;
+    if (unit === 'minutes') trigger.minutes = val;
+    else if (unit === 'hours') trigger.hours = val;
+    else trigger.seconds = val;
+  } else if (triggerMode === 'cron') {
+    trigger.cron = document.getElementById('trigger-cron-expr').value.trim();
+  } else if (triggerMode === 'dbwatch') {
+    trigger.trigger_type = 'db_watch';
+    trigger.query = document.getElementById('trigger-dbwatch-query').value.trim();
+    trigger.operator = document.getElementById('trigger-dbwatch-op').value;
+    trigger.threshold = parseFloat(document.getElementById('trigger-dbwatch-threshold').value) || 0;
+    trigger.poll_seconds = parseInt(document.getElementById('trigger-dbwatch-poll').value) || 60;
+  }
+  return trigger;
+}
+
+function submitCreateSession() {
+  var base = getSessionsApiBase();
+  var headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  var agentId = document.getElementById('new-session-agent-id').value.trim();
+  if (!agentId) { alert('Agent ID is required'); return; }
+  var stateless = document.getElementById('new-session-stateless').checked;
+  var policy = getSessionPolicy();
+
+  // Create the session
   fetch(base + '/sessions', {
     method: 'POST',
     headers: headers,
     body: JSON.stringify({ agent_id: agentId, policy: policy, stateless: stateless })
   })
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(data => {
+    .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(data) {
+      // If a trigger mode other than on-demand is selected, register it
+      if (triggerMode !== 'ondemand') {
+        var triggerPayload = buildTriggerPayload(agentId, policy);
+        return fetch(base + '/triggers', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(triggerPayload)
+        }).then(function(r) {
+          if (!r.ok) return r.json().then(function(d) { console.warn('Trigger registration failed:', d.detail); });
+          return r.json();
+        }).then(function() { return data; });
+      }
+      return data;
+    })
+    .then(function(data) {
       document.getElementById('create-session-form').style.display = 'none';
       fetchSessions();
     })
-    .catch(err => alert('Failed to create session: ' + err.message));
+    .catch(function(err) { alert('Failed to create session: ' + err.message); });
 }
 
 let liveWebSockets = {};
