@@ -180,6 +180,113 @@ class SqlConnector:
         """
         return await self.query(sql=sql, params=params, input=input)
 
+    async def discover_schema(self) -> Dict[str, Any]:
+        """Discover the database schema — tables, columns, types.
+
+        Returns a dict describing every table and its columns, suitable
+        for passing to an LLM so it can write correct SQL.
+
+        Returns:
+            {"tables": [{"name": "...", "columns": [{"name": "...", "type": "..."}]}]}
+        """
+        conn = self._connect()
+        tables: List[Dict[str, Any]] = []
+
+        if self._conn_str.startswith("sqlite"):
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            table_names = [row[0] for row in cursor.fetchall()]
+            for tname in table_names:
+                if tname.startswith("sqlite_"):
+                    continue
+                cursor.execute(f"PRAGMA table_info({tname})")  # noqa: S608
+                cols = [
+                    {"name": row[1], "type": row[2], "nullable": not row[3], "pk": bool(row[5])}
+                    for row in cursor.fetchall()
+                ]
+                # Sample a few rows for context
+                cursor.execute(f"SELECT COUNT(*) FROM {tname}")  # noqa: S608
+                row_count = cursor.fetchone()[0]
+                tables.append(
+                    {
+                        "name": tname,
+                        "columns": cols,
+                        "row_count": row_count,
+                    }
+                )
+            cursor.close()
+
+        elif self._conn_str.startswith("postgresql"):
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' ORDER BY table_name"
+            )
+            table_names = [row[0] for row in cursor.fetchall()]
+            for tname in table_names:
+                cursor.execute(
+                    "SELECT column_name, data_type, is_nullable, "
+                    "column_default FROM information_schema.columns "
+                    "WHERE table_name = %s ORDER BY ordinal_position",
+                    (tname,),
+                )
+                cols = [
+                    {
+                        "name": row[0],
+                        "type": row[1],
+                        "nullable": row[2] == "YES",
+                        "default": row[3],
+                    }
+                    for row in cursor.fetchall()
+                ]
+                tables.append({"name": tname, "columns": cols})
+            cursor.close()
+
+        elif self._conn_str.startswith("mysql"):
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES")
+            table_names = [row[0] for row in cursor.fetchall()]
+            for tname in table_names:
+                cursor.execute(f"DESCRIBE {tname}")  # noqa: S608
+                cols = [
+                    {
+                        "name": row[0],
+                        "type": row[1],
+                        "nullable": row[2] == "YES",
+                        "pk": row[3] == "PRI",
+                    }
+                    for row in cursor.fetchall()
+                ]
+                tables.append({"name": tname, "columns": cols})
+            cursor.close()
+
+        return {"tables": tables}
+
+    def schema_to_text(self, schema: Dict[str, Any]) -> str:
+        """Format a schema dict as human-readable text for LLM prompts.
+
+        Example output:
+            Table: orders (1500 rows)
+              - id INTEGER (PK)
+              - product TEXT
+              - amount REAL
+        """
+        lines = []
+        for table in schema.get("tables", []):
+            header = f"Table: {table['name']}"
+            if "row_count" in table:
+                header += f" ({table['row_count']} rows)"
+            lines.append(header)
+            for col in table.get("columns", []):
+                parts = [f"  - {col['name']} {col.get('type', '')}"]
+                if col.get("pk"):
+                    parts.append("(PK)")
+                if col.get("nullable") is False:
+                    parts.append("NOT NULL")
+                lines.append(" ".join(parts))
+            lines.append("")
+        return "\n".join(lines)
+
     def close(self) -> None:
         """Close the database connection."""
         if self._conn is not None:
@@ -286,6 +393,29 @@ class MongoConnector:
             return {"inserted_count": 0}
         result = coll.insert_many(docs)
         return {"inserted_count": len(result.inserted_ids)}
+
+    async def discover_schema(self) -> Dict[str, Any]:
+        """Discover MongoDB collections and sample field structures.
+
+        Samples a few documents from each collection to infer the schema.
+        """
+        db = self._connect()
+        collections = []
+        for name in db.list_collection_names():
+            sample = list(db[name].find().limit(5))
+            fields: Dict[str, str] = {}
+            for doc in sample:
+                for k, v in doc.items():
+                    if k not in fields:
+                        fields[k] = type(v).__name__
+            collections.append(
+                {
+                    "name": name,
+                    "document_count": db[name].estimated_document_count(),
+                    "fields": [{"name": k, "type": v} for k, v in fields.items()],
+                }
+            )
+        return {"collections": collections}
 
     def close(self) -> None:
         """Close the MongoDB connection."""

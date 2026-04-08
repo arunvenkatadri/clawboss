@@ -152,7 +152,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.84.0",
+        version="0.85.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -311,6 +311,26 @@ def create_app(
     app.state.tool_registry = tools
     app.state.llm = llm
 
+    # Find SqlConnector instances in the tool registry for schema discovery
+    _sql_connectors = {
+        name: fn
+        for name, fn in tools.items()
+        if hasattr(fn, "__self__") and type(fn.__self__).__name__ == "SqlConnector"
+    }
+
+    @app.get("/pipelines/schema")
+    async def get_pipeline_schema(_=Depends(auth)):
+        """Discover database schema from registered SQL connectors."""
+        schemas = {}
+        for name, bound_method in _sql_connectors.items():
+            connector = bound_method.__self__
+            schemas[name] = await connector.discover_schema()
+        # Also check for SqlConnector instances registered directly
+        for name, fn in tools.items():
+            if hasattr(fn, "discover_schema") and name not in schemas:
+                schemas[name] = await fn.discover_schema()
+        return schemas
+
     @app.get("/pipelines/tools")
     def list_pipeline_tools(_=Depends(auth)):
         """List available tools for pipeline building."""
@@ -330,7 +350,24 @@ def create_app(
             )
         from .pipeline_poml import PipelineBuilder
 
-        builder = PipelineBuilder(llm, tools, manager)
+        # Auto-discover schema from any SQL connectors
+        db_schema = None
+        for name, fn in tools.items():
+            if hasattr(fn, "discover_schema"):
+                try:
+                    db_schema = await fn.discover_schema()
+                    break
+                except Exception:
+                    pass
+        for name, bound in _sql_connectors.items():
+            if db_schema is None:
+                try:
+                    db_schema = await bound.__self__.discover_schema()
+                    break
+                except Exception:
+                    pass
+
+        builder = PipelineBuilder(llm, tools, manager, db_schema=db_schema)
         poml = await builder.create_poml(req.description)
         return {"poml": poml}
 

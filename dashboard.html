@@ -842,6 +842,14 @@
           <div id="pipeline-tools-tags" style="display:flex; flex-wrap:wrap; gap:0.2rem;"></div>
         </div>
 
+        <!-- Database schema -->
+        <div id="pipeline-schema" style="display:none; margin-top:0.4rem;">
+          <div class="collapsible-header" onclick="toggleCollapsible(this)" style="font-size:0.72rem; color:var(--muted);"><span class="arrow">&#9654;</span> Database schema</div>
+          <div class="collapsible-body">
+            <pre id="pipeline-schema-content" style="font-size:0.7rem; color:var(--muted); background:var(--bg); padding:0.4rem; border-radius:4px; max-height:200px; overflow-y:auto; margin:0;"></pre>
+          </div>
+        </div>
+
         <!-- Preview -->
         <div id="pipeline-preview" style="display:none; margin-top:0.4rem;">
           <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.2rem;">Pipeline steps:</div>
@@ -2550,6 +2558,45 @@ function loadPipelineTools() {
       }).join('');
     })
     .catch(function() { toolsDiv.style.display = 'none'; });
+
+  // Also fetch schema
+  var schemaDiv = document.getElementById('pipeline-schema');
+  var schemaContent = document.getElementById('pipeline-schema-content');
+  fetch(base + '/pipelines/schema', { headers: headers })
+    .then(function(r) { return r.ok ? r.json() : {}; })
+    .then(function(schemas) {
+      var text = '';
+      Object.keys(schemas).forEach(function(connName) {
+        var s = schemas[connName];
+        if (s.tables) {
+          s.tables.forEach(function(t) {
+            text += 'Table: ' + t.name;
+            if (t.row_count !== undefined) text += ' (' + t.row_count + ' rows)';
+            text += '\n';
+            (t.columns || []).forEach(function(c) {
+              text += '  - ' + c.name + ' ' + (c.type || '');
+              if (c.pk) text += ' (PK)';
+              text += '\n';
+            });
+            text += '\n';
+          });
+        }
+        if (s.collections) {
+          s.collections.forEach(function(c) {
+            text += 'Collection: ' + c.name + ' (' + c.document_count + ' docs)\n';
+            (c.fields || []).forEach(function(f) {
+              text += '  - ' + f.name + ' (' + f.type + ')\n';
+            });
+            text += '\n';
+          });
+        }
+      });
+      if (text) {
+        schemaContent.textContent = text;
+        schemaDiv.style.display = 'block';
+      }
+    })
+    .catch(function() {});
 }
 
 function generatePipelinePoml() {

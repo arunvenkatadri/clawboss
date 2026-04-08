@@ -268,7 +268,7 @@ of what the pipeline should do, produce a POML pipeline definition.
 
 Available tools:
 {tools}
-
+{schema_section}
 The POML format uses XML-style tags inside a <pipeline> block:
 
 ```xml
@@ -291,8 +291,10 @@ The POML format uses XML-style tags inside a <pipeline> block:
 
 Rules:
 - tool attributes must match one of the available tools listed above
-- <step> content: if it's a SQL query, write the SQL. Otherwise describe the action.
-- <threshold> key uses dot notation to extract a value from the previous step's output
+- <step> content: if it's a SQL query, write correct SQL using the database schema above. \
+Use the actual table and column names from the schema.
+- <threshold> key uses dot notation to extract a value from the previous step's output. \
+For SQL query results, the format is rows.0.column_name
 - <condition> if uses simple Python expressions with 'output' as the variable
 - Steps chain automatically — each step receives the previous step's output
 - Add chain="false" to a step to ignore previous output
@@ -334,6 +336,8 @@ class PipelineBuilder:
         llm: Async callable — your LLM function.
         tools: Registry mapping tool names to async callables.
         manager: SessionManager for created pipelines.
+        db_schema: Database schema dict from SqlConnector.discover_schema().
+                   Included in the LLM prompt so it writes correct SQL.
         system_prompt: Override the default generation prompt.
     """
 
@@ -342,11 +346,13 @@ class PipelineBuilder:
         llm: Callable[[str], Coroutine[Any, Any, str]],
         tools: ToolRegistry,
         manager: SessionManager,
+        db_schema: Optional[Dict[str, Any]] = None,
         system_prompt: Optional[str] = None,
     ):
         self._llm = llm
         self._tools = tools
         self._manager = manager
+        self._db_schema = db_schema
         self._system_prompt = system_prompt or PIPELINE_GENERATION_PROMPT
 
     def _tools_description(self) -> str:
@@ -357,6 +363,44 @@ class PipelineBuilder:
             doc = (fn.__doc__ or "").strip().split("\n")[0]
             lines.append(f"- {name}: {doc}" if doc else f"- {name}")
         return "\n".join(lines)
+
+    def _schema_description(self) -> str:
+        """Format the database schema for the LLM prompt."""
+        if self._db_schema is None:
+            return ""
+
+        # SQL schema
+        if "tables" in self._db_schema:
+            from .connectors import SqlConnector
+
+            connector = SqlConnector.__new__(SqlConnector)
+            return connector.schema_to_text(self._db_schema)
+
+        # MongoDB schema
+        if "collections" in self._db_schema:
+            lines = []
+            for coll in self._db_schema["collections"]:
+                header = f"Collection: {coll['name']}"
+                if "document_count" in coll:
+                    header += f" ({coll['document_count']} documents)"
+                lines.append(header)
+                for f in coll.get("fields", []):
+                    lines.append(f"  - {f['name']} ({f.get('type', 'unknown')})")
+                lines.append("")
+            return "\n".join(lines)
+
+        return ""
+
+    def _build_prompt(self) -> str:
+        """Build the full LLM prompt with tools and schema."""
+        schema_text = self._schema_description()
+        schema_section = ""
+        if schema_text:
+            schema_section = f"\nDatabase schema:\n{schema_text}\n"
+        return self._system_prompt.format(
+            tools=self._tools_description(),
+            schema_section=schema_section,
+        )
 
     async def create(
         self,
@@ -376,7 +420,7 @@ class PipelineBuilder:
         Returns:
             A configured Pipeline ready to .run().
         """
-        prompt = self._system_prompt.format(tools=self._tools_description())
+        prompt = self._build_prompt()
         prompt += f"\n\nUser's description:\n{description}"
 
         raw = await self._llm(prompt)
@@ -396,7 +440,7 @@ class PipelineBuilder:
 
         Useful for reviewing/editing the POML before running.
         """
-        prompt = self._system_prompt.format(tools=self._tools_description())
+        prompt = self._build_prompt()
         prompt += f"\n\nUser's description:\n{description}"
 
         raw = await self._llm(prompt)
