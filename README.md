@@ -111,6 +111,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
 | **Crash loop protection** | Agent keeps crashing and restarting forever |
+| **Pipeline orchestration** | No structured way to chain tool calls |
 | **REST control plane** | No way to pause/resume/stop agents remotely |
 
 ## Works with any agent framework
@@ -198,6 +199,31 @@ The context has three zones:
 | **Recent turns** | Last N turns | Full fidelity |
 
 The anchored state is never compressed — it's rebuilt from the supervisor's live state every turn. Even if the LLM "forgets" its budget limit, the supervisor still enforces it. Bring your own LLM summarizer for richer compression, or use the built-in audit-based extraction.
+
+## Pipeline orchestration
+
+Chain tool calls into supervised sequential pipelines. Output flows from one step to the next — every step goes through full Clawboss supervision (timeouts, budgets, circuit breakers, PII redaction, approvals).
+
+```python
+from clawboss import Pipeline, SessionManager, MemoryStore
+
+store = MemoryStore()
+mgr = SessionManager(store)
+
+result = await (
+    Pipeline(mgr, "researcher", policy_dict={"max_iterations": 10, "token_budget": 50000})
+    .add_step("web_search", search_fn, query="quantum computing")
+    .add_step("summarize", summarize_fn)
+    .add_step("write_report", write_fn, title="Research Report")
+    .run()
+)
+
+print(result.completed)     # True
+print(result.final_output)  # The report
+print(result.total_duration_ms)
+```
+
+Pipelines stop early if a step fails, the budget is exceeded, or a tool needs approval. Each step is recorded in the observer, audit trail, and session payload.
 
 ## Durable sessions
 
@@ -762,6 +788,20 @@ Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 - `deny(approval_id, reason="")` — deny a pending request
 - `list_pending(session_id=None)` — list pending approvals
 - `list_all(session_id=None)` — list all approvals
+
+### `Pipeline(manager, agent_id, policy_dict=None)`
+
+- `add_step(tool_name, fn, **kwargs)` — add a step (returns self for chaining)
+- `run()` — execute all steps, returns `PipelineResult`
+
+### `PipelineResult`
+
+- `completed` — True if all steps succeeded
+- `steps` — list of `StepResult` objects
+- `final_output` — output of the last successful step
+- `total_duration_ms` — sum of all step durations
+- `stopped_at` — step name where pipeline stopped (on failure)
+- `error` — error description (on failure)
 
 ## Observability
 

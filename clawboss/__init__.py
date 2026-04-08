@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.80.0"
+__version__ = "0.81.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -28,6 +28,7 @@ from .context import AnchoredState, CompressedContext, CompressedHistory, Contex
 from .errors import ClawbossError
 from .observe import Observer, ToolCallRecord, ToolMetrics
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
+from .pipeline import Pipeline, PipelineResult
 from .policy import Action, OnFailure, Policy, ScopeRule, ToolScope
 from .redact import Redactor
 from .session import SessionManager
@@ -88,4 +89,6 @@ __all__ = [
     "Observer",
     "ToolCallRecord",
     "ToolMetrics",
+    "Pipeline",
+    "PipelineResult",
 ]
