@@ -85,7 +85,9 @@ Open `dashboard.html` in a browser for a full management UI:
 
 - **Agents** — create, edit, delete, pause/resume/stop agents with supervision policies
 - **Skills** — define reusable capabilities (tool collections) and assign them to agents
-- **Sessions** — live view of running agent sessions from the REST API, with pause/resume/stop controls, budget usage, and audit logs
+- **Sessions** — live view of running agent sessions from the REST API, with pause/resume/stop controls, budget usage, and audit logs. Updates in real time via WebSocket.
+- **Pipeline editor** — describe what you want in natural language or write POML directly. The LLM generates the pipeline, you review and run it from the dashboard.
+- **Approvals** — pending tool approvals show as yellow cards with Approve/Deny buttons
 - **Chat** — open a conversation with any agent directly from the dashboard
 - **Costs** — track spend, set budgets with hard stops, view usage over time
 - **Policies** — see all active supervision rules at a glance
@@ -232,7 +234,9 @@ Describe what you want in plain English. The LLM generates POML, which gets pars
 ```python
 from clawboss import PipelineBuilder
 
-builder = PipelineBuilder(my_llm, available_tools, mgr)
+# Auto-discover schema so the LLM writes correct SQL
+schema = await sql.discover_schema()
+builder = PipelineBuilder(my_llm, available_tools, mgr, db_schema=schema)
 
 pipeline = await builder.create(
     "Check the alerts table. If there are more than 10 critical alerts, "
@@ -320,6 +324,34 @@ result = await (
 Read-only by default — `SqlConnector("...", allow_write=True)` to enable writes. Supports parameterized queries and configurable `max_rows`.
 
 Also ships `MongoConnector` for MongoDB (`find`, `insert`).
+
+### Schema auto-discovery
+
+Connectors introspect the database and expose the schema to the LLM so it writes correct SQL:
+
+```python
+sql = SqlConnector("sqlite:///data.db")
+schema = await sql.discover_schema()
+# {"tables": [{"name": "orders", "columns": [{"name": "id", "type": "INTEGER", "pk": true}, ...], "row_count": 1500}]}
+
+# Human-readable format for prompts
+print(sql.schema_to_text(schema))
+# Table: orders (1500 rows)
+#   - id INTEGER (PK)
+#   - product TEXT
+#   - amount REAL
+```
+
+When using `PipelineBuilder`, pass the schema and the LLM sees the actual tables:
+
+```python
+schema = await sql.discover_schema()
+builder = PipelineBuilder(my_llm, tools, mgr, db_schema=schema)
+pipeline = await builder.create("Show me total revenue by region")
+# LLM writes: SELECT region, sum(amount) FROM orders GROUP BY region
+```
+
+The REST endpoint `GET /pipelines/schema` returns the schema for all registered connectors. The dashboard shows it in the pipeline editor.
 
 ## Durable sessions
 
@@ -475,6 +507,14 @@ Endpoints:
 | GET | `/metrics/sessions/{id}` | Metrics for a specific session |
 | GET | `/metrics/recent` | Recent tool call log |
 | WS | `/sessions/{id}/events` | Stream status changes, audit, and approvals |
+| GET | `/pipelines/tools` | List available tools for pipeline building |
+| GET | `/pipelines/schema` | Auto-discovered database schema |
+| POST | `/pipelines/generate` | Natural language → POML (requires LLM) |
+| POST | `/pipelines/validate` | Validate POML and return step structure |
+| POST | `/pipelines/run` | Parse POML and run pipeline immediately |
+| GET | `/auth/login` | OAuth2 login redirect URL |
+| GET | `/auth/callback` | OAuth2 callback (exchange code for token) |
+| GET | `/auth/me` | Current authenticated user info |
 
 ```bash
 # Create a session
@@ -892,7 +932,7 @@ Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 - `add_threshold(key, threshold, above_step, below_step)` — threshold branch
 - `run()` — execute all steps, returns `PipelineResult`
 
-### `PipelineBuilder(llm, tools, manager)`
+### `PipelineBuilder(llm, tools, manager, db_schema=None)`
 
 - `create(description)` — natural language to executable Pipeline
 - `create_poml(description)` — natural language to POML text (for review)
@@ -906,12 +946,15 @@ Parses a POML document with `<pipeline>` tags into a Pipeline object.
 
 - `query(sql, params)` — execute a query, returns `{"rows": [...], "row_count": N}`
 - `execute(sql, params)` — execute a write statement
+- `discover_schema()` — introspect tables, columns, types, row counts
+- `schema_to_text(schema)` — format schema as human-readable text
 - Supports: `sqlite:///path`, `postgresql://...`, `mysql://...`
 
 ### `MongoConnector(uri, database, allow_write=False)`
 
 - `find(collection, filter, projection, sort, limit)` — query documents
 - `insert(collection, documents)` — insert documents (requires `allow_write`)
+- `discover_schema()` — sample documents to infer field structures
 
 ### `PipelineResult`
 
