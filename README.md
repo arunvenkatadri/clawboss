@@ -225,6 +225,51 @@ print(result.total_duration_ms)
 
 Pipelines stop early if a step fails, the budget is exceeded, or a tool needs approval. Each step is recorded in the observer, audit trail, and session payload.
 
+### Build pipelines from natural language
+
+Describe what you want in plain English. The LLM generates POML, which gets parsed into an executable pipeline.
+
+```python
+from clawboss import PipelineBuilder
+
+builder = PipelineBuilder(my_llm, available_tools, mgr)
+
+pipeline = await builder.create(
+    "Check the alerts table. If there are more than 10 critical alerts, "
+    "escalate to the on-call team. Otherwise log that everything is fine."
+)
+result = await pipeline.run()
+```
+
+The intermediate POML is human-readable, editable, and version-controllable:
+
+```xml
+<pipeline>
+  <step tool="sql.query">
+    SELECT count(*) as cnt FROM alerts WHERE severity='critical'
+  </step>
+  <threshold key="rows.0.cnt" value="10">
+    <above tool="escalate">Notify on-call team</above>
+    <below tool="log_ok">Log all clear</below>
+  </threshold>
+</pipeline>
+```
+
+You can also generate just the POML for review, then parse and run it:
+
+```python
+poml = await builder.create_poml("Check alerts and escalate if critical")
+# Review/edit the POML...
+pipeline = parse_pipeline_poml(poml, tools, mgr, "agent-1", policy)
+result = await pipeline.run()
+```
+
+Refine with feedback:
+
+```python
+updated_poml = await builder.refine(poml, "Add an email notification step at the end")
+```
+
 ### Conditional routing
 
 Add branching logic — route to different steps based on the previous output:
@@ -846,6 +891,16 @@ Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 - `add_condition(predicate, then_step, else_step)` — conditional branch
 - `add_threshold(key, threshold, above_step, below_step)` — threshold branch
 - `run()` — execute all steps, returns `PipelineResult`
+
+### `PipelineBuilder(llm, tools, manager)`
+
+- `create(description)` — natural language to executable Pipeline
+- `create_poml(description)` — natural language to POML text (for review)
+- `refine(current_poml, feedback)` — modify POML with natural language feedback
+
+### `parse_pipeline_poml(poml_text, tools, manager, agent_id, policy_dict)`
+
+Parses a POML document with `<pipeline>` tags into a Pipeline object.
 
 ### `SqlConnector(connection_string, allow_write=False, max_rows=1000)`
 

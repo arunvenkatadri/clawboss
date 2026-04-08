@@ -1,6 +1,6 @@
 {
   "name": "clawboss-ai",
-  "version": "0.82.0",
+  "version": "0.83.0",
   "description": "Clawboss is a Python package. Install with: pip install clawboss",
   "license": "Apache-2.0",
   "author": "arunvenkatadri",
