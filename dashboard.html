@@ -1680,11 +1680,105 @@ function renderOverview() {
 
   document.getElementById('overview-agents').innerHTML =
     AGENTS.map(a => renderAgentCard(a, false)).join('');
+
+  // Also load live agents into overview
+  var base = getSessionsApiBase();
+  var headers = getSessionsAuthHeaders();
+  fetch(base + '/sessions', { headers: headers })
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(sessions) {
+      var liveHtml = sessions.map(function(s) { return renderLiveAgentCard(s); }).join('');
+      var existing = document.getElementById('overview-agents').innerHTML;
+      document.getElementById('overview-agents').innerHTML = liveHtml + existing;
+      // Update counts
+      var running = sessions.filter(function(s) { return s.status === 'running'; }).length;
+      var paused = sessions.filter(function(s) { return s.status === 'paused'; }).length;
+      var stopped = sessions.filter(function(s) { return s.status === 'stopped' || s.status === 'failed'; }).length;
+      document.getElementById('sys-grid').innerHTML =
+        sysCard('$' + DEMO_COSTS.total_cost_usd.toFixed(2), 'This Month') +
+        sysCard(AGENTS.length + sessions.length, 'Agents') +
+        sysCard(SKILLS.length, 'Skills') +
+        sysCard(POLICIES.length, 'Policies') +
+        sysCard(totalTools, 'Tools') +
+        sysCard(DEMO_COSTS.total_calls, 'API Calls') +
+        sysCard(DEMO_COSTS.total_tokens.toLocaleString(), 'Tokens') +
+        sysCard(runningCount + running, 'Running') +
+        sysCard(pausedCount + paused, 'Paused') +
+        sysCard(stoppedCount + stopped, 'Stopped');
+    })
+    .catch(function() {});
 }
 
 function renderAgents() {
-  document.getElementById('agents-grid').innerHTML =
-    AGENTS.map(a => renderAgentCard(a, true)).join('');
+  // Render local mock agents
+  var localHtml = AGENTS.map(a => renderAgentCard(a, true)).join('');
+
+  // Also render live agents from the REST API
+  var base = getSessionsApiBase();
+  var headers = getSessionsAuthHeaders();
+  fetch(base + '/sessions', { headers: headers })
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(sessions) {
+      var liveHtml = sessions.map(function(s) {
+        return renderLiveAgentCard(s);
+      }).join('');
+      document.getElementById('agents-grid').innerHTML = liveHtml + localHtml;
+    })
+    .catch(function() {
+      // API not available — just show local agents
+      document.getElementById('agents-grid').innerHTML = localHtml;
+    });
+}
+
+function renderLiveAgentCard(s) {
+  var st = s.status || 'stopped';
+  var html = '<div class="card">';
+  html += '<div class="card-header">';
+  html += '<div class="card-header-left">';
+  html += '<span class="dot ' + statusDotClass(st) + '"></span>';
+  html += '<span class="card-title">' + esc(s.agent_id) + '</span>';
+  html += '</div>';
+  html += '<div class="card-header-right">';
+  html += '<span class="badge ' + statusBadgeClass(st) + '">' + esc(st) + '</span> ';
+  html += '<span class="badge badge-blue">supervised</span> ';
+  if (s.stateless) html += '<span class="badge badge-yellow">stateless</span> ';
+  html += '</div></div>';
+
+  html += '<div class="card-desc" style="font-size:0.75rem; color:var(--muted);">Session: ' + esc(s.session_id) + '</div>';
+
+  // Budget info
+  html += '<div class="detail-row"><span class="detail-label">Iterations</span><span class="detail-value">' + s.iterations + ' / ' + s.iteration_limit + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Tokens</span><span class="detail-value">' + s.tokens_used + (s.token_limit ? ' / ' + s.token_limit : '') + '</span></div>';
+  if (s.resume_count > 0) {
+    html += '<div class="detail-row"><span class="detail-label">Resumes</span><span class="detail-value">' + s.resume_count + '</span></div>';
+  }
+  if (s.failure_reason) {
+    html += '<div style="font-size:0.75rem; color:var(--red); margin:0.3rem 0; padding:0.3rem 0.5rem; background:rgba(250,82,82,0.1); border-radius:4px;">' + esc(s.failure_reason) + '</div>';
+  }
+
+  // Controls
+  html += '<div class="card-actions">';
+  if (st === 'running') {
+    html += '<button class="btn-secondary" onclick="liveAgentAction(\'' + s.session_id + '\',\'pause\')">Pause</button>';
+    html += '<button class="btn-danger" onclick="liveAgentAction(\'' + s.session_id + '\',\'stop\')">Stop</button>';
+  } else if (st === 'paused') {
+    html += '<button class="btn-secondary" onclick="liveAgentAction(\'' + s.session_id + '\',\'resume\')">Resume</button>';
+    html += '<button class="btn-danger" onclick="liveAgentAction(\'' + s.session_id + '\',\'stop\')">Stop</button>';
+  } else if (st === 'stopped' || st === 'failed') {
+    html += '<button class="btn-secondary" onclick="liveAgentAction(\'' + s.session_id + '\',\'restart\')">Restart</button>';
+  }
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function liveAgentAction(sessionId, action) {
+  var base = getSessionsApiBase();
+  var headers = getSessionsAuthHeaders();
+  fetch(base + '/sessions/' + sessionId + '/' + action, { method: 'POST', headers: headers })
+    .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function() { renderAgents(); })
+    .catch(function(err) { alert('Action failed: ' + err.message); });
 }
 
 function renderSkills() {
