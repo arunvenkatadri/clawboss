@@ -807,8 +807,51 @@
         </label>
         <span style="font-size:0.72rem; color:var(--muted);">No checkpoints, no crash recovery &mdash; in-memory only</span>
       </div>
+
+      <!-- Pipeline editor -->
+      <div style="margin-top:0.75rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.4rem;">
+          <label style="font-size:0.85rem; font-weight:600;">Pipeline <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional)</span></label>
+          <div style="display:flex; gap:0.3rem;">
+            <button class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;" onclick="togglePipelineMode('describe')" id="btn-pipeline-describe">Describe</button>
+            <button class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;" onclick="togglePipelineMode('edit')" id="btn-pipeline-edit">Edit POML</button>
+          </div>
+        </div>
+
+        <!-- Describe mode -->
+        <div id="pipeline-describe-mode" style="display:none;">
+          <textarea class="form-input" id="pipeline-description" rows="3" placeholder="Describe what the pipeline should do in plain English..." style="font-size:0.82rem; width:100%; resize:vertical;"></textarea>
+          <div style="display:flex; gap:0.4rem; margin-top:0.3rem;">
+            <button class="btn-secondary" onclick="generatePipelinePoml()" id="btn-generate-poml" style="font-size:0.78rem;">Generate POML</button>
+            <span id="pipeline-generate-status" style="font-size:0.72rem; color:var(--muted); align-self:center;"></span>
+          </div>
+        </div>
+
+        <!-- Edit mode -->
+        <div id="pipeline-edit-mode" style="display:none;">
+          <textarea class="form-input" id="pipeline-poml-editor" rows="10" placeholder="&lt;pipeline&gt;&#10;  &lt;step tool=&quot;search&quot;&gt;find information&lt;/step&gt;&#10;  &lt;step tool=&quot;summarize&quot;&gt;summarize findings&lt;/step&gt;&#10;&lt;/pipeline&gt;" style="font-size:0.78rem; width:100%; resize:vertical; font-family:monospace; line-height:1.5;"></textarea>
+          <div style="display:flex; gap:0.4rem; margin-top:0.3rem;">
+            <button class="btn-secondary" onclick="validatePipelinePoml()" style="font-size:0.78rem;">Validate</button>
+            <span id="pipeline-validate-status" style="font-size:0.72rem; color:var(--muted); align-self:center;"></span>
+          </div>
+        </div>
+
+        <!-- Available tools -->
+        <div id="pipeline-tools-list" style="display:none; margin-top:0.4rem;">
+          <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.2rem;">Available tools:</div>
+          <div id="pipeline-tools-tags" style="display:flex; flex-wrap:wrap; gap:0.2rem;"></div>
+        </div>
+
+        <!-- Preview -->
+        <div id="pipeline-preview" style="display:none; margin-top:0.4rem;">
+          <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.2rem;">Pipeline steps:</div>
+          <div id="pipeline-preview-steps"></div>
+        </div>
+      </div>
+
       <div class="card-actions" style="margin-top:0.5rem;">
         <button class="btn-secondary" onclick="submitCreateSession()" style="background:var(--accent); color:#fff; border-color:var(--accent);">Create Session</button>
+        <button class="btn-secondary" onclick="runPipelineNow()" style="font-size:0.78rem;" id="btn-run-pipeline" title="Create session and run the pipeline immediately">Run Pipeline</button>
       </div>
     </div>
 
@@ -2449,6 +2492,182 @@ function getSessionsAuthHeaders() {
   const key = (document.getElementById('sessions-api-key') || {}).value;
   if (!key) return {};
   return { 'Authorization': 'Bearer ' + key };
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline editor
+// ---------------------------------------------------------------------------
+
+var pipelineMode = null;
+
+function togglePipelineMode(mode) {
+  var describeDiv = document.getElementById('pipeline-describe-mode');
+  var editDiv = document.getElementById('pipeline-edit-mode');
+  var toolsDiv = document.getElementById('pipeline-tools-list');
+  var btnDescribe = document.getElementById('btn-pipeline-describe');
+  var btnEdit = document.getElementById('btn-pipeline-edit');
+
+  if (pipelineMode === mode) {
+    // Toggle off
+    pipelineMode = null;
+    describeDiv.style.display = 'none';
+    editDiv.style.display = 'none';
+    toolsDiv.style.display = 'none';
+    btnDescribe.style.background = '';
+    btnEdit.style.background = '';
+    return;
+  }
+
+  pipelineMode = mode;
+  describeDiv.style.display = mode === 'describe' ? 'block' : 'none';
+  editDiv.style.display = mode === 'edit' ? 'block' : 'none';
+  btnDescribe.style.background = mode === 'describe' ? 'var(--accent)' : '';
+  btnDescribe.style.color = mode === 'describe' ? '#fff' : '';
+  btnEdit.style.background = mode === 'edit' ? 'var(--accent)' : '';
+  btnEdit.style.color = mode === 'edit' ? '#fff' : '';
+
+  // Load available tools
+  loadPipelineTools();
+}
+
+function loadPipelineTools() {
+  var base = getSessionsApiBase();
+  var headers = getSessionsAuthHeaders();
+  var toolsDiv = document.getElementById('pipeline-tools-list');
+  var tagsDiv = document.getElementById('pipeline-tools-tags');
+
+  fetch(base + '/pipelines/tools', { headers: headers })
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(tools) {
+      if (tools.length === 0) {
+        toolsDiv.style.display = 'none';
+        return;
+      }
+      toolsDiv.style.display = 'block';
+      tagsDiv.innerHTML = tools.map(function(t) {
+        var tip = t.description ? ' title="' + esc(t.description) + '"' : '';
+        return '<span class="tag"' + tip + '>' + esc(t.name) + '</span>';
+      }).join('');
+    })
+    .catch(function() { toolsDiv.style.display = 'none'; });
+}
+
+function generatePipelinePoml() {
+  var base = getSessionsApiBase();
+  var headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  var desc = document.getElementById('pipeline-description').value.trim();
+  if (!desc) { alert('Enter a description first'); return; }
+
+  var statusEl = document.getElementById('pipeline-generate-status');
+  var btn = document.getElementById('btn-generate-poml');
+  statusEl.textContent = 'Generating...';
+  btn.disabled = true;
+
+  fetch(base + '/pipelines/generate', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ description: desc })
+  })
+    .then(function(r) {
+      if (r.status === 501) throw new Error('No LLM configured on server');
+      if (!r.ok) throw new Error('Error ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      document.getElementById('pipeline-poml-editor').value = data.poml;
+      statusEl.textContent = 'Generated! Switch to Edit POML to review.';
+      statusEl.style.color = 'var(--green)';
+      // Auto-switch to edit mode
+      togglePipelineMode('edit');
+      validatePipelinePoml();
+    })
+    .catch(function(err) {
+      statusEl.textContent = 'Failed: ' + err.message;
+      statusEl.style.color = 'var(--red)';
+    })
+    .finally(function() { btn.disabled = false; });
+}
+
+function validatePipelinePoml() {
+  var base = getSessionsApiBase();
+  var headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  var poml = document.getElementById('pipeline-poml-editor').value.trim();
+  if (!poml) return;
+
+  var agentId = document.getElementById('new-session-agent-id').value.trim() || 'preview';
+  var statusEl = document.getElementById('pipeline-validate-status');
+  var previewDiv = document.getElementById('pipeline-preview');
+  var stepsDiv = document.getElementById('pipeline-preview-steps');
+
+  fetch(base + '/pipelines/validate', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ poml: poml, agent_id: agentId })
+  })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || r.status); });
+      return r.json();
+    })
+    .then(function(data) {
+      statusEl.textContent = 'Valid (' + data.steps.length + ' steps)';
+      statusEl.style.color = 'var(--green)';
+      previewDiv.style.display = 'block';
+      stepsDiv.innerHTML = data.steps.map(function(s, i) {
+        var icon = s.type === 'condition' ? '&#9670;' : '&#9654;';
+        var toolLabel = s.tool ? ' <span style="color:var(--accent)">' + esc(s.tool) + '</span>' : '';
+        return '<div style="font-size:0.75rem; margin-bottom:0.15rem;">' +
+          '<span style="color:var(--muted)">' + (i + 1) + '.</span> ' +
+          icon + ' ' + esc(s.name) + toolLabel + '</div>';
+      }).join('');
+    })
+    .catch(function(err) {
+      statusEl.textContent = 'Invalid: ' + err.message;
+      statusEl.style.color = 'var(--red)';
+      previewDiv.style.display = 'none';
+    });
+}
+
+function getSessionPoml() {
+  if (pipelineMode === 'edit' || pipelineMode === 'describe') {
+    return (document.getElementById('pipeline-poml-editor').value || '').trim();
+  }
+  return '';
+}
+
+function runPipelineNow() {
+  var base = getSessionsApiBase();
+  var headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  var agentId = document.getElementById('new-session-agent-id').value.trim();
+  if (!agentId) { alert('Agent ID is required'); return; }
+  var poml = getSessionPoml();
+  if (!poml) { alert('Write or generate a pipeline first'); return; }
+  var maxIter = parseInt(document.getElementById('new-session-max-iter').value) || 10;
+  var timeout = parseInt(document.getElementById('new-session-timeout').value) || 30;
+  var budgetVal = document.getElementById('new-session-budget').value.trim();
+  var stateless = document.getElementById('new-session-stateless').checked;
+  var policy = { max_iterations: maxIter, tool_timeout: timeout };
+  if (budgetVal) policy.token_budget = parseInt(budgetVal);
+
+  fetch(base + '/pipelines/run', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({
+      agent_id: agentId, poml: poml, policy: policy, stateless: stateless
+    })
+  })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || r.status); });
+      return r.json();
+    })
+    .then(function(data) {
+      var msg = data.completed ? 'Pipeline completed!' : 'Pipeline stopped: ' + (data.error || 'unknown');
+      msg += '\nSteps: ' + data.steps.length + ', Duration: ' + data.total_duration_ms + 'ms';
+      if (data.final_output) msg += '\nOutput: ' + data.final_output.substring(0, 200);
+      alert(msg);
+      document.getElementById('create-session-form').style.display = 'none';
+      fetchSessions();
+    })
+    .catch(function(err) { alert('Pipeline failed: ' + err.message); });
 }
 
 function submitCreateSession() {

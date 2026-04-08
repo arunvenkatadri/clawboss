@@ -55,6 +55,26 @@ class DenyRequest(BaseModel):
     reason: str = ""
 
 
+class GeneratePipelineRequest(BaseModel):
+    description: str
+    tools: Optional[List[str]] = None  # tool names to make available
+
+
+class ParsePipelineRequest(BaseModel):
+    poml: str
+    agent_id: str
+    policy: Optional[Dict[str, Any]] = None
+    stateless: bool = False
+
+
+class CreatePipelineSessionRequest(BaseModel):
+    agent_id: str
+    poml: str
+    policy: Optional[Dict[str, Any]] = None
+    payload: Optional[Dict[str, Any]] = None
+    stateless: bool = False
+
+
 class SessionSummary(BaseModel):
     session_id: str
     agent_id: str
@@ -93,6 +113,8 @@ def create_app(
     allowed_origins: Optional[List[str]] = None,
     api_key: Optional[str] = None,
     require_auth: bool = False,
+    tool_registry: Optional[Dict[str, Any]] = None,
+    llm: Optional[Any] = None,
 ) -> FastAPI:
     """Build a FastAPI app wired to the given SessionManager.
 
@@ -130,7 +152,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.83.0",
+        version="0.84.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -280,6 +302,98 @@ def create_app(
     @app.get("/metrics/recent")
     def get_recent_calls(limit: int = 50, _=Depends(auth)):
         return manager.observer.recent_calls(limit=min(limit, 200))
+
+    # ------------------------------------------------------------------
+    # Pipeline endpoints
+    # ------------------------------------------------------------------
+
+    tools = tool_registry or {}
+    app.state.tool_registry = tools
+    app.state.llm = llm
+
+    @app.get("/pipelines/tools")
+    def list_pipeline_tools(_=Depends(auth)):
+        """List available tools for pipeline building."""
+        result = []
+        for name, fn in sorted(tools.items()):
+            doc = (fn.__doc__ or "").strip().split("\n")[0]
+            result.append({"name": name, "description": doc})
+        return result
+
+    @app.post("/pipelines/generate")
+    async def generate_pipeline_poml(req: GeneratePipelineRequest, _=Depends(auth)):
+        """Generate POML from a natural language description."""
+        if llm is None:
+            raise HTTPException(
+                status_code=501,
+                detail="No LLM configured. Pass llm= to create_app().",
+            )
+        from .pipeline_poml import PipelineBuilder
+
+        builder = PipelineBuilder(llm, tools, manager)
+        poml = await builder.create_poml(req.description)
+        return {"poml": poml}
+
+    @app.post("/pipelines/validate")
+    def validate_pipeline_poml(req: ParsePipelineRequest, _=Depends(auth)):
+        """Validate POML and return the parsed step structure."""
+        from .pipeline_poml import parse_pipeline_poml
+
+        try:
+            pipeline = parse_pipeline_poml(
+                req.poml,
+                tools,
+                manager,
+                req.agent_id,
+                policy_dict=req.policy,
+                stateless=req.stateless,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        # Return step names without running
+        steps = []
+        for node in pipeline._nodes:
+            if hasattr(node, "tool_name"):
+                steps.append({"type": "step", "name": node.name, "tool": node.tool_name})
+            else:
+                steps.append({"type": "condition", "name": node.name})
+        return {"valid": True, "steps": steps}
+
+    @app.post("/pipelines/run", status_code=201)
+    async def run_pipeline(req: CreatePipelineSessionRequest, _=Depends(auth)):
+        """Parse POML and run the pipeline immediately."""
+        from .pipeline_poml import parse_pipeline_poml
+
+        try:
+            pipeline = parse_pipeline_poml(
+                req.poml,
+                tools,
+                manager,
+                req.agent_id,
+                policy_dict=req.policy,
+                stateless=req.stateless,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        result = await pipeline.run()
+        return {
+            "session_id": result.session_id,
+            "completed": result.completed,
+            "steps": [
+                {
+                    "name": s.name,
+                    "tool": s.tool_name,
+                    "succeeded": s.result.succeeded,
+                    "duration_ms": s.result.duration_ms,
+                    "branch": s.branch,
+                }
+                for s in result.steps
+            ],
+            "final_output": str(result.final_output)[:1000] if result.final_output else None,
+            "error": result.error,
+            "total_duration_ms": result.total_duration_ms,
+        }
 
     @app.websocket("/sessions/{session_id}/events")
     async def session_events(websocket: WebSocket, session_id: str):

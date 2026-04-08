@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clawboss"
-version = "0.83.0"
+version = "0.84.0"
 description = "A way of controlling deployed agents to keep your (and their) sanity."
 readme = "README.md"
 license = "Apache-2.0"
