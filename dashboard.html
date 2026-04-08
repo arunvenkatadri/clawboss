@@ -690,7 +690,10 @@
     <div class="builder-box">
       <h3 style="display:flex; align-items:center; justify-content:space-between;">
         Create an Agent
-        <button class="btn-secondary" onclick="openAgentModal()">+ New Agent (Manual)</button>
+        <span>
+          <button class="btn-secondary" onclick="openAgentModal()">+ Manual</button>
+          <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display=document.getElementById('create-session-form').style.display==='none'?'block':'none'">+ New Agent</button>
+        </span>
       </h3>
       <textarea id="agent-builder-input" placeholder="Describe what you want the agent to do in plain English...&#10;&#10;Example: An agent that researches topics on the web, limited to 5 searches, with a 30 second timeout, and asks before deleting anything"></textarea>
       <div class="builder-actions">
@@ -698,90 +701,11 @@
         <span class="builder-status" id="agent-builder-status"></span>
       </div>
     </div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Agents</h3>
-    <div class="card-grid" id="agents-grid"></div>
-  </div>
 
-  <!-- Skills -->
-  <div class="section" id="sec-skills">
-    <div class="builder-box">
-      <h3 style="display:flex; align-items:center; justify-content:space-between;">
-        Create a Skill
-        <button class="btn-secondary" onclick="openSkillModal()">+ New Skill (Manual)</button>
-      </h3>
-      <textarea id="skill-builder-input" placeholder="Describe the skill (capability) in plain English...&#10;&#10;Example: A web search skill with a search tool and a page fetcher tool"></textarea>
-      <div class="builder-actions">
-        <button class="btn-primary" id="btn-create-skill-nl">Create from Description</button>
-        <span class="builder-status" id="skill-builder-status"></span>
-      </div>
-    </div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Skills</h3>
-    <div class="card-grid" id="skills-grid"></div>
-  </div>
-
-  <!-- Costs -->
-  <div class="section" id="sec-costs">
-    <div class="sys-grid" id="cost-totals"></div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Budgets</h3>
-    <div id="budgets-list"></div>
-    <div class="budget-form" id="budget-form">
-      <input type="text" name="name" placeholder="global or agent name">
-      <input type="number" name="dollars" placeholder="$ limit" step="0.01" min="0">
-      <select name="period">
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="monthly" selected>Monthly</option>
-        <option value="total">Total</option>
-      </select>
-      <label class="toggle" id="hard-stop-toggle">
-        <div class="toggle-track red" id="hard-stop-track"><div class="toggle-thumb"></div></div>
-        <span class="toggle-label" id="hard-stop-label">Hard stop</span>
-      </label>
-      <button type="button" id="btn-set-budget">Set Budget</button>
-    </div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Cost by Agent</h3>
-    <div id="cost-by-agent"></div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Last 24 Hours</h3>
-    <div id="cost-hourly"></div>
-  </div>
-
-  <!-- Policies -->
-  <div class="section" id="sec-policies">
-    <div class="builder-box">
-      <h3 style="display:flex; align-items:center; justify-content:space-between;">
-        Policies
-        <button class="btn-secondary" onclick="openPolicyModal()">+ New Policy</button>
-      </h3>
-      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
-        Policies are granular supervision rules. Each policy controls specific aspects of agent behavior.
-        Assign multiple policies to an agent &mdash; they merge in order (later policies override earlier ones for overlapping fields).
-      </p>
-    </div>
-    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Policies</h3>
-    <div class="card-grid" id="policy-grid"></div>
-  </div>
-
-  <!-- Sessions (live from REST API) -->
-  <div class="section" id="sec-sessions">
-    <div class="builder-box">
-      <h3 style="display:flex; align-items:center; justify-content:space-between;">
-        Live Sessions
-        <span>
-          <input class="form-input" id="sessions-api-url" placeholder="http://localhost:8000" value="http://localhost:8000" style="width:180px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;">
-          <input class="form-input" id="sessions-api-key" placeholder="API key (optional)" value="" style="width:150px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;" type="password">
-          <button class="btn-secondary" onclick="fetchSessions()">Refresh</button>
-        </span>
-      </h3>
-      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
-        Live agent sessions from the Clawboss control plane. Start the server with
-        <code>uvicorn clawboss.server:app</code> then refresh.
-        If you set <code>CLAWBOSS_API_KEY</code>, enter the same key above.
-      </p>
-    </div>
-    <!-- Create session form -->
+    <!-- Full agent creation form (with triggers, pipeline, policy) -->
     <div class="card" id="create-session-form" style="margin-bottom:0.75rem; display:none;">
-      <div class="card-header"><span class="card-title">New Session</span>
-        <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display='none'" style="font-size:0.75rem;">&times; Cancel</button>
+      <div class="card-header"><span class="card-title">New Agent</span>
+        <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display='none'" style="font-size:0.75rem;">&times; Close</button>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.5rem;">
         <div>
@@ -868,8 +792,6 @@
             <button class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;" onclick="togglePipelineMode('edit')" id="btn-pipeline-edit">Edit POML</button>
           </div>
         </div>
-
-        <!-- Describe mode -->
         <div id="pipeline-describe-mode" style="display:none;">
           <textarea class="form-input" id="pipeline-description" rows="3" placeholder="Describe what the pipeline should do in plain English..." style="font-size:0.82rem; width:100%; resize:vertical;"></textarea>
           <div style="display:flex; gap:0.4rem; margin-top:0.3rem;">
@@ -877,8 +799,6 @@
             <span id="pipeline-generate-status" style="font-size:0.72rem; color:var(--muted); align-self:center;"></span>
           </div>
         </div>
-
-        <!-- Edit mode -->
         <div id="pipeline-edit-mode" style="display:none;">
           <textarea class="form-input" id="pipeline-poml-editor" rows="10" placeholder="&lt;pipeline&gt;&#10;  &lt;step tool=&quot;search&quot;&gt;find information&lt;/step&gt;&#10;  &lt;step tool=&quot;summarize&quot;&gt;summarize findings&lt;/step&gt;&#10;&lt;/pipeline&gt;" style="font-size:0.78rem; width:100%; resize:vertical; font-family:monospace; line-height:1.5;"></textarea>
           <div style="display:flex; gap:0.4rem; margin-top:0.3rem;">
@@ -886,22 +806,16 @@
             <span id="pipeline-validate-status" style="font-size:0.72rem; color:var(--muted); align-self:center;"></span>
           </div>
         </div>
-
-        <!-- Available tools -->
         <div id="pipeline-tools-list" style="display:none; margin-top:0.4rem;">
           <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.2rem;">Available tools:</div>
           <div id="pipeline-tools-tags" style="display:flex; flex-wrap:wrap; gap:0.2rem;"></div>
         </div>
-
-        <!-- Database schema -->
         <div id="pipeline-schema" style="display:none; margin-top:0.4rem;">
           <div class="collapsible-header" onclick="toggleCollapsible(this)" style="font-size:0.72rem; color:var(--muted);"><span class="arrow">&#9654;</span> Database schema</div>
           <div class="collapsible-body">
             <pre id="pipeline-schema-content" style="font-size:0.7rem; color:var(--muted); background:var(--bg); padding:0.4rem; border-radius:4px; max-height:200px; overflow-y:auto; margin:0;"></pre>
           </div>
         </div>
-
-        <!-- Preview -->
         <div id="pipeline-preview" style="display:none; margin-top:0.4rem;">
           <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.2rem;">Pipeline steps:</div>
           <div id="pipeline-preview-steps"></div>
@@ -909,13 +823,90 @@
       </div>
 
       <div class="card-actions" style="margin-top:0.5rem;">
-        <button class="btn-secondary" onclick="submitCreateSession()" style="background:var(--accent); color:#fff; border-color:var(--accent);">Create Session</button>
-        <button class="btn-secondary" onclick="runPipelineNow()" style="font-size:0.78rem;" id="btn-run-pipeline" title="Create session and run the pipeline immediately">Run Pipeline</button>
+        <button class="btn-secondary" onclick="submitCreateSession()" style="background:var(--accent); color:#fff; border-color:var(--accent);">Create Agent</button>
+        <button class="btn-secondary" onclick="runPipelineNow()" style="font-size:0.78rem;" id="btn-run-pipeline" title="Create agent and run the pipeline immediately">Run Pipeline</button>
       </div>
     </div>
 
-    <div style="margin-bottom:0.5rem;">
-      <button class="btn-secondary" onclick="document.getElementById('create-session-form').style.display='block'">+ New Session</button>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Agents</h3>
+    <div class="card-grid" id="agents-grid"></div>
+  </div>
+
+  <!-- Skills -->
+  <div class="section" id="sec-skills">
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        Create a Skill
+        <button class="btn-secondary" onclick="openSkillModal()">+ New Skill (Manual)</button>
+      </h3>
+      <textarea id="skill-builder-input" placeholder="Describe the skill (capability) in plain English...&#10;&#10;Example: A web search skill with a search tool and a page fetcher tool"></textarea>
+      <div class="builder-actions">
+        <button class="btn-primary" id="btn-create-skill-nl">Create from Description</button>
+        <span class="builder-status" id="skill-builder-status"></span>
+      </div>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Skills</h3>
+    <div class="card-grid" id="skills-grid"></div>
+  </div>
+
+  <!-- Costs -->
+  <div class="section" id="sec-costs">
+    <div class="sys-grid" id="cost-totals"></div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Budgets</h3>
+    <div id="budgets-list"></div>
+    <div class="budget-form" id="budget-form">
+      <input type="text" name="name" placeholder="global or agent name">
+      <input type="number" name="dollars" placeholder="$ limit" step="0.01" min="0">
+      <select name="period">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly" selected>Monthly</option>
+        <option value="total">Total</option>
+      </select>
+      <label class="toggle" id="hard-stop-toggle">
+        <div class="toggle-track red" id="hard-stop-track"><div class="toggle-thumb"></div></div>
+        <span class="toggle-label" id="hard-stop-label">Hard stop</span>
+      </label>
+      <button type="button" id="btn-set-budget">Set Budget</button>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Cost by Agent</h3>
+    <div id="cost-by-agent"></div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Last 24 Hours</h3>
+    <div id="cost-hourly"></div>
+  </div>
+
+  <!-- Policies -->
+  <div class="section" id="sec-policies">
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        Policies
+        <button class="btn-secondary" onclick="openPolicyModal()">+ New Policy</button>
+      </h3>
+      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
+        Policies are granular supervision rules. Each policy controls specific aspects of agent behavior.
+        Assign multiple policies to an agent &mdash; they merge in order (later policies override earlier ones for overlapping fields).
+      </p>
+    </div>
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Policies</h3>
+    <div class="card-grid" id="policy-grid"></div>
+  </div>
+
+  <!-- Sessions (live from REST API) -->
+  <div class="section" id="sec-sessions">
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        Live Sessions
+        <span>
+          <input class="form-input" id="sessions-api-url" placeholder="http://localhost:8000" value="http://localhost:8000" style="width:180px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;">
+          <input class="form-input" id="sessions-api-key" placeholder="API key (optional)" value="" style="width:150px; display:inline-block; font-size:0.78rem; margin-right:0.4rem;" type="password">
+          <button class="btn-secondary" onclick="fetchSessions()">Refresh</button>
+        </span>
+      </h3>
+      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
+        Live agent sessions from the Clawboss control plane. Start the server with
+        <code>uvicorn clawboss.server:app</code> then refresh.
+        If you set <code>CLAWBOSS_API_KEY</code>, enter the same key above.
+      </p>
     </div>
     <div id="sessions-status" style="font-size:0.82rem; color:var(--muted); margin-bottom:0.5rem;"></div>
     <div class="card-grid" id="sessions-grid"></div>
