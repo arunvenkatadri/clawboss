@@ -87,6 +87,11 @@ class Supervisor:
         self._pre_guardrails: List[Any] = pre_guardrails or []
         self._post_guardrails: List[Any] = post_guardrails or []
         self._recent_calls: List[Dict[str, Any]] = []
+        self._last_call_meta: Dict[str, Any] = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "model": "",
+        }
         self._start_time = time.monotonic()
         self._last_activity = time.monotonic()
         self._paused = False
@@ -487,10 +492,34 @@ class Supervisor:
                     )
                     output = cleaned
 
-        # Record token usage if output includes it
+        # Record token usage if output includes it.
+        # Protocol: tool outputs can include {"tokens_used": N} for legacy
+        # single-value budgeting, or {"input_tokens": N, "output_tokens": M,
+        # "model": "..."} for full cost attribution.
         tokens = 0
-        if isinstance(output, dict) and "tokens_used" in output:
-            tokens = output["tokens_used"]
+        call_input_tokens = 0
+        call_output_tokens = 0
+        call_model = ""
+        if isinstance(output, dict):
+            if "tokens_used" in output:
+                tokens = output["tokens_used"]
+            if "input_tokens" in output:
+                call_input_tokens = output.get("input_tokens", 0) or 0
+            if "output_tokens" in output:
+                call_output_tokens = output.get("output_tokens", 0) or 0
+            if "model" in output:
+                call_model = output.get("model", "") or ""
+            # If both input/output are provided but tokens_used isn't, compute it
+            if tokens == 0 and (call_input_tokens or call_output_tokens):
+                tokens = call_input_tokens + call_output_tokens
+
+        # Stash call-level metadata for _observe_call
+        self._last_call_meta = {
+            "input_tokens": call_input_tokens,
+            "output_tokens": call_output_tokens,
+            "model": call_model,
+        }
+
         if tokens > 0:
             try:
                 self._budget.record_tokens(tokens)
@@ -795,14 +824,20 @@ class Supervisor:
         """Record a tool call with the observer if configured."""
         if self._observer is None or result.tool_name is None:
             return
+        meta = self._last_call_meta
         self._observer.record_tool_call(
             tool_name=result.tool_name,
             duration_ms=result.duration_ms,
             succeeded=result.succeeded,
-            tokens=result.budget.tokens_used if result.budget else 0,
             session_id=self._session_id or "",
+            agent_id=self._agent_id or "",
             error_kind=result.error.kind if result.error else "",
+            input_tokens=meta.get("input_tokens", 0),
+            output_tokens=meta.get("output_tokens", 0),
+            model=meta.get("model", ""),
         )
+        # Clear for next call
+        self._last_call_meta = {"input_tokens": 0, "output_tokens": 0, "model": ""}
 
     def _auto_checkpoint(self) -> None:
         """Save a checkpoint if a store is configured.

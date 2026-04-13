@@ -110,7 +110,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Confirmation gates** | Dangerous tools running without human approval |
 | **Audit log** | Not knowing what your agent did |
 | **Privacy shielding** | PII leaking through tool calls to LLMs or APIs |
-| **Observability** | No visibility into tool latency, error rates, cost |
+| **Observability + cost attribution** | No visibility into tool latency, error rates, or real dollar cost per agent/session/model |
 | **Context compression** | Agent forgetting its instructions mid-conversation |
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
@@ -1220,37 +1220,51 @@ Parses a POML document with `<pipeline>` tags into a Pipeline object.
 - `stopped_at` — step name where pipeline stopped (on failure)
 - `error` — error description (on failure)
 
-## Observability
+## Observability and cost attribution
 
-Structured telemetry for agent behavior — latency, success rates, token cost per tool, per session. Optional OpenTelemetry export for Datadog, Grafana, Honeycomb, etc.
-
-```python
-from clawboss import Observer
-
-# Standalone
-obs = Observer()
-obs.record_tool_call("web_search", duration_ms=120, succeeded=True, tokens=500)
-print(obs.tool_summary("web_search"))
-# {"calls": 1, "successes": 1, "avg_latency_ms": 120.0, ...}
-```
-
-When using `SessionManager`, the observer is wired in automatically — every tool call is recorded:
+Structured telemetry for agent behavior — latency, success rates, token counts, **dollar cost**, per tool, per session, per agent, per model. Optional OpenTelemetry export for Datadog, Grafana, Honeycomb, etc.
 
 ```python
-mgr = SessionManager(store)
-sid = mgr.start("agent-1", policy_dict)
-sv = mgr.get_supervisor(sid)
-await sv.call("search", search_fn, query="test")
+from clawboss import Observer, PricingTable
 
-# Per-tool metrics
-mgr.observer.tool_summary("search")
+# PricingTable.default() ships with common models
+obs = Observer(pricing=PricingTable.default())
 
-# Per-session metrics
-mgr.observer.session_summary(sid)
-
-# Recent call log
-mgr.observer.recent_calls(limit=50)
+obs.record_tool_call(
+    "llm_call",
+    duration_ms=120,
+    input_tokens=1000,
+    output_tokens=500,
+    model="claude-sonnet-4-6",
+)
+print(obs.tool_summary("llm_call"))
+# {"calls": 1, "total_cost_usd": 0.0105, ...}
 ```
+
+When using `SessionManager`, the observer is wired in automatically with default pricing — every tool call is recorded. Tools that report `{"input_tokens": N, "output_tokens": M, "model": "..."}` in their output get real dollar attribution:
+
+```python
+mgr = SessionManager(store)  # defaults to PricingTable.default()
+
+async def llm_call(prompt: str) -> dict:
+    # Your LLM wrapper
+    response = await client.chat(...)
+    return {
+        "result": response.text,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
+        "model": "claude-sonnet-4-6",
+    }
+
+# Cost attribution just works
+await sv.call("llm_call", llm_call, prompt="...")
+mgr.observer.cost_summary()
+# {"total_cost_usd": 0.0105, "by_agent": [...], "by_model": [...]}
+```
+
+Built-in pricing for Anthropic (Claude Opus/Sonnet/Haiku), OpenAI (GPT-4o, GPT-4o-mini, GPT-4 Turbo), and Google (Gemini Pro/Flash). Add your own via `pricing.set_model("my-model", 1.0, 2.0)`.
+
+The dashboard **Costs tab** reads from this data live — real spend by agent, session, tool, and model, updated as your agents run.
 
 REST endpoints:
 
@@ -1259,6 +1273,8 @@ REST endpoints:
 | GET | `/metrics/tools` | Aggregated metrics for all tools |
 | GET | `/metrics/sessions/{id}` | Metrics for a specific session |
 | GET | `/metrics/recent` | Recent tool call log |
+| GET | `/metrics/costs` | Full cost breakdown (by agent, session, tool, model) |
+| GET | `/metrics/pricing` | Current pricing table |
 
 OpenTelemetry export (optional — requires `opentelemetry-sdk`):
 

@@ -172,7 +172,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.90.0",
+        version="0.91.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -335,6 +335,19 @@ def create_app(
     @app.get("/metrics/recent")
     def get_recent_calls(limit: int = 50, _=Depends(auth)):
         return manager.observer.recent_calls(limit=min(limit, 200))
+
+    @app.get("/metrics/costs")
+    def get_cost_summary(_=Depends(auth)):
+        """Total cost breakdown by agent, session, tool, and model."""
+        return manager.observer.cost_summary()
+
+    @app.get("/metrics/pricing")
+    def get_pricing(_=Depends(auth)):
+        """Current pricing table used for cost attribution."""
+        pricing = manager.observer.pricing
+        if pricing is None:
+            return {"configured": False, "models": {}}
+        return {"configured": True, **pricing.to_dict()}
 
     # ------------------------------------------------------------------
     # Pipeline endpoints

@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.90.0"
+__version__ = "0.91.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -46,7 +46,7 @@ from .guardrails import (
     SemanticPiiRedactor,
     UrlGuard,
 )
-from .observe import Observer, ToolCallRecord, ToolMetrics
+from .observe import ModelPricing, Observer, PricingTable, ToolCallRecord, ToolMetrics
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
 from .pipeline import Pipeline, PipelineResult
 from .pipeline_poml import PipelineBuilder, parse_pipeline_poml
@@ -119,6 +119,8 @@ __all__ = [
     "Observer",
     "ToolCallRecord",
     "ToolMetrics",
+    "PricingTable",
+    "ModelPricing",
     "Pipeline",
     "PipelineResult",
     "PipelineBuilder",

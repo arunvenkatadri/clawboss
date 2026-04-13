@@ -1828,17 +1828,74 @@ function renderSkills() {
 }
 
 function renderCosts() {
-  const costs = DEMO_COSTS;
+  // Try to fetch real cost data from the REST API; fall back to demo data.
+  var base = getSessionsApiBase();
+  var headers = getSessionsAuthHeaders();
+  fetch(base + '/metrics/costs', { headers: headers })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(live) {
+      if (live && live.total_calls > 0) {
+        renderCostsFromLive(live);
+      } else {
+        renderCostsFromDemo(DEMO_COSTS);
+      }
+    })
+    .catch(function() { renderCostsFromDemo(DEMO_COSTS); });
+}
+
+function renderCostsFromLive(costs) {
   document.getElementById('cost-totals').innerHTML =
-    sysCard('$' + costs.total_cost_usd.toFixed(4), 'This Month') +
+    sysCard('$' + (costs.total_cost_usd || 0).toFixed(4), 'Total Cost') +
+    sysCard((costs.total_tokens || 0).toLocaleString(), 'Tokens') +
+    sysCard((costs.total_input_tokens || 0).toLocaleString(), 'Input') +
+    sysCard((costs.total_output_tokens || 0).toLocaleString(), 'Output') +
+    sysCard(costs.total_calls || 0, 'API Calls');
+
+  // No budgets from live data — leave the existing budgets section alone or clear it
+  document.getElementById('budgets-list').innerHTML =
+    '<div class="card"><div class="card-desc">Budgets are enforced per-session via Policy.token_budget. Live cost tracking above reflects actual spend.</div></div>';
+
+  // By agent
+  if (costs.by_agent && costs.by_agent.length) {
+    var html = '<div class="card"><table class="cost-table"><thead><tr><th>Agent</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
+    costs.by_agent.forEach(function(r) {
+      html += '<tr><td>' + esc(r.agent) + '</td><td>' + r.calls + '</td><td>' + (r.tokens || 0).toLocaleString() + '</td><td class="money">$' + (r.cost || 0).toFixed(6) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('cost-by-agent').innerHTML = html;
+  } else {
+    document.getElementById('cost-by-agent').innerHTML =
+      '<div class="card"><div class="card-desc">No tool calls yet — create a session and run a pipeline.</div></div>';
+  }
+
+  // By model (new section, show in hourly area)
+  var hourlyEl = document.getElementById('cost-hourly');
+  if (costs.by_model && costs.by_model.length) {
+    var html2 = '<div class="card"><table class="cost-table"><thead><tr><th>Model</th><th>Calls</th><th>Input</th><th>Output</th><th class="money">Cost</th></tr></thead><tbody>';
+    costs.by_model.forEach(function(m) {
+      html2 += '<tr><td>' + esc(m.model) + '</td><td>' + m.calls + '</td>';
+      html2 += '<td>' + (m.input_tokens || 0).toLocaleString() + '</td>';
+      html2 += '<td>' + (m.output_tokens || 0).toLocaleString() + '</td>';
+      html2 += '<td class="money">$' + (m.cost || 0).toFixed(6) + '</td></tr>';
+    });
+    html2 += '</tbody></table></div>';
+    hourlyEl.innerHTML = html2;
+  } else {
+    hourlyEl.innerHTML = '<div class="card"><div class="card-desc">Breakdown by model appears once tools report which model they used (output.model field).</div></div>';
+  }
+}
+
+function renderCostsFromDemo(costs) {
+  document.getElementById('cost-totals').innerHTML =
+    sysCard('$' + costs.total_cost_usd.toFixed(4), 'This Month (demo)') +
     sysCard(costs.total_tokens.toLocaleString(), 'Tokens') +
     sysCard(costs.total_calls, 'API Calls');
 
   if (costs.budgets.length) {
-    let html = '<div class="card-grid">';
-    costs.budgets.forEach(b => {
-      const pct = b.percent_used;
-      const cls = pct > 90 ? 'over' : pct > 70 ? 'warn' : 'ok';
+    var html = '<div class="card-grid">';
+    costs.budgets.forEach(function(b) {
+      var pct = b.percent_used;
+      var cls = pct > 90 ? 'over' : pct > 70 ? 'warn' : 'ok';
       html += '<div class="card">';
       html += '<div class="card-header"><span class="card-title">' + esc(b.name) + '</span><span>';
       if (b.hard_stop) html += '<span class="badge badge-red">hard stop</span> ';
@@ -1855,24 +1912,24 @@ function renderCosts() {
   }
 
   if (costs.by_agent.length) {
-    let html = '<div class="card"><table class="cost-table"><thead><tr><th>Agent</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
-    costs.by_agent.forEach(r => {
-      html += '<tr><td>' + esc(r.agent) + '</td><td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td><td class="money">$' + r.cost.toFixed(4) + '</td></tr>';
+    var html3 = '<div class="card"><table class="cost-table"><thead><tr><th>Agent</th><th>Calls</th><th>Tokens</th><th class="money">Cost</th></tr></thead><tbody>';
+    costs.by_agent.forEach(function(r) {
+      html3 += '<tr><td>' + esc(r.agent) + '</td><td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td><td class="money">$' + r.cost.toFixed(4) + '</td></tr>';
     });
-    html += '</tbody></table></div>';
-    document.getElementById('cost-by-agent').innerHTML = html;
+    html3 += '</tbody></table></div>';
+    document.getElementById('cost-by-agent').innerHTML = html3;
   }
 
   if (costs.hourly_24h.length) {
-    const maxCost = Math.max(...costs.hourly_24h.map(h => h.cost), 0.0001);
-    let html = '<div class="card"><div class="hourly-chart">';
-    costs.hourly_24h.forEach(h => {
-      const pct = Math.max(2, (h.cost / maxCost) * 100);
-      const hour = h.hour ? h.hour.slice(11, 16) : '';
-      html += '<div class="hourly-bar" style="height:' + pct + '%" data-label="' + hour + ': $' + h.cost.toFixed(4) + ' (' + h.calls + ' calls)"></div>';
+    var maxCost = Math.max.apply(null, costs.hourly_24h.map(function(h) { return h.cost; }).concat([0.0001]));
+    var html4 = '<div class="card"><div class="hourly-chart">';
+    costs.hourly_24h.forEach(function(h) {
+      var pct = Math.max(2, (h.cost / maxCost) * 100);
+      var hour = h.hour ? h.hour.slice(11, 16) : '';
+      html4 += '<div class="hourly-bar" style="height:' + pct + '%" data-label="' + hour + ': $' + h.cost.toFixed(4) + ' (' + h.calls + ' calls)"></div>';
     });
-    html += '</div></div>';
-    document.getElementById('cost-hourly').innerHTML = html;
+    html4 += '</div></div>';
+    document.getElementById('cost-hourly').innerHTML = html4;
   }
 }
 
