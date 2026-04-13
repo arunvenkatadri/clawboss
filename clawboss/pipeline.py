@@ -123,6 +123,26 @@ class Pipeline:
         self._payload = payload
         self._stateless = stateless
         self._nodes: List[PipelineNode] = []
+        self._reuse_session_id: Optional[str] = None
+
+    def with_context(self, session_id: str) -> "Pipeline":
+        """Attach this pipeline to an existing session.
+
+        Instead of starting a new session on run(), the pipeline reuses
+        the given session. The previous payload is loaded as context and
+        the new payload is merged into it after each run.
+
+        Use this for stateful agents that accumulate history — e.g.,
+        a streaming agent that sees the last N messages plus the current one.
+
+        Args:
+            session_id: Existing session to reuse.
+
+        Returns:
+            self, for chaining.
+        """
+        self._reuse_session_id = session_id
+        return self
 
     def add_step(
         self,
@@ -266,29 +286,148 @@ class Pipeline:
             else_kwargs=below_kwargs,
         )
 
-    async def run(self) -> PipelineResult:
+    def add_llm_decision(
+        self,
+        llm: Callable[[str], Coroutine[Any, Any, str]],
+        prompt_template: str,
+        name: str = "llm_decision",
+        output_schema: Optional[Dict[str, Any]] = None,
+        include_context: bool = False,
+    ) -> "Pipeline":
+        """Add an LLM-backed decision step.
+
+        The LLM reads the previous step's output (and optionally the
+        session payload for context) and returns a structured decision
+        as JSON. The pipeline then routes on the decision.
+
+        Example:
+            pipeline.add_step("fetch", fetch_fn)
+            pipeline.add_llm_decision(
+                my_llm,
+                prompt_template=\"\"\"
+                You are a fraud detector. Given this transaction:
+                {input}
+
+                Historical context: {context}
+
+                Return JSON: {{"action": "block|approve|escalate", "reason": "..."}}
+                \"\"\",
+                include_context=True,
+            )
+            pipeline.add_condition(
+                lambda out: out["action"] == "block",
+                then_step=("block", block_fn),
+                else_step=("approve", approve_fn),
+            )
+
+        Args:
+            llm: Async callable — your LLM (same pattern as SkillBuilder).
+            prompt_template: String with {input} and optionally {context} placeholders.
+            name: Name for this step.
+            output_schema: Optional JSON schema hint for the LLM.
+            include_context: If True, pass the session payload as {context}.
+
+        Returns:
+            self, for chaining.
+        """
+
+        async def llm_step(input: Any = None, _context: Any = None) -> Dict[str, Any]:
+            """Call the LLM with the templated prompt and parse JSON output."""
+            import json as _json
+
+            input_str = _json.dumps(input, default=str) if input is not None else ""
+            context_str = _json.dumps(_context, default=str) if _context is not None else "{}"
+
+            prompt = prompt_template.replace("{input}", input_str).replace("{context}", context_str)
+            if output_schema:
+                schema_json = _json.dumps(output_schema)
+                prompt += f"\n\nRespond with ONLY JSON matching: {schema_json}"
+
+            raw = await llm(prompt)
+
+            # Strip markdown fences if present
+            text = raw.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                text = text.strip()
+                if text.startswith("json\n"):
+                    text = text[5:]
+
+            try:
+                result: Dict[str, Any] = _json.loads(text)
+                return result
+            except (ValueError, _json.JSONDecodeError):
+                return {"raw": raw, "error": "Failed to parse JSON"}
+
+        # Mark the step so Pipeline.run() knows to inject context
+        step = Step(
+            name=name,
+            tool_name=name,
+            fn=llm_step,
+            kwargs={},
+            chain_input=True,
+            input_key="input",
+        )
+        step.__dict__["_include_context"] = include_context
+        self._nodes.append(step)
+        return self
+
+    async def run(
+        self,
+        initial_input: Optional[Any] = None,
+    ) -> PipelineResult:
         """Execute the pipeline — steps and conditions in sequence.
 
         Returns:
             PipelineResult with all step results and the final output.
         """
-        sid = self._manager.start(
-            self._agent_id,
-            self._policy_dict,
-            self._payload,
-            stateless=self._stateless,
-        )
-        sv = self._manager.get_supervisor(sid)
-        if sv is None:
-            return PipelineResult(session_id=sid, error="Failed to create supervisor")
+        # Reuse an existing session if with_context() was called
+        if self._reuse_session_id:
+            sid = self._reuse_session_id
+            sv = self._manager.get_supervisor(sid)
+            if sv is None:
+                # Session not in memory — try to resume it
+                try:
+                    sv = self._manager.resume(sid)
+                except Exception as e:
+                    return PipelineResult(
+                        session_id=sid, error=f"Failed to resume context session: {e}"
+                    )
+        else:
+            sid = self._manager.start(
+                self._agent_id,
+                self._policy_dict,
+                self._payload,
+                stateless=self._stateless,
+            )
+            sv = self._manager.get_supervisor(sid)
+            if sv is None:
+                return PipelineResult(session_id=sid, error="Failed to create supervisor")
 
         pipeline_result = PipelineResult(session_id=sid)
-        previous_output: Any = None
+        # Initial input for the first step (from stream payload or explicit param)
+        previous_output: Any = initial_input
+
+        # Load session context if any step needs it
+        session_context = None
+        needs_context = any(
+            isinstance(n, Step) and n.__dict__.get("_include_context", False) for n in self._nodes
+        )
+        if needs_context:
+            cp = self._manager.status(sid)
+            session_context = cp.payload if cp else {}
 
         for i, node in enumerate(self._nodes):
             sv.record_iteration()
 
             if isinstance(node, Step):
+                # Inject context for LLM decision steps
+                if node.__dict__.get("_include_context", False):
+                    node.kwargs = dict(node.kwargs)
+                    node.kwargs["_context"] = session_context
+
                 result, step_result = await self._run_step(sv, node, previous_output, i)
                 pipeline_result.steps.append(step_result)
 
@@ -337,17 +476,35 @@ class Pipeline:
 
                 previous_output = result.output
 
-            # Update payload with progress
-            self._manager.update_payload(
-                sid,
-                {
-                    "pipeline_step": i,
-                    "pipeline_total_steps": len(self._nodes),
-                },
-            )
+            # Update payload with progress (preserve existing payload)
+            existing_cp = self._manager.status(sid)
+            existing_payload = existing_cp.payload if existing_cp else {}
+            merged = dict(existing_payload)
+            merged["pipeline_step"] = i
+            merged["pipeline_total_steps"] = len(self._nodes)
+            self._manager.update_payload(sid, merged)
 
         pipeline_result.completed = True
-        self._manager.stop(sid)
+        # If running with context, keep the session alive for future runs
+        if not self._reuse_session_id:
+            self._manager.stop(sid)
+        else:
+            # Accumulate the output into the session payload for next run
+            cp = self._manager.status(sid)
+            if cp:
+                merged_payload = dict(cp.payload)
+                history = merged_payload.get("history", [])
+                if not isinstance(history, list):
+                    history = []
+                history.append(
+                    {
+                        "input": initial_input,
+                        "output": pipeline_result.final_output,
+                    }
+                )
+                # Keep only last 20 runs to bound payload size
+                merged_payload["history"] = history[-20:]
+                self._manager.update_payload(sid, merged_payload)
         return pipeline_result
 
     async def _run_step(

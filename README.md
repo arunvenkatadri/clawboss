@@ -355,6 +355,62 @@ pipeline = await builder.create("Show me total revenue by region")
 
 The REST endpoint `GET /pipelines/schema` returns the schema for all registered connectors. The dashboard shows it in the pipeline editor.
 
+## LLM decisions (agents that actually decide)
+
+Rule-based threshold routing is fine for known conditions. For agents that need to *interpret* input and decide what to do, use `add_llm_decision()` — a pipeline step that calls your LLM with a prompt template, parses structured JSON output, and feeds it to the next step for routing.
+
+```python
+pipeline = (
+    Pipeline(mgr, "fraud-detector", policy)
+    .add_step("enrich", enrich_fn)
+    .add_llm_decision(
+        my_llm,
+        prompt_template="""
+        Transaction: {input}
+        Historical context: {context}
+
+        Decide the action. Return JSON:
+        {"action": "block|approve|escalate", "reason": "..."}
+        """,
+        include_context=True,  # passes session payload as {context}
+    )
+    .add_condition(
+        lambda out: out["action"] == "block",
+        then_step=("block", block_fn),
+        else_step=("approve", approve_fn),
+    )
+)
+
+await pipeline.run(initial_input=stream_message)
+```
+
+The LLM sees the previous step's output as `{input}` and (optionally) the session payload as `{context}`. It returns structured JSON, which the pipeline routes on. Bring your own LLM — same pattern as `SkillBuilder`.
+
+## Stateful context with with_context()
+
+Stream agents that need to see history — the last N messages, running averages, user state — can reuse a single session across multiple pipeline runs. The session payload accumulates automatically.
+
+```python
+# Start a long-lived session
+sid = mgr.start("stream-agent", policy)
+
+# Each stream message runs through the pipeline with shared context
+async def on_message(msg):
+    return await (
+        Pipeline(mgr, "stream-agent", policy)
+        .with_context(sid)          # reuse session, don't auto-stop
+        .add_step("enrich", enrich_fn)
+        .add_llm_decision(my_llm, prompt, include_context=True)
+        .add_condition(...)
+        .run(initial_input=msg)     # stream message flows into first step
+    )
+
+kafka = KafkaStreamConnector(..., on_message=on_message)
+await kafka.start()
+```
+
+The pipeline keeps a rolling history (last 20 runs) in `session.payload["history"]`, visible to LLM decision steps via `{context}`. Each message's decision builds on the accumulated state.
+
 ## Streaming inputs
 
 Subscribe agents to real-time event streams. Each message fires the agent pipeline with the message payload as input.
@@ -1011,7 +1067,9 @@ Implementations: `SqliteStore(db_path)`, `MemoryStore()`
 - `add_step(tool_name, fn, **kwargs)` — add a step (returns self for chaining)
 - `add_condition(predicate, then_step, else_step)` — conditional branch
 - `add_threshold(key, threshold, above_step, below_step)` — threshold branch
-- `run()` — execute all steps, returns `PipelineResult`
+- `add_llm_decision(llm, prompt_template, include_context=False)` — LLM-backed decision step that returns structured JSON
+- `with_context(session_id)` — reuse an existing session for stateful multi-run agents
+- `run(initial_input=None)` — execute the pipeline, optionally seeded with an initial input (e.g., a stream message)
 
 ### `PipelineBuilder(llm, tools, manager, db_schema=None)`
 
