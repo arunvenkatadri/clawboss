@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.86.0"
+__version__ = "0.87.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -42,6 +42,12 @@ from .store import (
     SqliteStore,
     StateStore,
     validate_payload,
+)
+from .streams import (
+    KafkaStreamConnector,
+    KinesisStreamConnector,
+    RedisStreamConnector,
+    StreamConnector,
 )
 from .supervisor import SupervisedResult, Supervisor
 from .triggers import DbWatchEntry, Scheduler, WebhookTrigger
@@ -101,4 +107,8 @@ __all__ = [
     "Scheduler",
     "WebhookTrigger",
     "DbWatchEntry",
+    "StreamConnector",
+    "KafkaStreamConnector",
+    "KinesisStreamConnector",
+    "RedisStreamConnector",
 ]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clawboss"
-version = "0.86.0"
+version = "0.87.0"
 description = "A way of controlling deployed agents to keep your (and their) sanity."
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,6 +28,10 @@ dependencies = []
 
 [project.optional-dependencies]
 server = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "aiosqlite>=0.19"]
+kafka = ["aiokafka>=0.10"]
+kinesis = ["aioboto3>=12.0"]
+redis = ["redis>=5.0"]
+streams = ["aiokafka>=0.10", "aioboto3>=12.0", "redis>=5.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "mypy>=1.0", "ruff>=0.4", "httpx>=0.25"]
 
 [project.urls]

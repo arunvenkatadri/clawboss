@@ -113,6 +113,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
 | **Crash loop protection** | Agent keeps crashing and restarting forever |
+| **Streaming inputs** | No way to react to real-time events (Kafka/Kinesis/Redis) |
 | **Triggers & scheduling** | No way to run agents on schedule or on data events |
 | **Pipeline orchestration** | No structured way to chain tool calls |
 | **REST control plane** | No way to pause/resume/stop agents remotely |
@@ -353,6 +354,38 @@ pipeline = await builder.create("Show me total revenue by region")
 ```
 
 The REST endpoint `GET /pipelines/schema` returns the schema for all registered connectors. The dashboard shows it in the pipeline editor.
+
+## Streaming inputs
+
+Subscribe agents to real-time event streams. Each message fires the agent pipeline with the message payload as input.
+
+```python
+from clawboss import KafkaStreamConnector
+
+async def on_message(payload):
+    # Run pipeline with the message as input
+    return await pipeline.run()
+
+kafka = KafkaStreamConnector(
+    bootstrap_servers="localhost:9092",
+    topic="agent-events",
+    group_id="my-agent",
+    on_message=on_message,
+)
+await kafka.start()
+```
+
+Three streaming backends — install only what you need:
+
+| Connector | Install | Use for |
+|-----------|---------|---------|
+| `KafkaStreamConnector` | `pip install clawboss[kafka]` | Self-hosted, enterprise, replay, consumer groups |
+| `KinesisStreamConnector` | `pip install clawboss[kinesis]` | AWS-native event streams |
+| `RedisStreamConnector` | `pip install clawboss[redis]` | Simpler deployments, already-have-Redis |
+
+Or install all three: `pip install clawboss[streams]`
+
+All three use at-least-once delivery — messages are acknowledged only after the handler completes successfully. If the agent crashes mid-processing, the message is redelivered.
 
 ## Triggers and scheduling
 
