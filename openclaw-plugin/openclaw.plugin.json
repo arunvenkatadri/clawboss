@@ -1,7 +1,7 @@
 {
   "id": "clawboss-bridge",
   "name": "Clawboss Supervised Tools",
-  "version": "0.89.0",
+  "version": "0.90.0",
   "description": "Connects OpenClaw to clawboss-supervised Python tools via HTTP bridge",
   "entry": "dist/index.js",
   "configSchema": {

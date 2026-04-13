@@ -16,6 +16,8 @@
 
 Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
+> **Clawboss is built for long-duration agents** — agents that run for hours or days, not minutes. Read [the manifesto](docs/manifesto.md) for the full vision.
+
 ## Why
 
 You deploy an agent. It calls a flaky API in a loop. 47 times. At $0.03 per call. At 3am. Nobody's watching.
@@ -114,6 +116,8 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Durable sessions** | Agent dies mid-task, loses all progress |
 | **Crash loop protection** | Agent keeps crashing and restarting forever |
 | **16 guardrails** | No layered safety — rule-based + LLM-backed checks for every tool call |
+| **Reflection loops** | Agents looping without thinking about whether they're making progress |
+| **Session replay** | No way to reconstruct what an agent did after the fact |
 | **Streaming inputs** | No way to react to real-time events (Kafka/Kinesis/Redis) |
 | **Triggers & scheduling** | No way to run agents on schedule or on data events |
 | **Pipeline orchestration** | No structured way to chain tool calls |
@@ -355,6 +359,59 @@ pipeline = await builder.create("Show me total revenue by region")
 ```
 
 The REST endpoint `GET /pipelines/schema` returns the schema for all registered connectors. The dashboard shows it in the pipeline editor.
+
+## Reflection loops (agents that actually think)
+
+Long-duration agents don't just loop `run()` forever. They think → act → observe → reflect → think again. Each phase is its own LLM call, each phase is audited, and the reflection output feeds into the next think phase.
+
+```python
+from clawboss import ReflectionLoop, SessionManager, MemoryStore
+
+mgr = SessionManager(MemoryStore())
+
+loop = ReflectionLoop(
+    manager=mgr,
+    agent_id="research-agent",
+    goal="Write a report on quantum computing in 2026",
+    llm=my_llm,
+    tools={"search": search_fn, "take_notes": notes_fn, "write": write_fn},
+)
+
+result = await loop.run(max_cycles=20)
+print(result.final_answer)
+print(result.cycles_used)
+for c in result.cycles:
+    print(f"  {c.thought} → {c.tool_called} → {c.reflection}")
+```
+
+Each cycle is fully supervised. Guardrails apply. Crashes are recoverable. Every reflection is in the audit log. This is what distinguishes "agent ran for 72 hours doing useful work" from "agent ran in circles for 72 hours."
+
+See `examples/long_running_agent.py` for a full reference implementation.
+
+## Session replay
+
+Every session's audit log is a complete record of what the agent did. `SessionReplay` reconstructs the timeline step by step — every tool call, every decision, every guardrail check, every state change.
+
+```python
+from clawboss import SessionReplay
+
+replay = SessionReplay(mgr, session_id)
+summary = replay.summary()
+print(f"{summary.total_tool_calls} calls over {summary.duration_ms}ms")
+print(f"Unique tools: {summary.unique_tools}")
+
+# Walk through the timeline
+for frame in replay.frames():
+    print(frame.summary)
+
+# Jump to a specific point
+state_at_cycle_10 = replay.state_at(frame_index=10)
+
+# Filter to just tool calls
+tool_frames = replay.filter(phase="tool_call", outcome="allowed")
+```
+
+Available via REST at `GET /sessions/{id}/replay`. No new storage — it's built from the audit log you already have.
 
 ## LLM decisions (agents that actually decide)
 

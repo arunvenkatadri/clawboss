@@ -172,7 +172,7 @@ def create_app(
 
     app = FastAPI(
         title="Clawboss Control Plane",
-        version="0.89.0",
+        version="0.90.0",
         description=(
             "REST API for managing agent sessions. "
             + (
@@ -303,6 +303,19 @@ def create_app(
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return manager.get_audit_entries(session_id)
+
+    @app.get("/sessions/{session_id}/replay")
+    def get_session_replay(session_id: str, _=Depends(auth)):
+        """Reconstruct a session's timeline for inspection."""
+        from .replay import SessionReplay
+
+        replay = SessionReplay(manager, session_id)
+        if not replay.exists:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {
+            "summary": replay.summary().to_dict(),
+            "frames": replay.to_timeline(),
+        }
 
     # ------------------------------------------------------------------
     # Observability endpoints

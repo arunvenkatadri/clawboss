@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.89.0"
+__version__ = "0.90.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -52,6 +52,8 @@ from .pipeline import Pipeline, PipelineResult
 from .pipeline_poml import PipelineBuilder, parse_pipeline_poml
 from .policy import Action, OnFailure, Policy, ScopeRule, ToolScope
 from .redact import Redactor
+from .reflection import ReflectionCycle, ReflectionLoop, ReflectionResult
+from .replay import ReplayFrame, ReplaySummary, SessionReplay
 from .session import SessionManager
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
 from .store import (
@@ -149,4 +151,11 @@ __all__ = [
     "GoalVerifier",
     "ExplanationRequired",
     "EnsembleDecision",
+    # Long-duration features
+    "ReflectionLoop",
+    "ReflectionCycle",
+    "ReflectionResult",
+    "SessionReplay",
+    "ReplayFrame",
+    "ReplaySummary",
 ]
