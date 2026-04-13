@@ -76,12 +76,17 @@ class Supervisor:
         agent_id: Optional[str] = None,
         approval_queue: Optional[ApprovalQueue] = None,
         observer: Optional[Observer] = None,
+        pre_guardrails: Optional[List[Any]] = None,
+        post_guardrails: Optional[List[Any]] = None,
     ):
         self._policy = policy
         self._budget = BudgetTracker.from_policy(policy)
         self._circuit_breakers: Dict[str, CircuitBreaker] = {}
         self._tool_call_times: Dict[str, List[float]] = {}
         self._audit = audit or AuditLog.noop()
+        self._pre_guardrails: List[Any] = pre_guardrails or []
+        self._post_guardrails: List[Any] = post_guardrails or []
+        self._recent_calls: List[Dict[str, Any]] = []
         self._start_time = time.monotonic()
         self._last_activity = time.monotonic()
         self._paused = False
@@ -308,6 +313,28 @@ class Supervisor:
                 tool_name=tool_name,
             )
 
+        # Pre-call guardrails
+        gr_context = self._build_guardrail_context()
+        cached_output: Any = None
+        for gr in self._pre_guardrails:
+            result = await self._run_guardrail(gr, tool_name, kwargs, None, gr_context, "pre")
+            if not result.allowed:
+                self._audit.record(
+                    AuditPhase.POLICY_CHECK,
+                    AuditOutcome.DENIED,
+                    target=tool_name,
+                    detail=f"Guardrail '{result.guardrail_name}' blocked: {result.reason}",
+                )
+                return SupervisedResult(
+                    error=ClawbossError.policy_denied(f"{result.guardrail_name}: {result.reason}"),
+                    duration_ms=int((time.monotonic() - start) * 1000),
+                    budget=self._budget.snapshot(),
+                    tool_name=tool_name,
+                )
+            # Guardrail may replace the output (e.g., idempotency cache hit)
+            if result.replacement_output is not None:
+                cached_output = result.replacement_output
+
         # Outbound PII redaction — clean args before they reach the tool
         exec_kwargs = kwargs
         if self._redactor and self._redact_direction in ("outbound", "both"):
@@ -327,6 +354,27 @@ class Supervisor:
             target=tool_name,
             metadata={"args": {k: str(v)[:100] for k, v in exec_kwargs.items()}},
         )
+
+        # If a pre-guardrail provided cached output (idempotency), skip execution
+        if cached_output is not None:
+            output = cached_output
+            duration_ms = int((time.monotonic() - start) * 1000)
+            cb.record_success()
+            self._audit.record(
+                AuditPhase.TOOL_CALL,
+                AuditOutcome.INFO,
+                target=tool_name,
+                detail=f"Returned cached result in {duration_ms}ms",
+            )
+            result = SupervisedResult(
+                output=output,
+                succeeded=True,
+                duration_ms=duration_ms,
+                budget=self._budget.snapshot(),
+                tool_name=tool_name,
+            )
+            self._observe_call(result)
+            return result
 
         try:
             output = await asyncio.wait_for(
@@ -372,6 +420,49 @@ class Supervisor:
         cb.record_success()
         duration_ms = int((time.monotonic() - start) * 1000)
         self._last_activity = time.monotonic()
+
+        # Post-call guardrails — may block, modify, or allow the output
+        for gr in self._post_guardrails:
+            result = await self._run_guardrail(
+                gr, tool_name, exec_kwargs, output, gr_context, "post"
+            )
+            if not result.allowed:
+                self._audit.record(
+                    AuditPhase.POLICY_CHECK,
+                    AuditOutcome.DENIED,
+                    target=tool_name,
+                    detail=f"Post-guardrail '{result.guardrail_name}' blocked: {result.reason}",
+                )
+                return SupervisedResult(
+                    error=ClawbossError.policy_denied(f"{result.guardrail_name}: {result.reason}"),
+                    duration_ms=duration_ms,
+                    budget=self._budget.snapshot(),
+                    tool_name=tool_name,
+                )
+            if result.replacement_output is not None:
+                output = result.replacement_output
+                self._audit.record(
+                    AuditPhase.POLICY_CHECK,
+                    AuditOutcome.INFO,
+                    target=tool_name,
+                    detail=f"Guardrail '{result.guardrail_name}' replaced output: {result.reason}",
+                )
+
+        # Track this call in recent_calls for anomaly detection
+        self._recent_calls.append(
+            {
+                "tool": tool_name,
+                "args_summary": {k: str(v)[:50] for k, v in exec_kwargs.items()},
+                "duration_ms": duration_ms,
+            }
+        )
+        if len(self._recent_calls) > 50:
+            self._recent_calls = self._recent_calls[-50:]
+
+        # Call idempotency cache recording on any pre-guardrail that supports it
+        for gr in self._pre_guardrails:
+            if hasattr(gr, "record"):
+                gr.record(tool_name, exec_kwargs, output)
 
         # Inbound PII redaction — clean output before agent sees it
         if self._redactor and self._redact_direction in ("inbound", "both"):
@@ -582,6 +673,8 @@ class Supervisor:
         policy_override: Optional[Dict[str, Any]] = None,
         approval_queue: Optional[ApprovalQueue] = None,
         observer: Optional[Observer] = None,
+        pre_guardrails: Optional[List[Any]] = None,
+        post_guardrails: Optional[List[Any]] = None,
     ) -> Supervisor:
         """Rebuild a Supervisor from a checkpoint.
 
@@ -611,6 +704,8 @@ class Supervisor:
             agent_id=checkpoint.agent_id,
             approval_queue=approval_queue,
             observer=observer,
+            pre_guardrails=pre_guardrails,
+            post_guardrails=post_guardrails,
         )
         # Restore budget counters
         if checkpoint.tokens_used > 0:
@@ -630,6 +725,71 @@ class Supervisor:
         # Restore pause state
         sv._paused = checkpoint.status == SessionStatus.PAUSED
         return sv
+
+    def _build_guardrail_context(self) -> Dict[str, Any]:
+        """Build the context dict passed to guardrails."""
+        return {
+            "session_id": self._session_id or "",
+            "agent_id": self._agent_id or "",
+            "recent_calls": list(self._recent_calls),
+            "iterations": self._budget.snapshot().iterations,
+            "tokens_used": self._budget.snapshot().tokens_used,
+        }
+
+    async def _run_guardrail(
+        self,
+        guardrail: Any,
+        tool_name: str,
+        kwargs: Dict[str, Any],
+        output: Any,
+        context: Dict[str, Any],
+        phase: str,
+    ) -> Any:
+        """Run a guardrail, handling both sync and async check methods."""
+        from .guardrails.types import GuardrailResult
+
+        try:
+            # Try async methods first
+            if hasattr(guardrail, "check_async"):
+                if phase == "pre":
+                    # Some async checks take phase, some take output
+                    import inspect
+
+                    sig = inspect.signature(guardrail.check_async)
+                    if "phase" in sig.parameters:
+                        return await guardrail.check_async(
+                            tool_name, kwargs, output, context, phase=phase
+                        )
+                    if "output" in sig.parameters:
+                        return await guardrail.check_async(tool_name, kwargs, output, context)
+                    return await guardrail.check_async(tool_name, kwargs, context)
+                else:
+                    import inspect
+
+                    sig = inspect.signature(guardrail.check_async)
+                    if "phase" in sig.parameters:
+                        return await guardrail.check_async(
+                            tool_name, kwargs, output, context, phase=phase
+                        )
+                    if "output" in sig.parameters:
+                        return await guardrail.check_async(tool_name, kwargs, output, context)
+                    return await guardrail.check_async(tool_name, kwargs, context)
+            if hasattr(guardrail, "check"):
+                # Sync check — some take output, some don't
+                import inspect
+
+                sig = inspect.signature(guardrail.check)
+                params = sig.parameters
+                if "output" in params:
+                    return guardrail.check(tool_name, kwargs, output, context)
+                return guardrail.check(tool_name, kwargs, context)
+        except Exception as e:
+            return GuardrailResult(
+                allowed=True,
+                guardrail_name=getattr(guardrail, "name", "unknown"),
+                reason=f"Guardrail error (allowing): {e}",
+            )
+        return GuardrailResult.allow(getattr(guardrail, "name", "unknown"))
 
     def _observe_call(self, result: SupervisedResult) -> None:
         """Record a tool call with the observer if configured."""

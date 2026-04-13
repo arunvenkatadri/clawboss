@@ -17,7 +17,7 @@ Usage:
         print(result.error)
 """
 
-__version__ = "0.88.0"
+__version__ = "0.89.0"
 
 from .approval import ApprovalQueue, ApprovalRequest, ApprovalStatus
 from .audit import AuditEntry, AuditLog, AuditOutcome, AuditPhase, AuditSink, JsonlAuditSink
@@ -27,6 +27,25 @@ from .circuit_breaker import CircuitBreaker, CircuitState
 from .connectors import MongoConnector, SqlConnector
 from .context import AnchoredState, CompressedContext, CompressedHistory, ContextWindow, Turn
 from .errors import ClawbossError
+from .guardrails import (
+    ActiveHours,
+    AnomalyScorer,
+    CategoryRateLimit,
+    EnsembleDecision,
+    ExplanationRequired,
+    GoalVerifier,
+    GuardrailResult,
+    IdempotencyGuard,
+    IntentDriftDetector,
+    OutputLengthLimit,
+    PromptInjectionDetector,
+    RecursionDetector,
+    ResourceQuota,
+    SafetyClassifier,
+    SchemaValidator,
+    SemanticPiiRedactor,
+    UrlGuard,
+)
 from .observe import Observer, ToolCallRecord, ToolMetrics
 from .openclaw import OpenClawBridge, to_openclaw_manifest, to_openclaw_tool_schema
 from .pipeline import Pipeline, PipelineResult
@@ -111,4 +130,23 @@ __all__ = [
     "KafkaStreamConnector",
     "KinesisStreamConnector",
     "RedisStreamConnector",
+    # Guardrails — deterministic
+    "GuardrailResult",
+    "SchemaValidator",
+    "CategoryRateLimit",
+    "RecursionDetector",
+    "IdempotencyGuard",
+    "ResourceQuota",
+    "OutputLengthLimit",
+    "UrlGuard",
+    "ActiveHours",
+    # Guardrails — LLM-based
+    "PromptInjectionDetector",
+    "SafetyClassifier",
+    "IntentDriftDetector",
+    "SemanticPiiRedactor",
+    "AnomalyScorer",
+    "GoalVerifier",
+    "ExplanationRequired",
+    "EnsembleDecision",
 ]

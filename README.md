@@ -113,6 +113,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 | **Tool scoping** | Agents calling tools with dangerous arguments |
 | **Durable sessions** | Agent dies mid-task, loses all progress |
 | **Crash loop protection** | Agent keeps crashing and restarting forever |
+| **16 guardrails** | No layered safety — rule-based + LLM-backed checks for every tool call |
 | **Streaming inputs** | No way to react to real-time events (Kafka/Kinesis/Redis) |
 | **Triggers & scheduling** | No way to run agents on schedule or on data events |
 | **Pipeline orchestration** | No structured way to chain tool calls |
@@ -773,6 +774,64 @@ class MyDatabaseSink(AuditSink):
     def write(self, entry: AuditEntry) -> None:
         db.insert(entry.to_dict())
 ```
+
+## Guardrails
+
+Clawboss ships **16 guardrails** that hook into every supervised tool call. Eight are deterministic (rule-based, fast, zero-overhead when disabled). Eight are LLM-backed (bring-your-own-LLM, opt-in).
+
+```python
+from clawboss import (
+    SessionManager, UrlGuard, SchemaValidator, RecursionDetector,
+    PromptInjectionDetector, IntentDriftDetector,
+)
+
+mgr = SessionManager(
+    store,
+    pre_guardrails=[
+        UrlGuard(allowlist=["*.mycompany.com"]),
+        RecursionDetector(max_repeats=3),
+        PromptInjectionDetector(llm=my_llm),
+        IntentDriftDetector(llm=my_llm),
+    ],
+    post_guardrails=[
+        SchemaValidator({"search": {"type": "object", "required": ["rows"]}}),
+    ],
+)
+```
+
+### Deterministic (rule-based)
+
+| Guardrail | What it does |
+|-----------|-------------|
+| `SchemaValidator` | Enforce JSON schema on tool outputs — catches broken tools, corrupted data, hallucinations |
+| `CategoryRateLimit` | Rate limit across tool categories (e.g., all "network" tools combined ≤ 100/min) |
+| `RecursionDetector` | Detect tool call loops — block if same (tool, args) repeats within a window |
+| `IdempotencyGuard` | Cache results of mutating tool calls (send_email, charge_card) to dedupe retries |
+| `ResourceQuota` | CPU time and memory caps per session |
+| `OutputLengthLimit` | Block outputs exceeding size limit — prevents context blowup attacks |
+| `UrlGuard` | Allowlist / blocklist URLs and domains for web tools |
+| `ActiveHours` | Time-of-day and day-of-week restrictions (compliance) |
+
+### LLM-backed (bring-your-own-LLM)
+
+| Guardrail | What it does |
+|-----------|-------------|
+| `PromptInjectionDetector` | Classifier for jailbreak attempts, instruction overrides, role hijacks |
+| `SafetyClassifier` | Scan outputs for toxic content, hate, harassment, bias, illegal activities |
+| `IntentDriftDetector` | Compare action to original task — flag agents that wandered off |
+| `SemanticPiiRedactor` | NLP-based PII detection (spaCy NER) — catches names, locations, orgs that regex misses |
+| `AnomalyScorer` | Score tool calls against session history — flag unusual behavior |
+| `GoalVerifier` | Before risky actions, verify alignment with stated goal |
+| `ExplanationRequired` | Force the agent to generate a written justification for risky calls (audit log) |
+| `EnsembleDecision` | Require multiple LLMs to agree before allowing critical actions |
+
+### How guardrails work
+
+- **Pre-call guardrails** run before the tool executes. Can block the call or replace the result (e.g., `IdempotencyGuard` returns cached output).
+- **Post-call guardrails** run after the tool returns. Can block the output from reaching the agent, or modify it (e.g., `SemanticPiiRedactor` replaces with redacted text).
+- All guardrails return a `GuardrailResult(allowed, reason, replacement_output)` — uniform interface.
+- LLM-backed guardrails use the same bring-your-own-LLM pattern as `SkillBuilder` and `PipelineBuilder`.
+- Everything is opt-in. No guardrails configured = zero overhead.
 
 ## Privacy shielding (PII redaction)
 

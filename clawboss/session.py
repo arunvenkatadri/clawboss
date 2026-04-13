@@ -67,7 +67,12 @@ class SessionManager:
     race conditions from concurrent pause/resume/stop calls.
     """
 
-    def __init__(self, store: StateStore):
+    def __init__(
+        self,
+        store: StateStore,
+        pre_guardrails: Optional[List[Any]] = None,
+        post_guardrails: Optional[List[Any]] = None,
+    ):
         self._store = store
         self._supervisors: Dict[str, Supervisor] = {}
         self._audit_sinks: Dict[str, MemoryAuditSink] = {}
@@ -75,6 +80,8 @@ class SessionManager:
         self._stateless_sessions: set = set()
         self._approval_queue = ApprovalQueue()
         self._observer = Observer()
+        self._pre_guardrails: List[Any] = pre_guardrails or []
+        self._post_guardrails: List[Any] = post_guardrails or []
         self._lock = threading.Lock()  # protects the dicts above
         self._session_locks: Dict[str, threading.Lock] = {}  # per-session locks
 
@@ -135,6 +142,8 @@ class SessionManager:
             agent_id=agent_id,
             approval_queue=self._approval_queue,
             observer=self._observer,
+            pre_guardrails=self._pre_guardrails,
+            post_guardrails=self._post_guardrails,
         )
 
         # Store the ORIGINAL policy — this is immutable for the session's lifetime
@@ -255,6 +264,8 @@ class SessionManager:
             policy_override=original,
             approval_queue=self._approval_queue,
             observer=self._observer,
+            pre_guardrails=self._pre_guardrails,
+            post_guardrails=self._post_guardrails,
         )
         sv.paused = False
 
