@@ -49,6 +49,8 @@ Usage:
 
 from __future__ import annotations
 
+import ast
+import operator
 import re
 import xml.etree.ElementTree as ET
 from typing import Any, Callable, Coroutine, Dict, Optional
@@ -210,23 +212,126 @@ def _make_predicate(expr: str) -> Callable[[Any], bool]:
     - "'error' in output" — containment check
     - "output == 'done'" — equality
 
-    Uses a restricted eval with no builtins for safety.
+    Uses an AST-based evaluator — no eval().
     """
+    resolved_expr = expr.strip()
+
+    try:
+        tree = ast.parse(resolved_expr, mode="eval")
+    except SyntaxError as e:
+        raise ValueError(f"Invalid condition expression: {e}") from e
+
+    _validate_ast(tree.body)
 
     def _predicate(output: Any) -> bool:
-        # Make 'output' available in the expression
-        safe_globals: Dict[str, Any] = {"__builtins__": {}}
-        safe_locals: Dict[str, Any] = {"output": output}
-
-        # Support dot notation: output.rows.0.cnt → resolve manually
-        resolved_expr = _resolve_dot_notation(expr, output)
-
+        resolved = _resolve_dot_notation(resolved_expr, output)
         try:
-            return bool(eval(resolved_expr, safe_globals, safe_locals))  # noqa: S307
+            parsed = ast.parse(resolved, mode="eval")
+            return bool(_safe_eval_node(parsed.body, {"output": output}))
         except Exception:
             return False
 
     return _predicate
+
+
+_SAFE_COMPARE_OPS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+    ast.In: lambda a, b: a in b,
+    ast.NotIn: lambda a, b: a not in b,
+}
+
+_SAFE_BOOL_OPS = {
+    ast.And: all,
+    ast.Or: any,
+}
+
+_SAFE_UNARY_OPS = {
+    ast.Not: operator.not_,
+    ast.USub: operator.neg,
+}
+
+
+def _validate_ast(node: ast.AST) -> None:
+    """Reject AST nodes that aren't part of our safe subset."""
+    allowed_nodes = (
+        ast.Expression,
+        ast.Compare,
+        ast.BoolOp,
+        ast.UnaryOp,
+        ast.Constant,
+        ast.Name,
+        ast.Attribute,
+        ast.Subscript,
+        ast.Index,
+        ast.Tuple,
+        ast.List,
+    )
+    allowed_ops = (
+        ast.And,
+        ast.Or,
+        ast.Not,
+        ast.USub,
+        ast.Eq,
+        ast.NotEq,
+        ast.Lt,
+        ast.LtE,
+        ast.Gt,
+        ast.GtE,
+        ast.In,
+        ast.NotIn,
+        ast.Is,
+        ast.IsNot,
+        ast.Load,
+    )
+    if not isinstance(node, (*allowed_nodes, *allowed_ops)):
+        raise ValueError(f"Unsupported expression node: {type(node).__name__}")
+    for child in ast.iter_child_nodes(node):
+        _validate_ast(child)
+
+
+def _safe_eval_node(node: ast.AST, env: Dict[str, Any]) -> Any:
+    """Evaluate an AST node against the safe subset."""
+    if isinstance(node, ast.Constant):
+        return node.value
+
+    if isinstance(node, ast.Name):
+        if node.id not in env:
+            raise ValueError(f"Unknown variable: {node.id}")
+        return env[node.id]
+
+    if isinstance(node, ast.UnaryOp):
+        op_fn = _SAFE_UNARY_OPS.get(type(node.op))
+        if op_fn is None:
+            raise ValueError(f"Unsupported unary op: {type(node.op).__name__}")
+        return op_fn(_safe_eval_node(node.operand, env))
+
+    if isinstance(node, ast.BoolOp):
+        agg = _SAFE_BOOL_OPS.get(type(node.op))
+        if agg is None:
+            raise ValueError(f"Unsupported bool op: {type(node.op).__name__}")
+        return agg(_safe_eval_node(v, env) for v in node.values)
+
+    if isinstance(node, ast.Compare):
+        left = _safe_eval_node(node.left, env)
+        for op_node, comparator in zip(node.ops, node.comparators):
+            op_fn = _SAFE_COMPARE_OPS.get(type(op_node))
+            if op_fn is None:
+                raise ValueError(f"Unsupported comparison: {type(op_node).__name__}")
+            right = _safe_eval_node(comparator, env)
+            if not op_fn(left, right):
+                return False
+            left = right
+        return True
+
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return [_safe_eval_node(elt, env) for elt in node.elts]
+
+    raise ValueError(f"Unsupported expression node: {type(node).__name__}")
 
 
 def _resolve_dot_notation(expr: str, output: Any) -> str:
@@ -439,26 +544,34 @@ class PipelineBuilder:
         """Generate POML text from a description without parsing it.
 
         Useful for reviewing/editing the POML before running.
+        Validates that the output contains a parseable <pipeline> block.
         """
         prompt = self._build_prompt()
         prompt += f"\n\nUser's description:\n{description}"
 
         raw = await self._llm(prompt)
-        return self._extract_poml(raw)
+        poml = self._extract_poml(raw)
+        self._validate_poml_structure(poml)
+        return poml
 
     async def refine(
         self,
         current_poml: str,
         feedback: str,
     ) -> str:
-        """Refine existing POML based on feedback. Returns updated POML text."""
+        """Refine existing POML based on feedback. Returns updated POML text.
+
+        Validates that the output contains a parseable <pipeline> block.
+        """
         prompt = PIPELINE_REFINEMENT_PROMPT.format(
             current_poml=current_poml,
             tools=self._tools_description(),
             feedback=feedback,
         )
         raw = await self._llm(prompt)
-        return self._extract_poml(raw)
+        poml = self._extract_poml(raw)
+        self._validate_poml_structure(poml)
+        return poml
 
     @staticmethod
     def _extract_poml(text: str) -> str:
@@ -467,3 +580,14 @@ class PipelineBuilder:
         text = re.sub(r"^```(?:xml|poml)?\s*\n?", "", text)
         text = re.sub(r"\n?```\s*$", "", text)
         return text.strip()
+
+    @staticmethod
+    def _validate_poml_structure(poml: str) -> None:
+        """Check that POML has a valid <pipeline> block with parseable XML."""
+        pipeline_match = re.search(r"<pipeline>(.*?)</pipeline>", poml, re.DOTALL)
+        if not pipeline_match:
+            raise ValueError("LLM output missing <pipeline> block")
+        try:
+            ET.fromstring(f"<root>{pipeline_match.group(1).strip()}</root>")
+        except ET.ParseError as e:
+            raise ValueError(f"LLM output has invalid XML in <pipeline>: {e}") from e
