@@ -943,9 +943,26 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Triggers</label>
+      <label class="form-label">System Prompt</label>
+      <textarea class="form-textarea" id="agent-system-prompt" rows="6" placeholder="You are a research assistant. You search the web for information, verify facts from multiple sources, and produce concise summaries with citations."></textarea>
+      <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.3rem;">
+        <button class="btn-secondary" id="btn-generate-prompt" onclick="generateSystemPrompt()" style="white-space:nowrap; font-size:0.72rem; background:var(--accent); color:#000; border-color:var(--accent);">Generate Prompt</button>
+        <input class="form-input" id="agent-refine-input" placeholder="feedback: make it more concise, add error handling..." style="flex:1; font-size:0.78rem;">
+        <button class="btn-secondary" id="btn-refine-prompt" onclick="refineSystemPrompt()" style="white-space:nowrap; font-size:0.72rem;">Refine</button>
+      </div>
+      <div class="form-hint" id="refine-status">Write a rough description above, then hit Generate to have Claude write a proper system prompt.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Task <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional — for scheduled/triggered runs)</span></label>
+      <textarea class="form-textarea" id="agent-task" rows="2" placeholder="e.g. Scrape the front page of CNN and summarize the top 5 stories"></textarea>
+      <div class="form-hint">The default task this agent runs when deployed. Leave blank for chat-based agents.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Triggers <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional)</span></label>
       <input class="form-input" id="agent-triggers" placeholder="Comma-separated, e.g. research, look up, find out">
-      <div class="form-hint">Keywords that activate this agent</div>
+      <div class="form-hint">Keywords that route messages to this agent when using multi-agent setups</div>
     </div>
 
     <!-- Assigned Skills -->
@@ -979,6 +996,33 @@
       </div>
     </div>
 
+    <!-- Direct budget overrides -->
+    <div class="form-group">
+      <label class="form-label">Budget Overrides <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(override policy defaults)</span></label>
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; align-items:center; gap:0.3rem;">
+          <span style="font-size:0.78rem; color:var(--muted);">Token budget</span>
+          <input class="form-input" id="agent-token-budget" type="number" placeholder="from policy" min="0" style="width:110px; font-size:0.78rem;">
+        </div>
+        <div style="display:flex; align-items:center; gap:0.3rem;">
+          <span style="font-size:0.78rem; color:var(--muted);">Max spend</span>
+          <span style="font-size:0.78rem; color:var(--muted);">$</span>
+          <input class="form-input" id="agent-dollar-budget" type="number" placeholder="no limit" min="0" step="0.01" style="width:90px; font-size:0.78rem;">
+        </div>
+        <div style="display:flex; align-items:center; gap:0.3rem;">
+          <span style="font-size:0.78rem; color:var(--muted);">Max iterations</span>
+          <input class="form-input" id="agent-max-iterations" type="number" placeholder="from policy" min="1" style="width:80px; font-size:0.78rem;">
+        </div>
+        <div style="display:flex; align-items:center; gap:0.3rem;">
+          <span style="font-size:0.78rem; color:var(--muted);">Tool timeout</span>
+          <input class="form-input" id="agent-tool-timeout" type="number" placeholder="from policy" min="1" style="width:80px; font-size:0.78rem;">
+          <span style="font-size:0.72rem; color:var(--muted);">s</span>
+        </div>
+      </div>
+      <div id="agent-budget-estimate" style="font-size:0.72rem; color:var(--cyan); margin-top:0.3rem;"></div>
+      <div class="form-hint">Leave blank to use values from assigned policies. Values here take priority over policies.</div>
+    </div>
+
     <!-- When to run (triggers) -->
     <div class="form-group">
       <label class="form-label">When to run</label>
@@ -1002,8 +1046,24 @@
 
     <!-- Pipeline POML -->
     <div class="form-group">
-      <label class="form-label">Pipeline POML <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional)</span></label>
-      <textarea class="form-textarea" id="agent-pipeline-poml" rows="4" placeholder="&lt;pipeline&gt;&#10;  &lt;step tool=&quot;search&quot;&gt;...&lt;/step&gt;&#10;&lt;/pipeline&gt;" style="font-family:monospace; font-size:0.78rem;"></textarea>
+      <label class="form-label">Pipeline <span style="font-size:0.72rem; color:var(--muted); font-weight:400;">(optional — multi-step workflows)</span></label>
+
+      <!-- NL generation -->
+      <div style="display:flex; gap:0.4rem; align-items:center; margin-bottom:0.5rem;">
+        <input class="form-input" id="pipeline-nl-input" placeholder="e.g. search for news, filter important ones, email a summary" style="flex:1; font-size:0.78rem;">
+        <button class="btn-secondary" id="btn-generate-pipeline" onclick="generatePipeline()" style="white-space:nowrap; font-size:0.72rem; background:var(--accent); color:#000; border-color:var(--accent);">Generate</button>
+      </div>
+      <div class="form-hint" id="pipeline-gen-status" style="margin-bottom:0.5rem;"></div>
+
+      <!-- Visual step editor -->
+      <div id="pipeline-steps-editor" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+      <button class="btn-secondary" onclick="addPipelineStep()" style="margin-top:0.4rem; font-size:0.72rem;">+ Add Step</button>
+
+      <!-- Toggle raw POML -->
+      <div style="margin-top:0.5rem;">
+        <button class="btn-secondary" onclick="togglePipelineRaw()" style="font-size:0.7rem;" id="btn-toggle-poml">Show POML</button>
+      </div>
+      <textarea class="form-textarea" id="agent-pipeline-poml" rows="5" style="font-family:monospace; font-size:0.75rem; display:none; margin-top:0.3rem;" placeholder="<pipeline>&#10;  <step tool=&quot;search&quot;>...</step>&#10;</pipeline>"></textarea>
     </div>
 
     <div class="modal-footer">
@@ -1170,7 +1230,16 @@ function sysCard(value, label) {
 // -- Data Model --
 
 // Policies: granular supervision rules
-let POLICIES = [
+// Persist agents/skills/policies to localStorage
+function _loadState(key, fallback) {
+  try { var s = localStorage.getItem('clawboss_' + key); return s ? JSON.parse(s) : fallback; }
+  catch(e) { return fallback; }
+}
+function _saveState(key, data) {
+  try { localStorage.setItem('clawboss_' + key, JSON.stringify(data)); } catch(e) {}
+}
+
+const _DEFAULT_POLICIES = [
   {
     name: 'tight-budget',
     description: 'Strict token budget with termination on exceed',
@@ -1236,8 +1305,10 @@ let POLICIES = [
   }
 ];
 
+let POLICIES = _loadState('policies', _DEFAULT_POLICIES);
+
 // Skills: capabilities with tools
-let SKILLS = [
+const _DEFAULT_SKILLS = [
   {
     name: 'web-search',
     description: 'Search the web and fetch pages',
@@ -1265,8 +1336,10 @@ let SKILLS = [
   }
 ];
 
+let SKILLS = _loadState('skills', _DEFAULT_SKILLS);
+
 // Agents: supervised entities that use skills and have policies
-let AGENTS = [
+const _DEFAULT_AGENTS = [
   {
     name: 'web-researcher',
     description: 'Searches the web for information, summarises findings, and cites sources.',
@@ -1295,6 +1368,8 @@ let AGENTS = [
     assignedPolicies: ['rate-limiter']
   }
 ];
+
+let AGENTS = _loadState('agents', _DEFAULT_AGENTS);
 
 const DEMO_COSTS = {
   total_cost_usd: 2.3471,
@@ -1506,6 +1581,7 @@ function renderEffectivePolicyHtml(ep) {
   html += '<div class="detail-row"><span class="detail-label">Max iterations</span><span class="detail-value">' + ep.max_iterations + '</span></div>';
   html += '<div class="detail-row"><span class="detail-label">Tool timeout</span><span class="detail-value">' + ep.tool_timeout + 's</span></div>';
   if (ep.token_budget) html += '<div class="detail-row"><span class="detail-label">Token budget</span><span class="detail-value">' + ep.token_budget.toLocaleString() + ' tokens</span></div>';
+  if (ep.dollar_budget) html += '<div class="detail-row"><span class="detail-label">Dollar budget</span><span class="detail-value" style="color:var(--green);">$' + ep.dollar_budget.toFixed(2) + '</span></div>';
   html += '<div class="detail-row"><span class="detail-label">On timeout</span><span class="detail-value">' + esc(ep.on_timeout) + '</span></div>';
   html += '<div class="detail-row"><span class="detail-label">On budget exceeded</span><span class="detail-value">' + esc(ep.on_budget_exceeded) + '</span></div>';
   if (ep.require_confirm && ep.require_confirm.length) {
@@ -1589,6 +1665,12 @@ function renderAgentCard(agent, showActions) {
   html += '</div>';
 
   html += '<div class="card-desc">' + esc(agent.description) + '</div>';
+  if (agent.systemPrompt) {
+    html += '<div style="font-size:0.75rem; color:var(--text); background:var(--surface2); padding:0.4rem 0.55rem; border-radius:5px; margin:0.3rem 0; line-height:1.4; max-height:3.6em; overflow:hidden;">' + esc(agent.systemPrompt).substring(0, 200) + '</div>';
+  }
+  if (agent.task) {
+    html += '<div style="font-size:0.72rem; color:var(--cyan); margin:0.2rem 0;"><strong>Task:</strong> ' + esc(agent.task).substring(0, 120) + '</div>';
+  }
   html += renderTags(agent.triggers);
 
   // Show assigned skills
@@ -1629,12 +1711,14 @@ function renderAgentCard(agent, showActions) {
   html += '<button class="btn-secondary" onclick="openChatPanel(\'' + esc(agent.name) + '\')">Chat</button>';
   if (showActions) {
     if (agent._live) {
-      // Live agent — no edit/export, show API-backed controls
+      // Live agent — allow editing definition + API-backed controls
+      html += '<button class="btn-secondary" onclick="editLiveAgent(\'' + esc(agent._session_id) + '\')">Edit</button>';
       if (st === 'stopped' || st === 'failed') {
         html += '<button class="btn-secondary" onclick="liveAgentAction(\'' + esc(agent._session_id) + '\',\'restart\')">Restart</button>';
       }
     } else {
       html += '<button class="btn-secondary" onclick="editAgent(' + idx + ')">Edit</button>';
+      html += '<button class="btn-secondary" onclick="deployAgent(' + idx + ')" style="background:var(--accent);color:#fff;border-color:var(--accent);">Deploy</button>';
       html += '<button class="btn-secondary" onclick="exportAgent(' + idx + ')">Export JSON</button>';
       html += '<button class="btn-danger" onclick="requestDeleteAgent(' + idx + ')">Delete</button>';
     }
@@ -2034,31 +2118,73 @@ function sendChatMessage() {
   input.value = '';
   renderChatPanel();
 
-  setTimeout(() => {
-    if (!chatOpenAgent) return;
-    const tmpl = agentResponseTemplates[Math.floor(Math.random() * agentResponseTemplates.length)];
-    if (tmpl.toolCalls && tmpl.toolCalls.length) {
-      const toolCalls = tmpl.toolCalls.map(tc => ({
-        name: tc.name,
-        params: tc.params.replace('<topic>', text.split(' ').slice(0, 4).join(' '))
-      }));
-      chatHistory[chatOpenAgent].push({
-        role: 'agent',
-        content: null,
-        toolCalls: toolCalls
-      });
-      renderChatPanel();
-    }
+  // Show typing indicator
+  chatHistory[chatOpenAgent].push({ role: 'agent', content: '...' });
+  renderChatPanel();
 
-    setTimeout(() => {
-      if (!chatOpenAgent) return;
-      chatHistory[chatOpenAgent].push({
-        role: 'agent',
-        content: tmpl.content
-      });
+  // Get the full agent config to send to the backend
+  var agent = AGENTS.find(function(a) { return a.name === chatOpenAgent; });
+  var agentConfig = agent ? {
+    systemPrompt: agent.systemPrompt || agent.description || '',
+    task: agent.task || '',
+    assignedSkills: agent.assignedSkills || [],
+    tokenBudget: agent.tokenBudget || null,
+    maxIterations: agent.maxIterations || 10,
+    toolTimeout: agent.toolTimeout || 30,
+    _allSkills: SKILLS,
+    policy: {}
+  } : {};
+
+  // Build policy from assigned policies
+  if (agent && agent.assignedPolicies) {
+    var ep = getEffectivePolicyFromNames(agent.assignedPolicies);
+    agentConfig.policy = ep;
+    if (agent.tokenBudget) agentConfig.policy.token_budget = agent.tokenBudget;
+    if (agent.maxIterations) agentConfig.policy.max_iterations = agent.maxIterations;
+    if (agent.toolTimeout) agentConfig.policy.tool_timeout = agent.toolTimeout;
+  }
+
+  fetch('/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      agent_name: chatOpenAgent,
+      message: text,
+      agent_config: agentConfig
+    })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Remove typing indicator
+      var msgs = chatHistory[chatOpenAgent];
+      if (msgs && msgs.length && msgs[msgs.length - 1].content === '...') {
+        msgs.pop();
+      }
+
+      if (data.error) {
+        msgs.push({ role: 'agent', content: '[Error: ' + data.error + ']' });
+      } else {
+        var msg = { role: 'agent', content: data.content || '' };
+        if (data.tool_calls && data.tool_calls.length) {
+          msg.toolCalls = data.tool_calls;
+        }
+        msgs.push(msg);
+
+        // Update budget display if available
+        if (data.budget && agent) {
+          agent._chatBudget = data.budget;
+        }
+      }
       renderChatPanel();
-    }, 400);
-  }, 800);
+    })
+    .catch(function(err) {
+      var msgs = chatHistory[chatOpenAgent];
+      if (msgs && msgs.length && msgs[msgs.length - 1].content === '...') {
+        msgs.pop();
+      }
+      msgs.push({ role: 'agent', content: '[Error: ' + err.message + ']' });
+      renderChatPanel();
+    });
 }
 
 // Handle Enter key in chat input
@@ -2077,46 +2203,81 @@ document.getElementById('btn-create-agent-nl').addEventListener('click', () => {
   if (!desc) return;
 
   status.className = 'builder-status';
-  status.textContent = 'Creating agent...';
+  status.textContent = 'Generating prompt...';
 
-  const name = desc.split(/\s+/).slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') || 'custom-agent';
-  const base = getSessionsApiBase();
-  const headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+  // Send available skills + policies so the LLM can recommend
+  var skillsForLLM = SKILLS.map(function(s) { return { name: s.name, description: s.description }; });
+  var policiesForLLM = POLICIES.map(function(p) { return { name: p.name, description: p.description }; });
 
-  // Create via REST API so it persists
-  fetch(base + '/sessions', {
+  fetch('/generate-prompt', {
     method: 'POST',
-    headers: headers,
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      agent_id: name,
-      policy: { max_iterations: 5, tool_timeout: 15 },
+      description: desc,
+      available_skills: skillsForLLM,
+      available_policies: policiesForLLM
     })
   })
-    .then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    })
+    .then(r => r.json())
     .then(data => {
+      var schedule = data.schedule || {};
+      var newAgent = {
+        name: data.name || 'custom-agent',
+        description: desc,
+        systemPrompt: data.system_prompt || desc,
+        task: data.task || '',
+        triggers: [],
+        assignedSkills: data.skills || [],
+        allowUnassignedSkills: false,
+        status: 'stopped',
+        assignedPolicies: data.policies || ['rate-limiter'],
+        tokenBudget: data.token_budget || null,
+        maxIterations: data.max_iterations || null,
+        pipelinePoml: data.pipeline || null,
+        _schedule: schedule,
+      };
+      AGENTS.push(newAgent);
+      _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
+
       status.className = 'builder-status success';
-      status.textContent = 'Created: ' + name;
+      status.textContent = 'Generated — review and save';
       input.value = '';
       renderAll();
+      openAgentModal(AGENTS.length - 1);
+
+      // Apply schedule recommendation after modal opens
+      if (schedule.mode && schedule.mode !== 'ondemand') {
+        document.getElementById('agent-trigger-mode').value = schedule.mode;
+        if (document.getElementById('agent-trigger-mode').onchange) document.getElementById('agent-trigger-mode').onchange();
+        if (schedule.mode === 'interval' && schedule.interval_minutes) {
+          document.getElementById('agent-trigger-interval').value = schedule.interval_minutes;
+        }
+        if (schedule.mode === 'cron' && schedule.cron_expression) {
+          document.getElementById('agent-trigger-cron').value = schedule.cron_expression;
+        }
+      }
     })
     .catch(err => {
-      // Fallback to local if API not available
-      AGENTS.push({
+      // Fallback: use raw description as prompt
+      var name = desc.split(/\s+/).slice(0, 3).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30) || 'custom-agent';
+      var newAgent = {
         name: name,
         description: desc,
+        systemPrompt: desc,
+        task: '',
         triggers: [],
         assignedSkills: [],
         allowUnassignedSkills: false,
-        status: 'running',
+        status: 'stopped',
         assignedPolicies: ['rate-limiter']
-      });
-      status.className = 'builder-status success';
-      status.textContent = 'Created: ' + name + ' (local only)';
+      };
+      AGENTS.push(newAgent);
+      _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
+      status.className = 'builder-status';
+      status.textContent = 'LLM unavailable — edit manually';
       input.value = '';
       renderAll();
+      openAgentModal(AGENTS.length - 1);
     });
 });
 
@@ -2148,6 +2309,349 @@ document.getElementById('btn-create-skill-nl').addEventListener('click', () => {
 let editingAgentIdx = -1;
 let allowUnassignedOn = false;
 
+function generateSystemPrompt() {
+  var promptEl = document.getElementById('agent-system-prompt');
+  var statusEl = document.getElementById('refine-status');
+  var btn = document.getElementById('btn-generate-prompt');
+  var rawText = promptEl.value.trim();
+
+  if (!rawText) { statusEl.textContent = 'Write what you want the agent to do first.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  statusEl.textContent = 'Calling Claude...';
+
+  var skillsForLLM = SKILLS.map(function(s) { return { name: s.name, description: s.description }; });
+  var policiesForLLM = POLICIES.map(function(p) { return { name: p.name, description: p.description }; });
+
+  fetch('/generate-prompt', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      description: rawText,
+      available_skills: skillsForLLM,
+      available_policies: policiesForLLM
+    })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      promptEl.value = data.system_prompt || rawText;
+
+      var nameEl = document.getElementById('agent-name');
+      var taskEl = document.getElementById('agent-task');
+      if (data.name && (!nameEl.value || nameEl.value === nameEl.defaultValue)) {
+        nameEl.value = data.name;
+      }
+      if (data.task && !taskEl.value) {
+        taskEl.value = data.task;
+      }
+
+      // Apply recommended skills
+      if (data.skills && data.skills.length) {
+        document.querySelectorAll('#agent-skill-checklist input[type="checkbox"]').forEach(function(cb) {
+          cb.checked = data.skills.includes(cb.value);
+        });
+      }
+
+      // Apply recommended policies
+      if (data.policies && data.policies.length) {
+        document.querySelectorAll('#agent-policy-checklist input[type="checkbox"]').forEach(function(cb) {
+          cb.checked = data.policies.includes(cb.value);
+        });
+        updateAgentEffectivePolicyPreview();
+      }
+
+      // Apply budget recommendations
+      if (data.token_budget) {
+        document.getElementById('agent-token-budget').value = data.token_budget;
+      }
+      if (data.max_iterations) {
+        document.getElementById('agent-max-iterations').value = data.max_iterations;
+      }
+
+      // Apply schedule
+      var schedule = data.schedule || {};
+      if (schedule.mode && schedule.mode !== 'ondemand') {
+        var modeEl = document.getElementById('agent-trigger-mode');
+        modeEl.value = schedule.mode;
+        if (modeEl.onchange) modeEl.onchange();
+        if (schedule.mode === 'interval' && schedule.interval_minutes) {
+          document.getElementById('agent-trigger-interval').value = schedule.interval_minutes;
+        }
+        if (schedule.mode === 'cron' && schedule.cron_expression) {
+          document.getElementById('agent-trigger-cron').value = schedule.cron_expression;
+        }
+      }
+
+      // Apply pipeline if generated
+      if (data.pipeline) {
+        document.getElementById('agent-pipeline-poml').value = data.pipeline;
+        parsePomlToSteps();
+      }
+
+      updateAgentEffectivePolicyPreview();
+      var stepCount = document.querySelectorAll('#pipeline-steps-editor .pipeline-step').length;
+      statusEl.textContent = 'Generated. Skills, policies, schedule' + (stepCount ? ', and ' + stepCount + '-step pipeline' : '') + ' auto-applied. Review everything, then save.';
+      btn.disabled = false;
+      btn.textContent = 'Generate Prompt';
+    })
+    .catch(function(err) {
+      statusEl.textContent = 'Generation failed: ' + err.message;
+      btn.disabled = false;
+      btn.textContent = 'Generate Prompt';
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline visual editor
+// ---------------------------------------------------------------------------
+
+function getAvailableTools() {
+  // Collect tools from all skills
+  var tools = [];
+  SKILLS.forEach(function(s) {
+    if (s.tools) s.tools.forEach(function(t) {
+      if (!tools.find(function(x) { return x.name === t.name; })) {
+        tools.push({ name: t.name, description: t.description || '' });
+      }
+    });
+  });
+  return tools;
+}
+
+function addPipelineStep(tool, instruction) {
+  var editor = document.getElementById('pipeline-steps-editor');
+  var tools = getAvailableTools();
+  var idx = editor.querySelectorAll('.pipeline-step').length + 1;
+
+  var div = document.createElement('div');
+  div.className = 'pipeline-step';
+  div.style.cssText = 'background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.6rem; display:flex; gap:0.5rem; align-items:flex-start;';
+
+  var stepNum = document.createElement('span');
+  stepNum.style.cssText = 'font-size:0.72rem; color:var(--accent); font-weight:700; min-width:18px; padding-top:0.25rem;';
+  stepNum.textContent = idx;
+  div.appendChild(stepNum);
+
+  var fields = document.createElement('div');
+  fields.style.cssText = 'flex:1; display:flex; flex-direction:column; gap:0.3rem;';
+
+  // Tool selector — dropdown + custom option
+  var toolSelect = document.createElement('select');
+  toolSelect.className = 'form-input pipeline-step-tool';
+  toolSelect.style.cssText = 'font-size:0.78rem; padding:0.25rem 0.4rem;';
+  var optCustom = document.createElement('option');
+  optCustom.value = ''; optCustom.textContent = '— select tool —';
+  toolSelect.appendChild(optCustom);
+  tools.forEach(function(t) {
+    var opt = document.createElement('option');
+    opt.value = t.name; opt.textContent = t.name + (t.description ? ' — ' + t.description.substring(0, 40) : '');
+    if (tool === t.name) opt.selected = true;
+    toolSelect.appendChild(opt);
+  });
+  // Custom tool name option
+  var optOther = document.createElement('option');
+  optOther.value = '__custom__'; optOther.textContent = '(custom tool name)';
+  toolSelect.appendChild(optOther);
+  fields.appendChild(toolSelect);
+
+  // Custom tool name input (hidden by default)
+  var customInput = document.createElement('input');
+  customInput.className = 'form-input pipeline-step-custom-tool';
+  customInput.placeholder = 'tool name';
+  customInput.style.cssText = 'font-size:0.78rem; display:none; padding:0.25rem 0.4rem;';
+  if (tool && !tools.find(function(t) { return t.name === tool; })) {
+    toolSelect.value = '__custom__';
+    customInput.style.display = '';
+    customInput.value = tool;
+  }
+  toolSelect.onchange = function() {
+    customInput.style.display = this.value === '__custom__' ? '' : 'none';
+    syncStepsToPoml();
+  };
+  fields.appendChild(customInput);
+
+  // Instruction
+  var instrInput = document.createElement('input');
+  instrInput.className = 'form-input pipeline-step-instruction';
+  instrInput.placeholder = 'What should this step do?';
+  instrInput.value = instruction || '';
+  instrInput.style.cssText = 'font-size:0.78rem; padding:0.25rem 0.4rem;';
+  instrInput.oninput = syncStepsToPoml;
+  fields.appendChild(instrInput);
+
+  div.appendChild(fields);
+
+  // Controls
+  var controls = document.createElement('div');
+  controls.style.cssText = 'display:flex; flex-direction:column; gap:0.2rem;';
+  var btnUp = document.createElement('button');
+  btnUp.className = 'btn-secondary';
+  btnUp.style.cssText = 'font-size:0.6rem; padding:0.1rem 0.3rem; line-height:1;';
+  btnUp.textContent = '▲';
+  btnUp.onclick = function() { moveStep(div, -1); };
+  var btnDown = document.createElement('button');
+  btnDown.className = 'btn-secondary';
+  btnDown.style.cssText = 'font-size:0.6rem; padding:0.1rem 0.3rem; line-height:1;';
+  btnDown.textContent = '▼';
+  btnDown.onclick = function() { moveStep(div, 1); };
+  var btnDel = document.createElement('button');
+  btnDel.style.cssText = 'font-size:0.65rem; padding:0.1rem 0.3rem; line-height:1; color:var(--red); background:none; border:1px solid var(--red); border-radius:4px; cursor:pointer;';
+  btnDel.textContent = '✕';
+  btnDel.onclick = function() { div.remove(); renumberSteps(); syncStepsToPoml(); };
+  controls.appendChild(btnUp);
+  controls.appendChild(btnDown);
+  controls.appendChild(btnDel);
+  div.appendChild(controls);
+
+  editor.appendChild(div);
+  syncStepsToPoml();
+}
+
+function moveStep(stepDiv, direction) {
+  var parent = stepDiv.parentNode;
+  var steps = Array.from(parent.querySelectorAll('.pipeline-step'));
+  var idx = steps.indexOf(stepDiv);
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= steps.length) return;
+  if (direction < 0) {
+    parent.insertBefore(stepDiv, steps[newIdx]);
+  } else {
+    parent.insertBefore(stepDiv, steps[newIdx].nextSibling);
+  }
+  renumberSteps();
+  syncStepsToPoml();
+}
+
+function renumberSteps() {
+  var steps = document.querySelectorAll('#pipeline-steps-editor .pipeline-step');
+  steps.forEach(function(s, i) {
+    s.querySelector('span').textContent = i + 1;
+  });
+}
+
+function syncStepsToPoml() {
+  var steps = document.querySelectorAll('#pipeline-steps-editor .pipeline-step');
+  if (steps.length === 0) {
+    document.getElementById('agent-pipeline-poml').value = '';
+    return;
+  }
+  var xml = '<pipeline>\n';
+  steps.forEach(function(s) {
+    var toolSelect = s.querySelector('.pipeline-step-tool');
+    var customTool = s.querySelector('.pipeline-step-custom-tool');
+    var tool = toolSelect.value === '__custom__' ? customTool.value : toolSelect.value;
+    var instr = s.querySelector('.pipeline-step-instruction').value;
+    if (tool) {
+      xml += '  <step tool="' + tool.replace(/"/g, '&quot;') + '">' + (instr || '...') + '</step>\n';
+    }
+  });
+  xml += '</pipeline>';
+  document.getElementById('agent-pipeline-poml').value = xml;
+}
+
+function parsePomlToSteps() {
+  var poml = document.getElementById('agent-pipeline-poml').value;
+  var editor = document.getElementById('pipeline-steps-editor');
+  editor.innerHTML = '';
+  if (!poml.trim()) return;
+
+  var stepRegex = /<step\s+tool="([^"]*)"[^>]*>([\s\S]*?)<\/step>/g;
+  var match;
+  while ((match = stepRegex.exec(poml)) !== null) {
+    addPipelineStep(match[1], match[2].trim());
+  }
+}
+
+function togglePipelineRaw() {
+  var ta = document.getElementById('agent-pipeline-poml');
+  var btn = document.getElementById('btn-toggle-poml');
+  if (ta.style.display === 'none') {
+    ta.style.display = '';
+    btn.textContent = 'Hide POML';
+    // Sync visual to raw before showing
+    syncStepsToPoml();
+  } else {
+    ta.style.display = 'none';
+    btn.textContent = 'Show POML';
+    // Parse raw back to visual
+    parsePomlToSteps();
+  }
+}
+
+function generatePipeline() {
+  var input = document.getElementById('pipeline-nl-input');
+  var status = document.getElementById('pipeline-gen-status');
+  var btn = document.getElementById('btn-generate-pipeline');
+  var desc = input.value.trim();
+  if (!desc) { status.textContent = 'Describe the pipeline steps.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  status.textContent = 'Calling Claude...';
+
+  var tools = getAvailableTools();
+  var toolsDesc = tools.map(function(t) { return t.name + ': ' + (t.description || ''); }).join('\n');
+
+  fetch('/generate-pipeline', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ description: desc, available_tools: toolsDesc })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Set POML and parse to visual
+      document.getElementById('agent-pipeline-poml').value = data.poml || '';
+      parsePomlToSteps();
+      input.value = '';
+      status.textContent = 'Generated ' + document.querySelectorAll('#pipeline-steps-editor .pipeline-step').length + ' steps. Reorder or edit below.';
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+    })
+    .catch(function(err) {
+      status.textContent = 'Failed: ' + err.message;
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+    });
+}
+
+// ---------------------------------------------------------------------------
+
+function refineSystemPrompt() {
+  var promptEl = document.getElementById('agent-system-prompt');
+  var feedbackEl = document.getElementById('agent-refine-input');
+  var statusEl = document.getElementById('refine-status');
+  var btn = document.getElementById('btn-refine-prompt');
+  var currentPrompt = promptEl.value.trim();
+  var feedback = feedbackEl.value.trim();
+
+  if (!currentPrompt) { statusEl.textContent = 'Write a system prompt first, or use Create from Description.'; return; }
+  if (!feedback) { statusEl.textContent = 'Type what you want to change.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Refining...';
+  statusEl.textContent = 'Calling LLM...';
+
+  fetch('/generate-prompt', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ current_prompt: currentPrompt, feedback: feedback })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      promptEl.value = data.system_prompt || currentPrompt;
+      feedbackEl.value = '';
+      statusEl.textContent = 'Refined. Review the updated prompt above.';
+      btn.disabled = false;
+      btn.textContent = 'Refine with AI';
+    })
+    .catch(function(err) {
+      statusEl.textContent = 'Refine failed: ' + err.message;
+      btn.disabled = false;
+      btn.textContent = 'Refine with AI';
+    });
+}
+
 function openAgentModal(index) {
   editingAgentIdx = typeof index === 'number' ? index : -1;
   const isEdit = editingAgentIdx >= 0;
@@ -2158,6 +2662,8 @@ function openAgentModal(index) {
 
   document.getElementById('agent-name').value = isEdit ? agent.name : '';
   document.getElementById('agent-desc').value = isEdit ? agent.description : '';
+  document.getElementById('agent-system-prompt').value = isEdit && agent.systemPrompt ? agent.systemPrompt : '';
+  document.getElementById('agent-task').value = isEdit && agent.task ? agent.task : '';
   document.getElementById('agent-triggers').value = isEdit && agent.triggers ? agent.triggers.join(', ') : '';
 
   // Allow unassigned toggle
@@ -2197,11 +2703,23 @@ function openAgentModal(index) {
   // Effective policy preview
   updateAgentEffectivePolicyPreview();
 
+  // Budget overrides
+  document.getElementById('agent-token-budget').value = isEdit && agent.tokenBudget ? agent.tokenBudget : '';
+  document.getElementById('agent-dollar-budget').value = isEdit && agent.dollarBudget ? agent.dollarBudget : '';
+  document.getElementById('agent-max-iterations').value = isEdit && agent.maxIterations ? agent.maxIterations : '';
+  document.getElementById('agent-tool-timeout').value = isEdit && agent.toolTimeout ? agent.toolTimeout : '';
+
   // Trigger mode
   document.getElementById('agent-trigger-mode').value = 'ondemand';
   document.getElementById('agent-trigger-interval-opts').style.display = 'none';
   document.getElementById('agent-trigger-cron-opts').style.display = 'none';
-  document.getElementById('agent-pipeline-poml').value = '';
+  // Pipeline editor
+  document.getElementById('agent-pipeline-poml').value = isEdit && agent.pipelinePoml ? agent.pipelinePoml : '';
+  document.getElementById('agent-pipeline-poml').style.display = 'none';
+  document.getElementById('btn-toggle-poml').textContent = 'Show POML';
+  document.getElementById('pipeline-nl-input').value = '';
+  document.getElementById('pipeline-gen-status').textContent = '';
+  parsePomlToSteps();
 
   document.getElementById('agent-trigger-mode').onchange = function() {
     var mode = this.value;
@@ -2218,8 +2736,19 @@ function updateAgentEffectivePolicyPreview() {
     selected.push(cb.value);
   });
   var ep = getEffectivePolicyFromNames(selected);
+
+  // Apply budget overrides from the direct input fields
+  var budgetVal = document.getElementById('agent-token-budget').value.trim();
+  var dollarVal = document.getElementById('agent-dollar-budget').value.trim();
+  var iterVal = document.getElementById('agent-max-iterations').value.trim();
+  var timeoutVal = document.getElementById('agent-tool-timeout').value.trim();
+  if (budgetVal) ep.token_budget = parseInt(budgetVal);
+  if (dollarVal) ep.dollar_budget = parseFloat(dollarVal);
+  if (iterVal) ep.max_iterations = parseInt(iterVal);
+  if (timeoutVal) ep.tool_timeout = parseInt(timeoutVal);
+
   var contentEl = document.getElementById('agent-effective-policy-content');
-  if (selected.length === 0) {
+  if (selected.length === 0 && !budgetVal && !dollarVal && !iterVal && !timeoutVal) {
     contentEl.innerHTML = '<div style="font-size:0.78rem; color:var(--muted); padding:0.2rem 0;">No policies selected. Defaults will apply.</div>';
   } else {
     contentEl.innerHTML = renderEffectivePolicyHtml(ep);
@@ -2229,6 +2758,30 @@ function updateAgentEffectivePolicyPreview() {
 function closeAgentModal() {
   document.getElementById('agent-modal').classList.remove('open');
   editingAgentIdx = -1;
+}
+
+// Budget override fields update the effective policy preview live
+['agent-token-budget', 'agent-dollar-budget', 'agent-max-iterations', 'agent-tool-timeout'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', function() {
+    updateAgentEffectivePolicyPreview();
+    updateBudgetEstimate();
+  });
+});
+
+function updateBudgetEstimate() {
+  var el = document.getElementById('agent-budget-estimate');
+  var tokens = parseInt(document.getElementById('agent-token-budget').value) || 0;
+  var dollars = parseFloat(document.getElementById('agent-dollar-budget').value) || 0;
+  var parts = [];
+  if (tokens > 0) {
+    // Rough estimate: ~$3/1M input + ~$15/1M output for Sonnet, assume 60/40 split
+    var estCost = tokens * 0.000008;
+    parts.push('~$' + estCost.toFixed(4) + '/run at ' + tokens.toLocaleString() + ' tokens');
+  }
+  if (dollars > 0) {
+    parts.push('hard stop at $' + dollars.toFixed(2));
+  }
+  el.textContent = parts.length ? parts.join(' · ') : '';
 }
 
 function updateAllowUnassignedToggle() {
@@ -2246,6 +2799,8 @@ document.getElementById('allow-unassigned-toggle').addEventListener('click', () 
 function saveAgent() {
   const name = document.getElementById('agent-name').value.trim();
   const desc = document.getElementById('agent-desc').value.trim();
+  const systemPrompt = document.getElementById('agent-system-prompt').value.trim();
+  const task = document.getElementById('agent-task').value.trim();
   if (!name) { alert('Agent name is required.'); return; }
 
   const triggers = document.getElementById('agent-triggers').value
@@ -2261,11 +2816,22 @@ function saveAgent() {
     assignedPolicies.push(cb.value);
   });
 
+  // Budget overrides
+  const tokenBudget = document.getElementById('agent-token-budget').value.trim();
+  const dollarBudget = document.getElementById('agent-dollar-budget').value.trim();
+  const maxIterations = document.getElementById('agent-max-iterations').value.trim();
+  const toolTimeout = document.getElementById('agent-tool-timeout').value.trim();
+
   const data = {
-    name, description: desc, triggers, assignedSkills,
+    name, description: desc, systemPrompt, task, triggers, assignedSkills,
     allowUnassignedSkills: allowUnassignedOn,
+    pipelinePoml: document.getElementById('agent-pipeline-poml').value.trim() || null,
     status: editingAgentIdx >= 0 ? (AGENTS[editingAgentIdx].status || 'stopped') : 'stopped',
-    assignedPolicies: assignedPolicies
+    assignedPolicies: assignedPolicies,
+    tokenBudget: tokenBudget ? parseInt(tokenBudget) : null,
+    dollarBudget: dollarBudget ? parseFloat(dollarBudget) : null,
+    maxIterations: maxIterations ? parseInt(maxIterations) : null,
+    toolTimeout: toolTimeout ? parseInt(toolTimeout) : null,
   };
 
   if (editingAgentIdx >= 0) {
@@ -2274,11 +2840,87 @@ function saveAgent() {
     AGENTS.push(data);
   }
 
+  _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
   closeAgentModal();
   renderAll();
 }
 
 function editAgent(index) { openAgentModal(index); }
+
+function deployAgent(index) {
+  var agent = AGENTS[index];
+  if (!agent) return;
+
+  if (!agent.task && !agent.systemPrompt) {
+    alert('Agent needs a task or system prompt before deploying.');
+    return;
+  }
+
+  // Build policy from assigned policies + budget overrides
+  var ep = getEffectivePolicyFromNames(agent.assignedPolicies || []);
+  if (agent.tokenBudget) ep.token_budget = agent.tokenBudget;
+  if (agent.maxIterations) ep.max_iterations = agent.maxIterations;
+  if (agent.toolTimeout) ep.tool_timeout = agent.toolTimeout;
+
+  var policy = {};
+  if (ep.max_iterations) policy.max_iterations = ep.max_iterations;
+  if (ep.tool_timeout) policy.tool_timeout = ep.tool_timeout;
+  if (ep.token_budget) policy.token_budget = ep.token_budget;
+  if (ep.require_confirm && ep.require_confirm.length) policy.require_confirm = ep.require_confirm;
+
+  // Create session on the server
+  var base = getSessionsApiBase();
+  var headers = Object.assign({'Content-Type': 'application/json'}, getSessionsAuthHeaders());
+
+  fetch(base + '/sessions', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ agent_id: agent.name, policy: policy })
+  })
+    .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(data) {
+      agent.status = 'running';
+      _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
+      renderAll();
+      if (typeof fetchSessions === 'function') fetchSessions();
+
+      // Open chat panel and auto-run the task
+      openChatPanel(agent.name);
+      if (agent.task) {
+        document.getElementById('chat-input').value = agent.task;
+        sendChatMessage();
+      }
+    })
+    .catch(function(err) { alert('Deploy failed: ' + err.message); });
+}
+
+function editLiveAgent(sessionId) {
+  // Find the live agent by session ID and convert to an editable agent
+  var agent = AGENTS.find(function(a) { return a._session_id === sessionId; });
+  if (!agent) { alert('Agent not found'); return; }
+
+  // Create a local editable copy if one doesn't exist yet
+  var localIdx = AGENTS.findIndex(function(a) { return !a._live && a.name === agent.name; });
+  if (localIdx < 0) {
+    // Convert live agent to a local definition
+    var local = {
+      name: agent.name,
+      description: agent.description || '',
+      triggers: agent.triggers || [],
+      assignedSkills: agent.assignedSkills || [],
+      assignedPolicies: agent.assignedPolicies || [],
+      allowUnassignedSkills: agent.allowUnassignedSkills || false,
+      status: 'stopped',
+      tokenBudget: agent._session ? agent._session.token_limit : null,
+      maxIterations: agent._session ? agent._session.iteration_limit : null,
+      dollarBudget: agent.dollarBudget || null,
+      toolTimeout: agent.toolTimeout || null,
+    };
+    AGENTS.push(local);
+    localIdx = AGENTS.length - 1;
+  }
+  openAgentModal(localIdx);
+}
 
 // -- Skill Modal --
 let editingSkillIdx = -1;
@@ -2394,6 +3036,8 @@ function saveSkill() {
     SKILLS.push(data);
   }
 
+  _saveState('skills', SKILLS);
+  _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
   closeSkillModal();
   renderAll();
 }
@@ -2606,6 +3250,8 @@ function savePolicy() {
     POLICIES.push(data);
   }
 
+  _saveState('policies', POLICIES);
+  _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
   closePolicyModal();
   renderAll();
 }
@@ -2675,6 +3321,9 @@ function confirmDelete() {
       }
     });
   }
+  _saveState('agents', AGENTS.filter(function(a) { return !a._live; }));
+  _saveState('skills', SKILLS);
+  _saveState('policies', POLICIES);
   closeDeleteModal();
   renderAll();
 }
