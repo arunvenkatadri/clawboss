@@ -85,16 +85,19 @@ asyncio.run(main())
 
 Open `dashboard.html` in a browser for a full management UI:
 
-- **Agents** — create, edit, delete, pause/resume/stop agents with supervision policies
+- **Agents** — create, edit, deploy, and manage agents. Each agent has a system prompt, task, assigned skills, policies, budget overrides, and an optional POML pipeline. Agents persist to localStorage across refreshes.
+- **LLM-powered agent builder** — describe what you want in plain English. Claude generates a system prompt, picks the right skills and policies, sets a schedule, suggests budgets, and creates a multi-step pipeline — all auto-applied. Hit "Refine" to iterate on the prompt.
+- **Live chat** — open a conversation with any agent directly from the dashboard. Messages go through a real LLM with full clawboss supervision (budgets, iterations, timeouts, circuit breakers). Tool calls are visible in the chat.
+- **Deploy** — click Deploy on an agent card to create a supervised session and auto-run the agent's task. The chat panel opens and shows the agent working.
 - **Skills** — define reusable capabilities (tool collections) and assign them to agents
+- **Pipeline editor** — visual step builder with drag-to-reorder, or describe the pipeline in natural language and let Claude generate the POML. Toggle between visual and raw POML views.
+- **Budget overrides** — set token budget, dollar budget, max iterations, and tool timeout directly on each agent. Values override assigned policies. Live cost estimates update as you type.
 - **Sessions** — live view of running agent sessions from the REST API, with pause/resume/stop controls, budget usage, and audit logs. Updates in real time via WebSocket.
-- **Pipeline editor** — describe what you want in natural language or write POML directly. The LLM generates the pipeline, you review and run it from the dashboard.
 - **Approvals** — pending tool approvals show as yellow cards with Approve/Deny buttons
-- **Chat** — open a conversation with any agent directly from the dashboard
 - **Costs** — track spend, set budgets with hard stops, view usage over time
 - **Policies** — see all active supervision rules at a glance
 
-The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API.
+The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API. The LLM features (prompt generation, chat, pipeline generation) require a backend with an LLM API key — use [Artemis](https://github.com/arunvenkatadri/artemis) or provide your own `/chat` and `/generate-prompt` endpoints.
 
 <img width="1498" height="953" alt="Screenshot 2026-03-25 at 6 05 30 PM" src="https://github.com/user-attachments/assets/11a5047c-6328-43bc-a6cf-d56a9b0b45da" />
 
