@@ -99,7 +99,10 @@ Open `dashboard.html` in a browser for a full management UI:
 
 The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API. The LLM features (prompt generation, chat, pipeline generation) require a backend with an LLM API key — use [Artemis](https://github.com/arunvenkatadri/artemis) or provide your own `/chat` and `/generate-prompt` endpoints.
 
-<img width="1498" height="953" alt="Screenshot 2026-03-25 at 6 05 30 PM" src="https://github.com/user-attachments/assets/11a5047c-6328-43bc-a6cf-d56a9b0b45da" />
+
+<img width="1383" height="1270" alt="Sdd" src="https://github.com/user-attachments/assets/b4fec9fa-59d4-4476-93ac-19684c835ab0" />
+
+
 
 ## What it does
 
