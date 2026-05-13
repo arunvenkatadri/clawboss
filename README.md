@@ -11,6 +11,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-658-brightgreen.svg)]()
 
 **Stop your AI agents from going rogue and set your long acting agents up for success.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
@@ -252,7 +253,7 @@ pipeline = await builder.create(
 result = await pipeline.run()
 ```
 
-The intermediate POML is human-readable, editable, and version-controllable:
+The intermediate POML is human-readable, editable, and version-controllable. Condition expressions use an AST-based evaluator (no `eval()`) — safe against injection even with untrusted POML inputs:
 
 ```xml
 <pipeline>
