@@ -211,9 +211,7 @@ class TestApprovalREST:
         sv = mgr.get_supervisor(sid)
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(
-            sv.call("delete_file", delete_file, path="/tmp")
-        )
+        result = asyncio.run(sv.call("delete_file", delete_file, path="/tmp"))
         assert result.error.kind == "approval_pending"
         approval_id = result.error.details["approval_id"]
 
@@ -246,9 +244,7 @@ class TestApprovalREST:
 
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(
-            sv.call("send_email", delete_file, path="test")
-        )
+        result = asyncio.run(sv.call("send_email", delete_file, path="test"))
         approval_id = result.error.details["approval_id"]
 
         resp = client.post(

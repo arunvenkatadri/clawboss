@@ -318,12 +318,12 @@ def _safe_eval_node(node: ast.AST, env: Dict[str, Any]) -> Any:
 
     if isinstance(node, ast.Compare):
         left = _safe_eval_node(node.left, env)
-        for op_node, comparator in zip(node.ops, node.comparators):
-            op_fn = _SAFE_COMPARE_OPS.get(type(op_node))
-            if op_fn is None:
-                raise ValueError(f"Unsupported comparison: {type(op_node).__name__}")
+        for cmp_op, comparator in zip(node.ops, node.comparators):
+            cmp_fn = _SAFE_COMPARE_OPS.get(type(cmp_op))
+            if cmp_fn is None:
+                raise ValueError(f"Unsupported comparison: {type(cmp_op).__name__}")
             right = _safe_eval_node(comparator, env)
-            if not op_fn(left, right):
+            if not cmp_fn(left, right):
                 return False
             left = right
         return True
