@@ -15,6 +15,8 @@ Or convert schemas without running a server:
     schema = to_openclaw_tool_schema(tool_def)
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import re
@@ -36,7 +38,7 @@ def _slugify(name: str) -> str:
     return s.strip("-")
 
 
-def to_openclaw_tool_schema(tool: ToolDefinition) -> dict:
+def to_openclaw_tool_schema(tool: ToolDefinition) -> dict[str, Any]:
     """Convert a clawboss ToolDefinition to OpenClaw's registerTool format.
 
     Returns a dict with name, description, and JSON Schema parameters
@@ -73,7 +75,7 @@ def to_openclaw_manifest(
     skill: Skill,
     plugin_id: Optional[str] = None,
     bridge_port: int = 9229,
-) -> dict:
+) -> dict[str, Any]:
     """Generate an openclaw.plugin.json manifest for a skill.
 
     Args:
@@ -102,7 +104,7 @@ def to_openclaw_manifest(
     }
 
 
-def _supervised_result_to_dict(result: SupervisedResult) -> dict:
+def _supervised_result_to_dict(result: SupervisedResult) -> dict[str, Any]:
     """Convert a SupervisedResult to a JSON-serializable response dict."""
     response: Dict[str, Any] = {
         "success": result.succeeded,
@@ -161,7 +163,9 @@ class OpenClawBridge:
         self._audit = audit
         self._host = host
         self._port = port
-        self._registry: Dict[str, Tuple[ToolDefinition, Callable[..., Coroutine]]] = {}
+        self._registry: Dict[
+            str, Tuple[ToolDefinition, Callable[..., Coroutine[Any, Any, Any]]]
+        ] = {}
         self._lock = threading.Lock()
         self._server: Optional[ThreadingHTTPServer] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -170,7 +174,7 @@ class OpenClawBridge:
     def register_tool(
         self,
         tool: ToolDefinition,
-        fn: Callable[..., Coroutine],
+        fn: Callable[..., Coroutine[Any, Any, Any]],
     ) -> None:
         """Register a tool with its async implementation."""
         with self._lock:
@@ -179,7 +183,7 @@ class OpenClawBridge:
     def register_skill(
         self,
         skill: Skill,
-        tool_impls: Dict[str, Callable[..., Coroutine]],
+        tool_impls: Dict[str, Callable[..., Coroutine[Any, Any, Any]]],
     ) -> None:
         """Register all tools from a skill.
 
@@ -214,7 +218,7 @@ class OpenClawBridge:
         if self._loop_thread:
             self._loop_thread.join(timeout=5)
 
-    def _execute_tool(self, tool_name: str, params: dict) -> dict:
+    def _execute_tool(self, tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
         """Execute a tool through the Supervisor. Called from HTTP handler thread."""
         if not self._loop:
             return {
@@ -233,15 +237,15 @@ class OpenClawBridge:
         result = future.result(timeout=self._policy.request_timeout)
         return _supervised_result_to_dict(result)
 
-    def _make_handler(self) -> type:
+    def _make_handler(self) -> type[BaseHTTPRequestHandler]:
         """Create an HTTP request handler class bound to this bridge."""
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
-            def log_message(self, format, *args):
+            def log_message(self, format: str, *args: Any) -> None:
                 pass  # suppress default stderr logging
 
-            def _send_json(self, status: int, data: dict) -> None:
+            def _send_json(self, status: int, data: dict[str, Any]) -> None:
                 body = json.dumps(data).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -250,14 +254,14 @@ class OpenClawBridge:
                 self.end_headers()
                 self.wfile.write(body)
 
-            def do_OPTIONS(self):
+            def do_OPTIONS(self) -> None:
                 self.send_response(204)
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type")
                 self.end_headers()
 
-            def do_GET(self):
+            def do_GET(self) -> None:
                 parsed = urllib.parse.urlparse(self.path)
                 path = parsed.path.strip("/")
 
@@ -278,7 +282,7 @@ class OpenClawBridge:
                 else:
                     self._send_json(404, {"error": "Not found"})
 
-            def do_POST(self):
+            def do_POST(self) -> None:
                 parsed = urllib.parse.urlparse(self.path)
                 segments = parsed.path.strip("/").split("/")
 

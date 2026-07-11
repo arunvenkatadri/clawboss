@@ -29,6 +29,8 @@ OpenTelemetry (optional):
     obs = Observer(otlp_endpoint="http://localhost:4317")
 """
 
+from __future__ import annotations
+
 import threading
 import time
 from collections import defaultdict
@@ -136,7 +138,7 @@ class ToolCallRecord:
         """Backward-compat: total tokens (input + output)."""
         return self.input_tokens + self.output_tokens
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = time.time()
 

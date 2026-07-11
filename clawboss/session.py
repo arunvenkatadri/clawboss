@@ -80,7 +80,7 @@ class SessionManager:
         self._supervisors: Dict[str, Supervisor] = {}
         self._audit_sinks: Dict[str, MemoryAuditSink] = {}
         self._original_policies: Dict[str, Dict[str, Any]] = {}
-        self._stateless_sessions: set = set()
+        self._stateless_sessions: set[str] = set()
         self._approval_queue = ApprovalQueue()
         # Default to the built-in pricing table so costs work out of the box.
         self._observer = Observer(pricing=pricing or PricingTable.default())
@@ -349,7 +349,7 @@ class SessionManager:
         with self._lock:
             return self._supervisors.get(session_id)
 
-    def get_audit_entries(self, session_id: str) -> list:
+    def get_audit_entries(self, session_id: str) -> list[Dict[str, Any]]:
         """Get audit log entries for a session (in-memory + persisted)."""
         cp = self._store.load_checkpoint(session_id)
         persisted = cp.audit_log if cp is not None else []

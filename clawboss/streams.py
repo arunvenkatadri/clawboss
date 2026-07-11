@@ -85,7 +85,7 @@ class KafkaStreamConnector:
         self._deserializer = value_deserializer or (lambda b: json.loads(b.decode()))
         self._consumer: Any = None
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[None]] = None
 
     async def start(self) -> None:
         """Start consuming messages."""
@@ -176,7 +176,7 @@ class KinesisStreamConnector:
         self._iterator_type = shard_iterator_type
         self._poll_interval = poll_interval
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[None]] = None
         self._session: Any = None
 
     async def start(self) -> None:
@@ -279,7 +279,7 @@ class RedisStreamConnector:
         self._block_ms = block_ms
         self._redis: Any = None
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task[None]] = None
 
     async def start(self) -> None:
         """Start consuming from the Redis stream."""

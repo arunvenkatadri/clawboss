@@ -44,7 +44,7 @@ class ApprovalRequest:
     resolved_by: str = ""  # who approved/denied (for audit)
     deny_reason: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.created_at:
             self.created_at = datetime.now(timezone.utc).isoformat()
 
@@ -68,7 +68,7 @@ class ApprovalQueue:
     One queue per SessionManager — holds approvals for all sessions.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._requests: Dict[str, ApprovalRequest] = {}
         self._lock = threading.Lock()
 

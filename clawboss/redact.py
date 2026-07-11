@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 # ---------------------------------------------------------------------------
 
 # Each pattern: (category_name, compiled_regex, placeholder)
-_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
+_PATTERNS: List[Tuple[str, "re.Pattern[str]", str]] = [
     (
         "email",
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),

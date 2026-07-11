@@ -244,8 +244,8 @@ class Supervisor:
     async def call(
         self,
         tool_name: str,
-        fn: Callable[..., Coroutine],
-        **kwargs,
+        fn: Callable[..., Coroutine[Any, Any, Any]],
+        **kwargs: Any,
     ) -> SupervisedResult:
         """Supervise an async tool call.
 
@@ -562,7 +562,7 @@ class Supervisor:
     async def execute_approved(
         self,
         approval_id: str,
-        fn: Callable[..., Coroutine],
+        fn: Callable[..., Coroutine[Any, Any, Any]],
     ) -> SupervisedResult:
         """Execute a previously-approved tool call.
 
@@ -629,8 +629,8 @@ class Supervisor:
     def call_sync(
         self,
         tool_name: str,
-        fn: Callable,
-        **kwargs,
+        fn: Callable[..., Any],
+        **kwargs: Any,
     ) -> SupervisedResult:
         """Supervise a synchronous tool call.
 
@@ -638,7 +638,7 @@ class Supervisor:
         For use when you don't have an event loop.
         """
 
-        async def _wrapper(**kw):
+        async def _wrapper(**kw: Any) -> Any:
             return fn(**kw)
 
         try:

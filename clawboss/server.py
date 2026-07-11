@@ -23,15 +23,15 @@ import secrets
 from typing import Any, Callable, Dict, List, Optional
 
 try:
-    from fastapi import (  # type: ignore[import-not-found]
+    from fastapi import (
         Depends,
         FastAPI,
         HTTPException,
         WebSocket,
         WebSocketDisconnect,
     )
-    from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
-    from pydantic import BaseModel  # type: ignore[import-not-found]
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
 except ImportError as e:
     raise ImportError("clawboss[server] extras required: pip install clawboss[server]") from e
 
@@ -204,24 +204,24 @@ def create_app(
     # ------------------------------------------------------------------
 
     @app.post("/sessions", response_model=SessionSummary, status_code=201)
-    def create_session(req: CreateSessionRequest, _=Depends(auth)):
+    def create_session(req: CreateSessionRequest, _: Any = Depends(auth)) -> Dict[str, Any]:
         sid = manager.start(req.agent_id, req.policy, req.payload, stateless=req.stateless)
         cp = manager.status(sid)
         return _checkpoint_to_summary(cp)
 
     @app.get("/sessions", response_model=List[SessionSummary])
-    def list_sessions(_=Depends(auth)):
+    def list_sessions(_: Any = Depends(auth)) -> List[Dict[str, Any]]:
         return [_checkpoint_to_summary(cp) for cp in manager.list_sessions()]
 
     @app.get("/sessions/{session_id}", response_model=SessionDetail)
-    def get_session(session_id: str, _=Depends(auth)):
+    def get_session(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return _checkpoint_to_detail(cp)
 
     @app.post("/sessions/{session_id}/pause", response_model=SessionSummary)
-    def pause_session(session_id: str, _=Depends(auth)):
+    def pause_session(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         try:
             manager.pause(session_id)
         except Exception as e:
@@ -232,7 +232,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.post("/sessions/{session_id}/resume", response_model=SessionSummary)
-    def resume_session(session_id: str, _=Depends(auth)):
+    def resume_session(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         try:
             manager.resume(session_id)
         except Exception as e:
@@ -243,7 +243,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.post("/sessions/{session_id}/stop", response_model=SessionSummary)
-    def stop_session(session_id: str, _=Depends(auth)):
+    def stop_session(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         try:
             manager.stop(session_id)
         except Exception as e:
@@ -254,7 +254,7 @@ def create_app(
         return _checkpoint_to_summary(cp)
 
     @app.post("/sessions/{session_id}/restart", response_model=SessionSummary, status_code=201)
-    def restart_session(session_id: str, _=Depends(auth)):
+    def restart_session(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         try:
             new_sid = manager.restart(session_id)
         except Exception as e:
@@ -269,14 +269,14 @@ def create_app(
     # ------------------------------------------------------------------
 
     @app.get("/sessions/{session_id}/approvals")
-    def list_approvals(session_id: str, _=Depends(auth)):
+    def list_approvals(session_id: str, _: Any = Depends(auth)) -> Any:
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return [r.to_dict() for r in manager.approval_queue.list_all(session_id)]
 
     @app.post("/sessions/{session_id}/approvals/{approval_id}/approve")
-    def approve_tool_call(session_id: str, approval_id: str, _=Depends(auth)):
+    def approve_tool_call(session_id: str, approval_id: str, _: Any = Depends(auth)) -> Any:
         req = manager.approval_queue.approve(approval_id)
         if req is None:
             raise HTTPException(
@@ -287,8 +287,8 @@ def create_app(
 
     @app.post("/sessions/{session_id}/approvals/{approval_id}/deny")
     def deny_tool_call(
-        session_id: str, approval_id: str, body: DenyRequest = DenyRequest(), _=Depends(auth)
-    ):
+        session_id: str, approval_id: str, body: DenyRequest = DenyRequest(), _: Any = Depends(auth)
+    ) -> Any:
         req = manager.approval_queue.deny(approval_id, reason=body.reason)
         if req is None:
             raise HTTPException(
@@ -298,14 +298,14 @@ def create_app(
         return req.to_dict()
 
     @app.get("/sessions/{session_id}/audit")
-    def get_audit(session_id: str, _=Depends(auth)):
+    def get_audit(session_id: str, _: Any = Depends(auth)) -> Any:
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return manager.get_audit_entries(session_id)
 
     @app.get("/sessions/{session_id}/replay")
-    def get_session_replay(session_id: str, _=Depends(auth)):
+    def get_session_replay(session_id: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         """Reconstruct a session's timeline for inspection."""
         from .replay import SessionReplay
 
@@ -322,27 +322,27 @@ def create_app(
     # ------------------------------------------------------------------
 
     @app.get("/metrics/tools")
-    def get_tool_metrics(_=Depends(auth)):
+    def get_tool_metrics(_: Any = Depends(auth)) -> Any:
         return manager.observer.all_tools_summary()
 
     @app.get("/metrics/sessions/{session_id}")
-    def get_session_metrics(session_id: str, _=Depends(auth)):
+    def get_session_metrics(session_id: str, _: Any = Depends(auth)) -> Any:
         cp = manager.status(session_id)
         if cp is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return manager.observer.session_summary(session_id)
 
     @app.get("/metrics/recent")
-    def get_recent_calls(limit: int = 50, _=Depends(auth)):
+    def get_recent_calls(limit: int = 50, _: Any = Depends(auth)) -> Any:
         return manager.observer.recent_calls(limit=min(limit, 200))
 
     @app.get("/metrics/costs")
-    def get_cost_summary(_=Depends(auth)):
+    def get_cost_summary(_: Any = Depends(auth)) -> Any:
         """Total cost breakdown by agent, session, tool, and model."""
         return manager.observer.cost_summary()
 
     @app.get("/metrics/pricing")
-    def get_pricing(_=Depends(auth)):
+    def get_pricing(_: Any = Depends(auth)) -> Any:
         """Current pricing table used for cost attribution."""
         pricing = manager.observer.pricing
         if pricing is None:
@@ -365,7 +365,7 @@ def create_app(
     }
 
     @app.get("/pipelines/schema")
-    async def get_pipeline_schema(_=Depends(auth)):
+    async def get_pipeline_schema(_: Any = Depends(auth)) -> Any:
         """Discover database schema from registered SQL connectors."""
         schemas = {}
         for name, bound_method in _sql_connectors.items():
@@ -378,7 +378,7 @@ def create_app(
         return schemas
 
     @app.get("/pipelines/tools")
-    def list_pipeline_tools(_=Depends(auth)):
+    def list_pipeline_tools(_: Any = Depends(auth)) -> Any:
         """List available tools for pipeline building."""
         result = []
         for name, fn in sorted(tools.items()):
@@ -387,7 +387,9 @@ def create_app(
         return result
 
     @app.post("/pipelines/generate")
-    async def generate_pipeline_poml(req: GeneratePipelineRequest, _=Depends(auth)):
+    async def generate_pipeline_poml(
+        req: GeneratePipelineRequest, _: Any = Depends(auth)
+    ) -> Dict[str, Any]:
         """Generate POML from a natural language description."""
         if llm is None:
             raise HTTPException(
@@ -418,7 +420,7 @@ def create_app(
         return {"poml": poml}
 
     @app.post("/pipelines/validate")
-    def validate_pipeline_poml(req: ParsePipelineRequest, _=Depends(auth)):
+    def validate_pipeline_poml(req: ParsePipelineRequest, _: Any = Depends(auth)) -> Dict[str, Any]:
         """Validate POML and return the parsed step structure."""
         from .pipeline_poml import parse_pipeline_poml
 
@@ -443,7 +445,9 @@ def create_app(
         return {"valid": True, "steps": steps}
 
     @app.post("/pipelines/run", status_code=201)
-    async def run_pipeline(req: CreatePipelineSessionRequest, _=Depends(auth)):
+    async def run_pipeline(
+        req: CreatePipelineSessionRequest, _: Any = Depends(auth)
+    ) -> Dict[str, Any]:
         """Parse POML and run the pipeline immediately."""
         from .pipeline_poml import parse_pipeline_poml
 
@@ -490,26 +494,28 @@ def create_app(
     app.state.webhooks = webhooks
 
     @app.post("/triggers", status_code=201)
-    async def create_trigger(req: CreateTriggerRequest, _=Depends(auth)):
+    async def create_trigger(req: CreateTriggerRequest, _: Any = Depends(auth)) -> Dict[str, Any]:
         """Create a new trigger."""
 
-        async def _make_pipeline_runner():
+        async def _make_pipeline_runner() -> Any:
             """Build a pipeline runner from the trigger's POML."""
             if not req.poml or not req.agent_id:
                 return None
             from .pipeline_poml import parse_pipeline_poml
 
-            async def run_pipeline():
+            async def _run_pipeline() -> Any:
+                assert req.poml is not None
+                assert req.agent_id is not None
                 pipeline = parse_pipeline_poml(
                     req.poml,
                     tools,
                     manager,
-                    req.agent_id or "triggered",
+                    req.agent_id,
                     policy_dict=req.policy,
                 )
                 return await pipeline.run()
 
-            return run_pipeline
+            return _run_pipeline
 
         pipeline_fn = await _make_pipeline_runner()
 
@@ -535,7 +541,7 @@ def create_app(
         elif req.trigger_type == "webhook":
             if pipeline_fn is None:
 
-                async def noop():
+                async def noop() -> None:
                     return None
 
                 pipeline_fn = noop
@@ -570,8 +576,8 @@ def create_app(
             }
             cmp_fn = ops.get(op, ops[">"])
 
-            def make_condition(cmp: Any, thresh: float) -> Callable[[Dict], bool]:
-                def condition(r: Dict) -> bool:
+            def make_condition(cmp: Any, thresh: float) -> Callable[[Dict[str, Any]], bool]:
+                def condition(r: Dict[str, Any]) -> bool:
                     try:
                         val = r["rows"][0][list(r["rows"][0].keys())[0]]
                         return bool(cmp(float(val), thresh))
@@ -596,7 +602,7 @@ def create_app(
         return {"name": req.name, "type": req.trigger_type, "created": True}
 
     @app.get("/triggers")
-    def list_triggers(_=Depends(auth)):
+    def list_triggers(_: Any = Depends(auth)) -> Any:
         """List all registered triggers."""
         triggers = scheduler.list_triggers()
         for name, wh in webhooks.items():
@@ -604,7 +610,7 @@ def create_app(
         return triggers
 
     @app.get("/triggers/history")
-    def get_trigger_history(limit: int = 50, _=Depends(auth)):
+    def get_trigger_history(limit: int = 50, _: Any = Depends(auth)) -> Any:
         """Get trigger firing history."""
         history = scheduler.history(limit)
         for wh in webhooks.values():
@@ -613,7 +619,7 @@ def create_app(
         return history[:limit]
 
     @app.post("/triggers/{trigger_name}/fire")
-    async def fire_webhook(trigger_name: str, _=Depends(auth)):
+    async def fire_webhook(trigger_name: str, _: Any = Depends(auth)) -> Any:
         """Fire a webhook trigger manually."""
         wh = webhooks.get(trigger_name)
         if wh is None:
@@ -622,17 +628,17 @@ def create_app(
         return record.to_dict()
 
     @app.post("/triggers/{trigger_name}/enable")
-    def enable_trigger(trigger_name: str, _=Depends(auth)):
+    def enable_trigger(trigger_name: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         scheduler.enable(trigger_name)
         return {"name": trigger_name, "enabled": True}
 
     @app.post("/triggers/{trigger_name}/disable")
-    def disable_trigger(trigger_name: str, _=Depends(auth)):
+    def disable_trigger(trigger_name: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         scheduler.disable(trigger_name)
         return {"name": trigger_name, "enabled": False}
 
     @app.delete("/triggers/{trigger_name}")
-    def remove_trigger(trigger_name: str, _=Depends(auth)):
+    def remove_trigger(trigger_name: str, _: Any = Depends(auth)) -> Dict[str, Any]:
         removed = scheduler.remove(trigger_name)
         if trigger_name in webhooks:
             del webhooks[trigger_name]
@@ -642,7 +648,7 @@ def create_app(
         return {"removed": trigger_name}
 
     @app.websocket("/sessions/{session_id}/events")
-    async def session_events(websocket: WebSocket, session_id: str):
+    async def session_events(websocket: WebSocket, session_id: str) -> None:
         """Stream audit events and status changes for a session.
 
         WebSocket auth: pass the API key as a query param ?token=<key>
@@ -707,7 +713,7 @@ def create_app(
 # ---------------------------------------------------------------------------
 
 
-def _checkpoint_to_summary(cp) -> dict:
+def _checkpoint_to_summary(cp: Any) -> Dict[str, Any]:
     return {
         "session_id": cp.session_id,
         "agent_id": cp.agent_id,
@@ -724,7 +730,7 @@ def _checkpoint_to_summary(cp) -> dict:
     }
 
 
-def _checkpoint_to_detail(cp) -> dict:
+def _checkpoint_to_detail(cp: Any) -> Dict[str, Any]:
     d = _checkpoint_to_summary(cp)
     d["policy_dict"] = cp.policy_dict
     d["circuit_breaker_states"] = cp.circuit_breaker_states

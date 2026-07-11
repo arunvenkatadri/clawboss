@@ -22,8 +22,8 @@ import time
 from typing import Any, Dict, Optional
 
 try:
-    from fastapi import Depends, HTTPException, Request  # type: ignore[import-not-found]
-    from fastapi.security import (  # type: ignore[import-not-found]
+    from fastapi import Depends, FastAPI, HTTPException, Request
+    from fastapi.security import (
         HTTPAuthorizationCredentials,
         HTTPBearer,
     )
@@ -40,7 +40,7 @@ _oauth_tokens: Dict[str, Dict[str, Any]] = {}
 def make_auth_dependency(
     api_key: Optional[str] = None,
     oauth_enabled: bool = False,
-):
+) -> Any:
     """Build a FastAPI dependency that enforces auth.
 
     Checks in order:
@@ -80,7 +80,9 @@ def make_auth_dependency(
     return _check_auth
 
 
-def register_oauth_routes(app: Any, provider: str, client_id: str, client_secret: str) -> None:
+def register_oauth_routes(
+    app: "FastAPI", provider: str, client_id: str, client_secret: str
+) -> None:
     """Add OAuth2 login/callback routes to the FastAPI app.
 
     Supports: "github", "google"
@@ -106,7 +108,7 @@ def register_oauth_routes(app: Any, provider: str, client_id: str, client_secret
     config = providers[provider]
 
     @app.get("/auth/login")
-    def oauth_login(request: Request) -> dict:
+    def oauth_login(request: Request) -> Dict[str, Any]:
         """Redirect URL for OAuth2 login."""
         callback_url = str(request.base_url) + "auth/callback"
         state = secrets.token_hex(16)
@@ -120,10 +122,10 @@ def register_oauth_routes(app: Any, provider: str, client_id: str, client_secret
         return {"login_url": url, "state": state}
 
     @app.get("/auth/callback")
-    async def oauth_callback(code: str, state: str = "") -> dict:
+    async def oauth_callback(code: str, state: str = "") -> Dict[str, Any]:
         """OAuth2 callback — exchange code for token, create session."""
         try:
-            import httpx  # type: ignore[import-not-found]
+            import httpx
         except ImportError:
             raise HTTPException(
                 status_code=500,
@@ -176,7 +178,7 @@ def register_oauth_routes(app: Any, provider: str, client_id: str, client_secret
     @app.get("/auth/me")
     async def auth_me(
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """Get info about the current authenticated user."""
         if credentials is None:
             raise HTTPException(status_code=401, detail="Not authenticated")

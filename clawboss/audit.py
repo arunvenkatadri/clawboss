@@ -86,7 +86,7 @@ class JsonlAuditSink(AuditSink):
 class MemoryAuditSink(AuditSink):
     """In-memory audit sink for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._entries: List[AuditEntry] = []
         self._lock = threading.Lock()
 
