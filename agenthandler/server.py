@@ -174,7 +174,7 @@ def create_app(
 
     app = FastAPI(
         title="AgentHandler Control Plane",
-        version="0.91.0",
+        version="0.93.0",
         description=(
             "REST API for managing agent sessions. "
             + (

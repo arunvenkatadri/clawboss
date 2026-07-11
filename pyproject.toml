@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agenthandler"
-version = "0.92.0"
+version = "0.93.0"
 description = "A way of controlling deployed agents to keep your (and their) sanity."
 readme = "README.md"
 license = {text = "Apache-2.0"}
