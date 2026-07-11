@@ -41,7 +41,7 @@ class Step:
 
     name: str
     tool_name: str
-    fn: Callable[..., Coroutine]
+    fn: Callable[..., Coroutine[Any, Any, Any]]
     kwargs: Dict[str, Any] = field(default_factory=dict)
     chain_input: bool = True
     input_key: str = "input"
@@ -147,7 +147,7 @@ class Pipeline:
     def add_step(
         self,
         tool_name: str,
-        fn: Callable[..., Coroutine],
+        fn: Callable[..., Coroutine[Any, Any, Any]],
         name: Optional[str] = None,
         chain_input: bool = True,
         input_key: str = "input",
@@ -181,8 +181,8 @@ class Pipeline:
     def add_condition(
         self,
         predicate: Callable[[Any], bool],
-        then_step: Tuple[str, Callable[..., Coroutine]],
-        else_step: Optional[Tuple[str, Callable[..., Coroutine]]] = None,
+        then_step: Tuple[str, Callable[..., Coroutine[Any, Any, Any]]],
+        else_step: Optional[Tuple[str, Callable[..., Coroutine[Any, Any, Any]]]] = None,
         name: Optional[str] = None,
         then_kwargs: Optional[Dict[str, Any]] = None,
         else_kwargs: Optional[Dict[str, Any]] = None,
@@ -235,8 +235,8 @@ class Pipeline:
         self,
         key: str,
         threshold: float,
-        above_step: Tuple[str, Callable[..., Coroutine]],
-        below_step: Optional[Tuple[str, Callable[..., Coroutine]]] = None,
+        above_step: Tuple[str, Callable[..., Coroutine[Any, Any, Any]]],
+        below_step: Optional[Tuple[str, Callable[..., Coroutine[Any, Any, Any]]]] = None,
         name: Optional[str] = None,
         above_kwargs: Optional[Dict[str, Any]] = None,
         below_kwargs: Optional[Dict[str, Any]] = None,
@@ -273,7 +273,7 @@ class Pipeline:
                 else:
                     return False
             try:
-                return float(val) >= threshold  # type: ignore[arg-type]
+                return float(val) >= threshold
             except (TypeError, ValueError):
                 return False
 

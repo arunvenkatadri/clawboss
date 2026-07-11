@@ -14,6 +14,8 @@ Security notes:
   by the Supervisor internals, never by agent code).
 """
 
+from __future__ import annotations
+
 import json
 import os
 import secrets
@@ -23,7 +25,7 @@ import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 # Maximum payload size in bytes (1 MB). Payloads exceeding this are rejected.
 MAX_PAYLOAD_BYTES = 1_048_576
@@ -87,7 +89,7 @@ class Checkpoint:
     # Persisted audit entries (list of dicts) — survives crashes
     audit_log: List[Dict[str, Any]] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
         if not self.created_at:
@@ -171,7 +173,7 @@ class StateStore(Protocol):
 class MemoryStore:
     """In-memory checkpoint store. Thread-safe."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._data: Dict[str, Checkpoint] = {}
         self._lock = threading.Lock()
 
@@ -318,7 +320,7 @@ class SqliteStore:
                 return cursor.rowcount
 
     @staticmethod
-    def _row_to_checkpoint(row) -> Checkpoint:
+    def _row_to_checkpoint(row: Tuple[Any, ...]) -> Checkpoint:
         # Handle both old (11-column) and new (13-column) schemas
         created_at = row[11] if len(row) > 11 else ""
         audit_log = json.loads(row[12]) if len(row) > 12 else []

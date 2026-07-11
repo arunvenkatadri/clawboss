@@ -2,7 +2,7 @@
 
 import threading
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from .errors import ClawbossError
 
@@ -55,7 +55,7 @@ class BudgetTracker:
         self._lock = threading.Lock()
 
     @classmethod
-    def from_policy(cls, policy) -> "BudgetTracker":
+    def from_policy(cls, policy: Any) -> "BudgetTracker":
         return cls(
             token_limit=policy.token_budget,
             iteration_limit=policy.max_iterations,
@@ -87,7 +87,7 @@ class BudgetTracker:
                 iteration_limit=self._iteration_limit,
             )
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all counters."""
         with self._lock:
             self._tokens_used = 0

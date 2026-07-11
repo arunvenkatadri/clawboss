@@ -62,7 +62,7 @@ from .session import SessionManager
 # Tool registry type
 # ---------------------------------------------------------------------------
 
-ToolRegistry = Dict[str, Callable[..., Coroutine]]
+ToolRegistry = Dict[str, Callable[..., Coroutine[Any, Any, Any]]]
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ def _make_predicate(expr: str) -> Callable[[Any], bool]:
     return _predicate
 
 
-_SAFE_COMPARE_OPS = {
+_SAFE_COMPARE_OPS: Dict[type, Callable[[Any, Any], Any]] = {
     ast.Eq: operator.eq,
     ast.NotEq: operator.ne,
     ast.Lt: operator.lt,
@@ -338,7 +338,7 @@ def _resolve_dot_notation(expr: str, output: Any) -> str:
     """Replace output.x.y.z with the actual resolved value in the expression."""
 
     # Find patterns like output.foo.bar.0.baz
-    def _replace(match: re.Match) -> str:
+    def _replace(match: re.Match[str]) -> str:
         path = match.group(0)
         parts = path.split(".")
         val = output

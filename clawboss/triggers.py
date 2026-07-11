@@ -51,7 +51,7 @@ class TriggerRecord:
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.fired_at:
             self.fired_at = datetime.now(timezone.utc).isoformat()
 
@@ -165,7 +165,7 @@ class Scheduler:
     Runs in a daemon thread. Non-blocking.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._intervals: Dict[str, IntervalEntry] = {}
         self._crons: Dict[str, CronEntry] = {}
         self._db_watches: Dict[str, DbWatchEntry] = {}
@@ -384,7 +384,7 @@ class Scheduler:
                 except Exception as e:
                     self._record(de.name, "db_watch", error=str(e))
 
-    async def _fire(self, name: str, trigger_type: str, fn: Callable) -> None:
+    async def _fire(self, name: str, trigger_type: str, fn: Callable[..., Any]) -> None:
         """Fire a trigger and record the result."""
         try:
             result = await fn()

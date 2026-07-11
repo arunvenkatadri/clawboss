@@ -4,7 +4,7 @@
 class ClawbossError(Exception):
     """Base error for all clawboss supervision failures."""
 
-    def __init__(self, kind: str, message: str, **details):
+    def __init__(self, kind: str, message: str, **details: object) -> None:
         self.kind = kind
         self.details = details
         super().__init__(message)
