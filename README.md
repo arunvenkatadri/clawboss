@@ -13,9 +13,11 @@
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 [![Tests](https://img.shields.io/badge/tests-658-brightgreen.svg)]()
 
-**Stop your AI agents from going rogue and set your long acting agents up for success.** AgentHandler wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
+*Every agent needs a handler.*
 
-Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
+**AgentHandler is the governance layer for AI agents.** Wrap tool calls with timeouts, budgets, circuit breakers, guardrails, and audit logging — so one bad tool call doesn't drain your wallet or loop forever. MCP-native, with adapters for OpenAI Agents SDK and Claude Agent SDK.
+
+Zero dependencies. Works with **any agent framework** — OpenAI Agents SDK, Claude Agent SDK, Mastra, LangChain, CrewAI, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, MCP server mode, and a [dashboard](#dashboard) for managing everything in one place.
 
 > **AgentHandler is built for long-duration agents** — agents that run for hours or days, not minutes. Read [the manifesto](docs/manifesto.md) for the full vision.
 
@@ -135,11 +137,12 @@ The Sessions tab connects to the REST control plane (`uvicorn agenthandler.serve
 AgentHandler doesn't care what framework you use. It supervises tool calls — any async or sync callable. If your agent calls tools, AgentHandler can wrap them.
 
 ```python
-# LangChain? Wrap your tools.
-# CrewAI? Wrap your tools.
-# AutoGen? Wrap your tools.
+# OpenAI Agents SDK? Wrap your tools.
+# Claude Agent SDK? Wrap your tools.
+# Mastra? Wrap your tools.
+# LangChain / CrewAI? Wrap your tools.
+# MCP server? Built-in (see below).
 # Custom loop? Wrap your tools.
-# OpenClaw? There's a built-in bridge (see below).
 
 result = await supervisor.call("my_tool", my_tool_fn, **kwargs)
 ```
@@ -749,46 +752,42 @@ AgentHandler is designed to supervise untrusted agent behavior. The stateful ses
 
 **Sessions can expire.** Call `SqliteStore.delete_expired(max_age_seconds)` to clean up old sessions.
 
-## OpenClaw integration
+## MCP server mode
 
-AgentHandler includes a built-in bridge for [OpenClaw](https://github.com/openclaw/openclaw). Expose your supervised tools to OpenClaw over HTTP — all supervision (timeouts, budgets, circuit breakers) applies automatically.
+Expose supervised tools via Model Context Protocol. Any MCP client — Claude Desktop, Claude Code, Cursor — gets governed tool access with full supervision.
+
+```bash
+pip install agenthandler[mcp]
+```
 
 ```python
-from agenthandler import OpenClawBridge, Skill, ToolDefinition, ToolParameter
+from agenthandler import SupervisedMCPServer, UrlGuard, RecursionDetector
 
-# Define your skill with tools and supervision limits
-skill = Skill(
-    name="web_research",
-    description="Research topics on the web",
-    tools=[
-        ToolDefinition(
-            name="web_search",
-            description="Search the web",
-            parameters=[
-                ToolParameter(name="query", type="string",
-                              description="Search query", required=True),
-            ],
-        ),
+server = SupervisedMCPServer(
+    name="my-tools",
+    tools={
+        "search": search_fn,
+        "write": write_fn,
+        "send_email": email_fn,
+    },
+    policy={
+        "tool_timeout": 30,
+        "token_budget": 50000,
+        "require_confirm": ["send_email"],
+    },
+    pre_guardrails=[
+        UrlGuard(allowlist=["*.example.com"]),
+        RecursionDetector(max_repeats=3),
     ],
-    supervision={"tool_timeout": 15, "max_iterations": 5, "token_budget": 10000},
 )
 
-# Start the bridge
-bridge = OpenClawBridge(port=9229)
-bridge.register_skill(skill, {"web_search": my_search_fn})
-bridge.serve()  # GET /tools, POST /execute/{name}
+server.run()  # stdio for Claude Desktop
+# server.run(transport="streamable-http")  # network mode
 ```
 
-Then install the TypeScript plugin from `openclaw-plugin/` into OpenClaw. The plugin auto-discovers tools from the bridge and registers them. See `examples/openclaw_bridge.py` for a full working example.
+Every tool call through MCP goes through the Supervisor — timeouts, budgets, circuit breakers, PII redaction, guardrails, approvals, audit, cost tracking. A capability manifest is available at `agenthandler://manifest`.
 
-You can also convert schemas without running a bridge:
-
-```python
-from agenthandler import to_openclaw_tool_schema, to_openclaw_manifest
-
-schema = to_openclaw_tool_schema(tool_def)    # OpenClaw JSON Schema format
-manifest = to_openclaw_manifest(skill)         # openclaw.plugin.json content
-```
+See `examples/mcp_server.py` for a full working example.
 
 ## Policy from config
 
