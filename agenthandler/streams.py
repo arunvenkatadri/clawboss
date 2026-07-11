@@ -90,7 +90,7 @@ class KafkaStreamConnector:
     async def start(self) -> None:
         """Start consuming messages."""
         try:
-            from aiokafka import AIOKafkaConsumer  # type: ignore[import-not-found]
+            from aiokafka import AIOKafkaConsumer
         except ImportError as e:
             raise ImportError("aiokafka required: pip install aiokafka") from e
 
@@ -182,7 +182,7 @@ class KinesisStreamConnector:
     async def start(self) -> None:
         """Start consuming from all shards."""
         try:
-            import aioboto3  # type: ignore[import-not-found]
+            import aioboto3
         except ImportError as e:
             raise ImportError("aioboto3 required: pip install aioboto3") from e
 
@@ -284,7 +284,7 @@ class RedisStreamConnector:
     async def start(self) -> None:
         """Start consuming from the Redis stream."""
         try:
-            import redis.asyncio as redis  # type: ignore[import-not-found]
+            import redis.asyncio as redis
         except ImportError as e:
             raise ImportError("redis required: pip install redis") from e
 

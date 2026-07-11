@@ -71,8 +71,8 @@ class SqlConnector:
             self._conn.row_factory = sqlite3.Row
         elif self._conn_str.startswith("postgresql://"):
             try:
-                import psycopg2  # type: ignore[import-untyped]
-                import psycopg2.extras  # type: ignore[import-untyped]
+                import psycopg2
+                import psycopg2.extras
 
                 self._conn = psycopg2.connect(self._conn_str)
             except ImportError as e:
@@ -325,7 +325,7 @@ class MongoConnector:
         if self._db is not None:
             return self._db
         try:
-            import pymongo  # type: ignore[import-not-found]
+            import pymongo
 
             self._client = pymongo.MongoClient(self._uri)
             self._db = self._client[self._database]

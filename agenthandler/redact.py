@@ -163,7 +163,7 @@ class Redactor:
     def _init_nlp(self) -> None:
         """Load spaCy model for NER. Fails silently if not installed."""
         try:
-            import spacy  # type: ignore[import-not-found]
+            import spacy
 
             self._nlp = spacy.load("en_core_web_sm")
         except (ImportError, OSError):

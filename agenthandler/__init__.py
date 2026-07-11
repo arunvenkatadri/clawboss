@@ -73,6 +73,11 @@ from .streams import (
 from .supervisor import SupervisedResult, Supervisor
 from .triggers import DbWatchEntry, Scheduler, WebhookTrigger
 
+try:
+    from .mcp_server import SupervisedMCPServer
+except ImportError:
+    pass
+
 __all__ = [
     "Policy",
     "OnFailure",
@@ -160,4 +165,6 @@ __all__ = [
     "SessionReplay",
     "ReplayFrame",
     "ReplaySummary",
+    # MCP
+    "SupervisedMCPServer",
 ]

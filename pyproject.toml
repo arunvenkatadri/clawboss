@@ -32,6 +32,7 @@ kafka = ["aiokafka>=0.10"]
 kinesis = ["aioboto3>=12.0"]
 redis = ["redis>=5.0"]
 streams = ["aiokafka>=0.10", "aioboto3>=12.0", "redis>=5.0"]
+mcp = ["mcp>=1.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "mypy>=1.0", "ruff>=0.4", "httpx>=0.25"]
 
 [project.urls]
@@ -61,7 +62,8 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["agenthandler.server", "agenthandler.auth"]
+module = ["agenthandler.server", "agenthandler.auth", "agenthandler.mcp_server"]
+warn_unused_ignores = false
 disallow_untyped_decorators = false
 disallow_subclassing_any = false
 
@@ -77,6 +79,7 @@ module = [
     "spacy.*",
     "psycopg2.*",
     "pymysql.*",
+    "mcp.*",
     "pymongo.*",
     "opentelemetry.*",
 ]
