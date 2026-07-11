@@ -12,8 +12,13 @@ All notable changes to AgentHandler are documented here.
 - Test count badge in README.
 
 ### Changed
-- **mypy --strict** enabled across all 29 source files with zero errors. Full type annotations on every function.
+- **Rebrand**: Clawboss → AgentHandler. `pip install agenthandler`.
+- **MCP server mode**: `SupervisedMCPServer` exposes tools via Model Context Protocol with full supervision. `pip install agenthandler[mcp]`.
+- **mypy --strict** enabled across all 30 source files with zero errors. Full type annotations on every function.
 - Python 3.13 compatibility: replaced deprecated `asyncio.get_event_loop()` in approval tests.
+
+### Removed
+- `openclaw-plugin/` directory — superseded by native MCP server mode. The Python-side `OpenClawBridge` remains for backward compatibility.
 
 ## [0.91.0] — 2026-06-10
 
