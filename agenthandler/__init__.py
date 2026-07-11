@@ -54,6 +54,13 @@ from .policy import Action, OnFailure, Policy, ScopeRule, ToolScope
 from .redact import Redactor
 from .reflection import ReflectionCycle, ReflectionLoop, ReflectionResult
 from .replay import ReplayFrame, ReplaySummary, SessionReplay
+from .sdk_adapters import (
+    AgentHandlerMiddleware,
+    openai_guardrail_adapter,
+    supervised_tool_registry,
+    wrap_claude_tool,
+    wrap_openai_tool,
+)
 from .session import SessionManager
 from .skill import Skill, SkillStore, ToolDefinition, ToolParameter
 from .store import (
@@ -75,6 +82,11 @@ from .triggers import DbWatchEntry, Scheduler, WebhookTrigger
 
 try:
     from .mcp_server import SupervisedMCPServer
+except ImportError:
+    pass
+
+try:
+    from .a2a import A2AAgentCard, A2AClient, A2ASkill, A2ASupervisedEndpoint, A2ATask, TaskState
 except ImportError:
     pass
 
@@ -167,4 +179,17 @@ __all__ = [
     "ReplaySummary",
     # MCP
     "SupervisedMCPServer",
+    # A2A
+    "A2AAgentCard",
+    "A2AClient",
+    "A2ASkill",
+    "A2ASupervisedEndpoint",
+    "A2ATask",
+    "TaskState",
+    # SDK adapters
+    "wrap_openai_tool",
+    "wrap_claude_tool",
+    "openai_guardrail_adapter",
+    "supervised_tool_registry",
+    "AgentHandlerMiddleware",
 ]
