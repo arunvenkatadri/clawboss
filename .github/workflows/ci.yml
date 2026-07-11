@@ -38,4 +38,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev,server]"
-      - run: mypy clawboss/
+      - run: mypy agenthandler/

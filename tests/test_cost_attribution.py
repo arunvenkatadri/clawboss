@@ -2,9 +2,9 @@
 
 import pytest
 
-from clawboss.observe import ModelPricing, Observer, PricingTable
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.observe import ModelPricing, Observer, PricingTable
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # PricingTable

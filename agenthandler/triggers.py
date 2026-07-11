@@ -7,7 +7,7 @@ Three trigger types:
   crosses a threshold
 
 Usage:
-    from clawboss.triggers import Scheduler, WebhookTrigger, DbWatchTrigger
+    from agenthandler.triggers import Scheduler, WebhookTrigger, DbWatchTrigger
 
     scheduler = Scheduler()
 
@@ -321,7 +321,7 @@ class Scheduler:
         self._running = True
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
-            target=self._run_loop, daemon=True, name="clawboss-scheduler"
+            target=self._run_loop, daemon=True, name="agenthandler-scheduler"
         )
         self._thread.start()
 

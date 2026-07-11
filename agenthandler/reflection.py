@@ -5,7 +5,7 @@ observe what happened, reflect on whether it worked, and adjust.
 
 Each cycle is four LLM-backed phases:
 1. **Think** — what should I do next, given the goal and what's happened?
-2. **Act** — actually run a tool (fully supervised by Clawboss).
+2. **Act** — actually run a tool (fully supervised by AgentHandler).
 3. **Observe** — what came back, and how does it compare to what I expected?
 4. **Reflect** — did this advance the goal? Should I change approach?
 
@@ -17,7 +17,7 @@ in circles for 72 hours."
 Bring-your-own-LLM — same pattern as SkillBuilder, PipelineBuilder.
 
 Usage:
-    from clawboss import ReflectionLoop, SessionManager, MemoryStore
+    from agenthandler import ReflectionLoop, SessionManager, MemoryStore
 
     store = MemoryStore()
     mgr = SessionManager(store)
@@ -42,7 +42,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional
 
-from .errors import ClawbossError
+from .errors import AgentHandlerError
 from .session import SessionManager
 
 LLMFn = Callable[[str], Awaitable[str]]
@@ -180,7 +180,7 @@ class ReflectionLoop:
     """Structured think → act → observe → reflect loop.
 
     Built on top of SessionManager + Supervisor — every cycle runs
-    through full Clawboss supervision (budgets, policies, guardrails,
+    through full AgentHandler supervision (budgets, policies, guardrails,
     audit, observability).
 
     Args:
@@ -232,7 +232,7 @@ class ReflectionLoop:
             # -- 1. THINK --
             try:
                 sv.record_iteration()
-            except ClawbossError as e:
+            except AgentHandlerError as e:
                 cycle.error = f"Iteration limit reached: {e}"
                 result.cycles.append(cycle)
                 result.stopped_reason = "iteration_limit"

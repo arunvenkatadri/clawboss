@@ -1,12 +1,12 @@
-"""Tests for clawboss.pipeline — sequential supervised orchestration."""
+"""Tests for agenthandler.pipeline — sequential supervised orchestration."""
 
 from typing import Any
 
 import pytest
 
-from clawboss.pipeline import Pipeline
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.pipeline import Pipeline
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # Helpers

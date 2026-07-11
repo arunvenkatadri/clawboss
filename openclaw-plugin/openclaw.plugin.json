@@ -1,8 +1,8 @@
 {
-  "id": "clawboss-bridge",
-  "name": "Clawboss Supervised Tools",
+  "id": "agenthandler-bridge",
+  "name": "AgentHandler Supervised Tools",
   "version": "0.91.0",
-  "description": "Connects OpenClaw to clawboss-supervised Python tools via HTTP bridge",
+  "description": "Connects OpenClaw to agenthandler-supervised Python tools via HTTP bridge",
   "entry": "dist/index.js",
   "configSchema": {
     "type": "object",
@@ -10,7 +10,7 @@
       "bridgeUrl": {
         "type": "string",
         "default": "http://localhost:9229",
-        "description": "URL of the clawboss bridge server"
+        "description": "URL of the agenthandler bridge server"
       }
     }
   },

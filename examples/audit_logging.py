@@ -2,7 +2,7 @@
 
 import asyncio
 
-from clawboss import AuditLog, JsonlAuditSink, Policy, Supervisor
+from agenthandler import AuditLog, JsonlAuditSink, Policy, Supervisor
 
 
 async def calculator(expression: str) -> str:

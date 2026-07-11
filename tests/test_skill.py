@@ -1,8 +1,8 @@
-"""Tests for clawboss.skill — Skill, ToolDefinition, ToolParameter, SkillStore."""
+"""Tests for agenthandler.skill — Skill, ToolDefinition, ToolParameter, SkillStore."""
 
 import json
 
-from clawboss.skill import Skill, SkillStore, ToolDefinition, ToolParameter, _slugify
+from agenthandler.skill import Skill, SkillStore, ToolDefinition, ToolParameter, _slugify
 
 # ---------------------------------------------------------------------------
 # Helpers

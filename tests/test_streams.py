@@ -1,8 +1,8 @@
-"""Tests for clawboss.streams — Kafka, Kinesis, Redis connectors."""
+"""Tests for agenthandler.streams — Kafka, Kinesis, Redis connectors."""
 
 import pytest
 
-from clawboss.streams import (
+from agenthandler.streams import (
     KafkaStreamConnector,
     KinesisStreamConnector,
     RedisStreamConnector,

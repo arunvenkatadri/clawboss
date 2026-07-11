@@ -1,6 +1,6 @@
-"""Tests for clawboss.redact — PII detection and redaction."""
+"""Tests for agenthandler.redact — PII detection and redaction."""
 
-from clawboss.redact import Redactor
+from agenthandler.redact import Redactor
 
 
 class TestRedactorEmail:

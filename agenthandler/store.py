@@ -236,7 +236,7 @@ class SqliteStore:
         store.save_checkpoint(checkpoint)
     """
 
-    def __init__(self, db_path: str = "clawboss_sessions.db"):
+    def __init__(self, db_path: str = "agenthandler_sessions.db"):
         self._db_path = db_path
         self._lock = threading.Lock()
 

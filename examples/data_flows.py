@@ -14,9 +14,9 @@ import os
 import sqlite3
 import tempfile
 
-from clawboss import MemoryStore, SessionManager
-from clawboss.connectors import SqlConnector
-from clawboss.pipeline import Pipeline
+from agenthandler import MemoryStore, SessionManager
+from agenthandler.connectors import SqlConnector
+from agenthandler.pipeline import Pipeline
 
 # -- Setup: create a test database --
 

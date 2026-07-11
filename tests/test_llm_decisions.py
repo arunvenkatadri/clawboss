@@ -2,9 +2,9 @@
 
 import pytest
 
-from clawboss.pipeline import Pipeline
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.pipeline import Pipeline
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 POLICY = {"max_iterations": 10, "tool_timeout": 10}
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "clawboss"
+name = "agenthandler"
 version = "0.92.0"
 description = "A way of controlling deployed agents to keep your (and their) sanity."
 readme = "README.md"
@@ -35,13 +35,13 @@ streams = ["aiokafka>=0.10", "aioboto3>=12.0", "redis>=5.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "mypy>=1.0", "ruff>=0.4", "httpx>=0.25"]
 
 [project.urls]
-Homepage = "https://github.com/arunvenkatadri/Clawboss"
-Repository = "https://github.com/arunvenkatadri/Clawboss"
-Issues = "https://github.com/arunvenkatadri/Clawboss/issues"
+Homepage = "https://github.com/arunvenkatadri/AgentHandler"
+Repository = "https://github.com/arunvenkatadri/AgentHandler"
+Issues = "https://github.com/arunvenkatadri/AgentHandler/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["clawboss"]
-artifacts = ["clawboss/py.typed"]
+packages = ["agenthandler"]
+artifacts = ["agenthandler/py.typed"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -61,7 +61,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["clawboss.server", "clawboss.auth"]
+module = ["agenthandler.server", "agenthandler.auth"]
 disallow_untyped_decorators = false
 disallow_subclassing_any = false
 

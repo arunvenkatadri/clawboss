@@ -9,8 +9,8 @@ Run:
 
 import asyncio
 
-from clawboss import MemoryStore, SessionManager
-from clawboss.pipeline_poml import PipelineBuilder, parse_pipeline_poml
+from agenthandler import MemoryStore, SessionManager
+from agenthandler.pipeline_poml import PipelineBuilder, parse_pipeline_poml
 
 # -- Simulated tools --
 

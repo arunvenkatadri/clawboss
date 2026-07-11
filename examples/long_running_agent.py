@@ -11,7 +11,7 @@ Demonstrates:
 - Session replay for post-hoc inspection
 - Observability metrics
 
-This is what a "long-running agent" looks like in Clawboss.
+This is what a "long-running agent" looks like in AgentHandler.
 
 Run:
     python examples/long_running_agent.py
@@ -20,15 +20,15 @@ Run:
 import asyncio
 import json
 
-from clawboss import (
+from agenthandler import (
     MemoryStore,
     OutputLengthLimit,
     RecursionDetector,
     SchemaValidator,
     SessionManager,
 )
-from clawboss.reflection import ReflectionLoop
-from clawboss.replay import SessionReplay
+from agenthandler.reflection import ReflectionLoop
+from agenthandler.replay import SessionReplay
 
 # -- Simulated tools --
 

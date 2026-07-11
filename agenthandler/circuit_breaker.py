@@ -5,7 +5,7 @@ import time
 from enum import Enum
 from typing import Optional
 
-from .errors import ClawbossError
+from .errors import AgentHandlerError
 
 
 class CircuitState(Enum):
@@ -41,7 +41,7 @@ class CircuitBreaker:
         self._lock = threading.Lock()
 
     def check(self, tool_name: str) -> None:
-        """Check if the circuit allows a call. Raises ClawbossError if open."""
+        """Check if the circuit allows a call. Raises AgentHandlerError if open."""
         with self._lock:
             if self._state == CircuitState.CLOSED:
                 return
@@ -50,7 +50,7 @@ class CircuitBreaker:
                 if self._opened_at and (time.monotonic() - self._opened_at) >= self._reset_after:
                     self._state = CircuitState.HALF_OPEN
                     return
-                raise ClawbossError.circuit_open(tool_name, self._consecutive_failures)
+                raise AgentHandlerError.circuit_open(tool_name, self._consecutive_failures)
             # HALF_OPEN: allow one test call
             return
 

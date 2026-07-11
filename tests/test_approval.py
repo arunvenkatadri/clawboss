@@ -1,15 +1,15 @@
-"""Tests for clawboss approval flow — human-in-the-loop confirmation."""
+"""Tests for agenthandler approval flow — human-in-the-loop confirmation."""
 
 import pytest
 
-from clawboss.approval import ApprovalQueue, ApprovalStatus
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.approval import ApprovalQueue, ApprovalStatus
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 try:
     from fastapi.testclient import TestClient
 
-    from clawboss.server import create_app
+    from agenthandler.server import create_app
 
     HAS_FASTAPI = True
 except ImportError:

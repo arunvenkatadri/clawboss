@@ -30,8 +30,8 @@ interface BridgeResponse {
 }
 
 export default definePluginEntry({
-  id: "clawboss-bridge",
-  name: "Clawboss Supervised Tools",
+  id: "agenthandler-bridge",
+  name: "AgentHandler Supervised Tools",
 
   async register(api) {
     const config = api.getConfig();
@@ -44,7 +44,7 @@ export default definePluginEntry({
       const resp = await fetch(`${bridgeUrl}/tools`);
       if (!resp.ok) {
         api.log.error(
-          `Failed to fetch tools from clawboss bridge at ${bridgeUrl}: HTTP ${resp.status}`
+          `Failed to fetch tools from agenthandler bridge at ${bridgeUrl}: HTTP ${resp.status}`
         );
         return;
       }
@@ -52,7 +52,7 @@ export default definePluginEntry({
       tools = data.tools;
     } catch (err) {
       api.log.error(
-        `Cannot connect to clawboss bridge at ${bridgeUrl}. Is the bridge running?`
+        `Cannot connect to agenthandler bridge at ${bridgeUrl}. Is the bridge running?`
       );
       return;
     }
@@ -103,7 +103,7 @@ export default definePluginEntry({
                   type: "text" as const,
                   text:
                     data.error?.message ||
-                    "Unknown error from clawboss bridge",
+                    "Unknown error from agenthandler bridge",
                 },
               ],
               isError: true,
@@ -114,7 +114,7 @@ export default definePluginEntry({
     }
 
     api.log.info(
-      `Registered ${tools.length} tool(s) from clawboss bridge`
+      `Registered ${tools.length} tool(s) from agenthandler bridge`
     );
   },
 });

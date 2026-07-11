@@ -15,5 +15,5 @@ labels: bug
 
 **Environment**
 - Python version:
-- clawboss version:
+- agenthandler version:
 - OS:

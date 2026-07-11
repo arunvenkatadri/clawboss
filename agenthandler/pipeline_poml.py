@@ -36,7 +36,7 @@ POML pipeline format::
 
 Usage:
     # Parse POML into a Pipeline
-    from clawboss.pipeline_poml import parse_pipeline_poml, PipelineBuilder
+    from agenthandler.pipeline_poml import parse_pipeline_poml, PipelineBuilder
 
     pipeline = parse_pipeline_poml(poml_text, tool_registry, mgr, "agent-1", policy)
     result = await pipeline.run()

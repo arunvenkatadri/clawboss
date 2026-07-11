@@ -1,8 +1,8 @@
-"""Basic clawboss usage — supervise tool calls with timeouts and budgets."""
+"""Basic agenthandler usage — supervise tool calls with timeouts and budgets."""
 
 import asyncio
 
-from clawboss import Policy, Supervisor
+from agenthandler import Policy, Supervisor
 
 
 async def web_search(query: str) -> str:
@@ -26,7 +26,7 @@ async def main():
     supervisor = Supervisor(policy)
 
     # Normal call — succeeds
-    result = await supervisor.call("web_search", web_search, query="clawboss python")
+    result = await supervisor.call("web_search", web_search, query="agenthandler python")
     print(f"Search: {result.user_message()}")
     print(f"  took {result.duration_ms}ms, succeeded={result.succeeded}")
 

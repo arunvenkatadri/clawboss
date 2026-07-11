@@ -1,4 +1,4 @@
-"""Tests for clawboss.connectors — SQL and NoSQL database tools."""
+"""Tests for agenthandler.connectors — SQL and NoSQL database tools."""
 
 import os
 import tempfile
@@ -6,10 +6,10 @@ from typing import Any
 
 import pytest
 
-from clawboss.connectors import SqlConnector
-from clawboss.pipeline import Pipeline
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.connectors import SqlConnector
+from agenthandler.pipeline import Pipeline
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 POLICY = {"max_iterations": 10, "tool_timeout": 10}
 

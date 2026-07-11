@@ -14,7 +14,7 @@ Optional dependencies:
 - Redis Streams: ``pip install redis``
 
 Usage:
-    from clawboss.streams import KafkaStreamConnector
+    from agenthandler.streams import KafkaStreamConnector
 
     async def on_message(payload):
         # Run pipeline with the payload as input

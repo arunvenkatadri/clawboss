@@ -4,7 +4,7 @@ Bring your own LLM. Pass any async callable that takes a prompt string
 and returns a string. Works with OpenAI, Anthropic, local models, whatever.
 
 Usage:
-    from clawboss import SkillBuilder, SkillStore
+    from agenthandler import SkillBuilder, SkillStore
 
     async def my_llm(prompt: str) -> str:
         return await openai.chat(messages=[{"role": "user", "content": prompt}])
@@ -12,7 +12,7 @@ Usage:
     builder = SkillBuilder(my_llm)
     skill = await builder.create("A skill that researches topics on the web")
 
-    store = SkillStore("~/.clawboss/skills")
+    store = SkillStore("~/.agenthandler/skills")
     store.save(skill)
 """
 

@@ -6,10 +6,10 @@ import tempfile
 
 import pytest
 
-from clawboss.connectors import SqlConnector
-from clawboss.pipeline_poml import PipelineBuilder
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.connectors import SqlConnector
+from agenthandler.pipeline_poml import PipelineBuilder
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 
 def _make_test_db():

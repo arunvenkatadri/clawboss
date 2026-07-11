@@ -1,13 +1,13 @@
-"""Tests for clawboss.supervisor — Supervisor and SupervisedResult."""
+"""Tests for agenthandler.supervisor — Supervisor and SupervisedResult."""
 
 import asyncio
 
 import pytest
 
-from clawboss.audit import AuditLog, MemoryAuditSink
-from clawboss.errors import ClawbossError
-from clawboss.policy import Policy
-from clawboss.supervisor import SupervisedResult, Supervisor
+from agenthandler.audit import AuditLog, MemoryAuditSink
+from agenthandler.errors import AgentHandlerError
+from agenthandler.policy import Policy
+from agenthandler.supervisor import SupervisedResult, Supervisor
 
 # ---------------------------------------------------------------------------
 # Helper tool functions
@@ -46,7 +46,7 @@ class TestSupervisedResult:
         assert r.user_message() == "hello"
 
     def test_user_message_on_error(self):
-        err = ClawbossError.timeout(5000)
+        err = AgentHandlerError.timeout(5000)
         r = SupervisedResult(error=err, succeeded=False)
         msg = r.user_message()
         assert "5000" in msg
@@ -133,7 +133,7 @@ class TestSupervisorBudgetTracking:
         policy = Policy(token_budget=1000)
         sv = Supervisor(policy)
         sv.record_tokens(800)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             sv.record_tokens(300)
         assert exc_info.value.kind == "budget_exceeded"
 
@@ -200,7 +200,7 @@ class TestSupervisorIterations:
         sv = Supervisor(Policy(max_iterations=2))
         sv.record_iteration()
         sv.record_iteration()
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             sv.record_iteration()
         assert exc_info.value.kind == "max_iterations"
 

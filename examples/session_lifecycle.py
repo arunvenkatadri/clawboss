@@ -8,7 +8,7 @@ Run:
 
 import asyncio
 
-from clawboss import MemoryStore, SessionManager
+from agenthandler import MemoryStore, SessionManager
 
 # -- Simulated tools --
 

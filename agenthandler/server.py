@@ -1,14 +1,14 @@
 """REST control plane — FastAPI app exposing the SessionManager.
 
-Optional dependency: install with ``pip install clawboss[server]``.
+Optional dependency: install with ``pip install agenthandler[server]``.
 
 Run with::
 
-    uvicorn clawboss.server:app
+    uvicorn agenthandler.server:app
 
 Or with API key auth::
 
-    CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
+    AGENTHANDLER_API_KEY=my-secret-key uvicorn agenthandler.server:app
 
 Or use ``create_app()`` to build an app with a custom store.
 
@@ -33,7 +33,9 @@ try:
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel
 except ImportError as e:
-    raise ImportError("clawboss[server] extras required: pip install clawboss[server]") from e
+    raise ImportError(
+        "agenthandler[server] extras required: pip install agenthandler[server]"
+    ) from e
 
 from .auth import make_auth_dependency, register_oauth_routes
 from .session import SessionManager
@@ -146,32 +148,32 @@ def create_app(
                         Pass ["*"] to allow all origins (NOT recommended
                         for production without auth).
         api_key: If set, all HTTP endpoints require ``Authorization: Bearer <key>``.
-                 If None, checks the CLAWBOSS_API_KEY environment variable.
+                 If None, checks the AGENTHANDLER_API_KEY environment variable.
         require_auth: If True and no API key is configured, ALL requests
                      are rejected with 401. The default module-level ``app``
-                     sets this to True — set CLAWBOSS_API_KEY to use it.
+                     sets this to True — set AGENTHANDLER_API_KEY to use it.
     """
     if manager is None:
         store = SqliteStore()
         manager = SessionManager(store)
 
     # Resolve API key: explicit param > env var > disabled
-    resolved_key = api_key if api_key is not None else os.environ.get("CLAWBOSS_API_KEY")
+    resolved_key = api_key if api_key is not None else os.environ.get("AGENTHANDLER_API_KEY")
 
     # If require_auth is set and no key is configured, reject all requests
     if require_auth and resolved_key is None:
         resolved_key = "__REJECT_ALL__"  # sentinel — no valid token can match this
 
     # OAuth config from env vars
-    oauth_provider = os.environ.get("CLAWBOSS_OAUTH_PROVIDER")
-    oauth_client_id = os.environ.get("CLAWBOSS_OAUTH_CLIENT_ID", "")
-    oauth_client_secret = os.environ.get("CLAWBOSS_OAUTH_CLIENT_SECRET", "")
+    oauth_provider = os.environ.get("AGENTHANDLER_OAUTH_PROVIDER")
+    oauth_client_id = os.environ.get("AGENTHANDLER_OAUTH_CLIENT_ID", "")
+    oauth_client_secret = os.environ.get("AGENTHANDLER_OAUTH_CLIENT_SECRET", "")
     oauth_enabled = bool(oauth_provider and oauth_client_id and oauth_client_secret)
 
     auth = make_auth_dependency(api_key=resolved_key, oauth_enabled=oauth_enabled)
 
     app = FastAPI(
-        title="Clawboss Control Plane",
+        title="AgentHandler Control Plane",
         version="0.91.0",
         description=(
             "REST API for managing agent sessions. "
@@ -179,7 +181,7 @@ def create_app(
                 "Authentication: Bearer token required."
                 if resolved_key
                 else "WARNING: No authentication configured. "
-                "Set CLAWBOSS_API_KEY or pass api_key to create_app()."
+                "Set AGENTHANDLER_API_KEY or pass api_key to create_app()."
             )
         ),
     )
@@ -738,7 +740,7 @@ def _checkpoint_to_detail(cp: Any) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Default app instance for ``uvicorn clawboss.server:app``
+# Default app instance for ``uvicorn agenthandler.server:app``
 # ---------------------------------------------------------------------------
 
 app = create_app(require_auth=True)

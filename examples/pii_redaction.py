@@ -2,7 +2,7 @@
 
 import asyncio
 
-from clawboss import Policy, Redactor, Supervisor
+from agenthandler import Policy, Redactor, Supervisor
 
 
 async def send_email(to: str, body: str) -> str:

@@ -26,7 +26,7 @@ None of those assumptions hold when the agent runs for 72 hours.
 
 ## What long-duration agents need
 
-After building Clawboss, I'm convinced the minimum viable infrastructure for production long-duration agents looks like this:
+After building AgentHandler, I'm convinced the minimum viable infrastructure for production long-duration agents looks like this:
 
 ### Durable state, or it didn't happen
 
@@ -78,9 +78,9 @@ But they don't give you:
 - **Declarative safety.** You define in code what the agent can and can't do. That code is auditable, version-controllable, testable.
 - **Transparent supervision.** Not a black box — every decision is logged with the reason.
 
-## What Clawboss is
+## What AgentHandler is
 
-Clawboss is the open-source foundation for long-duration agents. Everything in this manifesto is already built:
+AgentHandler is the open-source foundation for long-duration agents. Everything in this manifesto is already built:
 
 - Durable sessions with crash recovery and policy checksums
 - 16 guardrails (8 deterministic, 8 LLM-backed)
@@ -98,12 +98,12 @@ You run it on your infrastructure. Any LLM framework. Any database. Any model.
 
 ## Why this matters
 
-The next two years of AI will be defined by what agents can do without a human watching every move. That requires an infrastructure layer that doesn't yet exist in the managed platforms. Clawboss is one answer.
+The next two years of AI will be defined by what agents can do without a human watching every move. That requires an infrastructure layer that doesn't yet exist in the managed platforms. AgentHandler is one answer.
 
-If you're building long-duration agents and the managed platforms aren't giving you what you need, try Clawboss. Fork it, break it, file issues. This is where long-running agents live now.
+If you're building long-duration agents and the managed platforms aren't giving you what you need, try AgentHandler. Fork it, break it, file issues. This is where long-running agents live now.
 
 ---
 
-**Code:** [github.com/arunvenkatadri/clawboss](https://github.com/arunvenkatadri/clawboss)
-**Install:** `pip install clawboss`
+**Code:** [github.com/arunvenkatadri/agenthandler](https://github.com/arunvenkatadri/agenthandler)
+**Install:** `pip install agenthandler`
 **Author:** Arun Venkatadri

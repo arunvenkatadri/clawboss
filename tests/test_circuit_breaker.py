@@ -1,11 +1,11 @@
-"""Tests for clawboss.circuit_breaker — CircuitBreaker state machine."""
+"""Tests for agenthandler.circuit_breaker — CircuitBreaker state machine."""
 
 import time
 
 import pytest
 
-from clawboss.circuit_breaker import CircuitBreaker, CircuitState
-from clawboss.errors import ClawbossError
+from agenthandler.circuit_breaker import CircuitBreaker, CircuitState
+from agenthandler.errors import AgentHandlerError
 
 
 class TestCircuitBreakerInitialState:
@@ -50,7 +50,7 @@ class TestCircuitBreakerOpen:
         cb.record_failure()
         cb.record_failure()
         assert cb.state is CircuitState.OPEN
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             cb.check("broken_tool")
         assert exc_info.value.kind == "circuit_open"
         assert "broken_tool" in str(exc_info.value)

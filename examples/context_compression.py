@@ -8,8 +8,8 @@ aggressively because the supervisor enforces safety, not the LLM's memory.
 
 import asyncio
 
-from clawboss import Policy, Supervisor
-from clawboss.context import ContextWindow
+from agenthandler import Policy, Supervisor
+from agenthandler.context import ContextWindow
 
 
 async def main():

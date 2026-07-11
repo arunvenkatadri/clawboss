@@ -1,9 +1,9 @@
-"""Tests for clawboss.audit — AuditLog, AuditEntry, sinks."""
+"""Tests for agenthandler.audit — AuditLog, AuditEntry, sinks."""
 
 import json
 from io import StringIO
 
-from clawboss.audit import (
+from agenthandler.audit import (
     AuditEntry,
     AuditLog,
     AuditOutcome,

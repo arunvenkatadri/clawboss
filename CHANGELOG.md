@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Clawboss are documented here.
+All notable changes to AgentHandler are documented here.
 
 ## [0.92.0] — 2026-07-11
 
@@ -53,7 +53,7 @@ All notable changes to Clawboss are documented here.
 ## [0.87.0] — 2026-06-06
 
 ### Added
-- **Streaming inputs**: `KafkaStreamConnector`, `KinesisStreamConnector`, `RedisStreamConnector`. At-least-once delivery. Optional extras: `clawboss[kafka]`, `clawboss[kinesis]`, `clawboss[redis]`, `clawboss[streams]`.
+- **Streaming inputs**: `KafkaStreamConnector`, `KinesisStreamConnector`, `RedisStreamConnector`. At-least-once delivery. Optional extras: `agenthandler[kafka]`, `agenthandler[kinesis]`, `agenthandler[redis]`, `agenthandler[streams]`.
 
 ## [0.86.0] — 2026-06-05
 
@@ -122,14 +122,14 @@ All notable changes to Clawboss are documented here.
 - **Human-in-the-loop approval**: `ApprovalQueue` with submit/approve/deny. `require_confirm` policy field. REST endpoints and WebSocket notifications. Dashboard approval cards.
 
 ### Changed
-- npm package renamed to `clawboss-ai` (name `clawboss` was taken).
+- npm package renamed to `agenthandler-ai` (name `agenthandler` was taken).
 
 ## [0.77.0] — 2026-05-27
 
 ### Added
 - **Durable sessions**: `SessionManager` with `start()`, `pause()`, `resume()`, `stop()`, `restart()`. `SqliteStore` and `MemoryStore`.
 - **REST control plane**: FastAPI app with 20+ endpoints for session CRUD, metrics, audit logs.
-- **API key auth**: Bearer token authentication via `CLAWBOSS_API_KEY`.
+- **API key auth**: Bearer token authentication via `AGENTHANDLER_API_KEY`.
 - **Stateless sessions**: `stateless=True` for in-memory-only supervision.
 - **Crash loop protection**: `max_resumes` with automatic failure marking.
 - Lifecycle example: `examples/session_lifecycle.py`.

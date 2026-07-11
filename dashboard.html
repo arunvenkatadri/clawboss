@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clawboss Dashboard</title>
+  <title>AgentHandler Dashboard</title>
   <style>
     :root {
       --bg: #1a1b1e;
@@ -655,7 +655,7 @@
 
 <!-- Top bar -->
 <div class="topbar">
-  <h1>Clawboss</h1>
+  <h1>AgentHandler</h1>
   <div class="actions">
     <button type="button" id="btn-reload">Reload Demo</button>
   </div>
@@ -677,8 +677,8 @@
   <!-- Overview -->
   <div class="section active" id="sec-overview">
     <div class="demo-banner">
-      Interactive demo &mdash; this dashboard shows what Clawboss supervision looks like.
-      Connect it to a live agent with <code>pip install clawboss</code>.
+      Interactive demo &mdash; this dashboard shows what AgentHandler supervision looks like.
+      Connect it to a live agent with <code>pip install agenthandler</code>.
     </div>
     <div class="sys-grid" id="sys-grid"></div>
     <h3 style="font-size:0.85rem; color:var(--muted); margin:1rem 0 0.5rem;">Agents</h3>
@@ -909,9 +909,9 @@
         </span>
       </h3>
       <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
-        Live agent sessions from the Clawboss control plane. Start the server with
-        <code>uvicorn clawboss.server:app</code> then refresh.
-        If you set <code>CLAWBOSS_API_KEY</code>, enter the same key above.
+        Live agent sessions from the AgentHandler control plane. Start the server with
+        <code>uvicorn agenthandler.server:app</code> then refresh.
+        If you set <code>AGENTHANDLER_API_KEY</code>, enter the same key above.
       </p>
     </div>
     <div id="sessions-status" style="font-size:0.82rem; color:var(--muted); margin-bottom:0.5rem;"></div>
@@ -1232,11 +1232,11 @@ function sysCard(value, label) {
 // Policies: granular supervision rules
 // Persist agents/skills/policies to localStorage
 function _loadState(key, fallback) {
-  try { var s = localStorage.getItem('clawboss_' + key); return s ? JSON.parse(s) : fallback; }
+  try { var s = localStorage.getItem('agenthandler_' + key); return s ? JSON.parse(s) : fallback; }
   catch(e) { return fallback; }
 }
 function _saveState(key, data) {
-  try { localStorage.setItem('clawboss_' + key, JSON.stringify(data)); } catch(e) {}
+  try { localStorage.setItem('agenthandler_' + key, JSON.stringify(data)); } catch(e) {}
 }
 
 const _DEFAULT_POLICIES = [
@@ -1621,7 +1621,7 @@ function renderSupervision(agent) {
   if (policyNames.length === 0) return '';
   const ep = getEffectivePolicy(agent);
 
-  let html = '<div class="supervision-box"><div class="label"><span class="dot dot-green"></span> Clawboss Active &mdash; ' + policyNames.map(esc).join(', ') + '</div>';
+  let html = '<div class="supervision-box"><div class="label"><span class="dot dot-green"></span> AgentHandler Active &mdash; ' + policyNames.map(esc).join(', ') + '</div>';
   html += renderEffectivePolicyHtml(ep);
   html += '</div>';
   return html;
@@ -3775,7 +3775,7 @@ function fetchSessions() {
     .catch(err => {
       statusEl.textContent = 'Could not reach API: ' + err.message;
       document.getElementById('sessions-grid').innerHTML =
-        '<div class="card"><div class="card-desc">Start the server with <code>uvicorn clawboss.server:app</code></div></div>';
+        '<div class="card"><div class="card-desc">Start the server with <code>uvicorn agenthandler.server:app</code></div></div>';
     });
 }
 

@@ -10,7 +10,7 @@ Run:
 import asyncio
 import json
 
-from clawboss import MemoryStore, Observer, PricingTable, SessionManager
+from agenthandler import MemoryStore, Observer, PricingTable, SessionManager
 
 
 def print_json(label: str, data: dict) -> None:

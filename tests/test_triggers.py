@@ -1,11 +1,11 @@
-"""Tests for clawboss.triggers — scheduling, webhooks, and DB watch."""
+"""Tests for agenthandler.triggers — scheduling, webhooks, and DB watch."""
 
 import asyncio
 import time
 
 import pytest
 
-from clawboss.triggers import (
+from agenthandler.triggers import (
     Scheduler,
     WebhookTrigger,
     _cron_matches,

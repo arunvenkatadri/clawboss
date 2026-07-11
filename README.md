@@ -1,4 +1,4 @@
-# Clawboss 
+# AgentHandler 
 
 
 
@@ -7,17 +7,17 @@
 
 
 
-[![CI](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml/badge.svg)](https://github.com/arunvenkatadri/Clawboss/actions/workflows/ci.yml)
+[![CI](https://github.com/arunvenkatadri/AgentHandler/actions/workflows/ci.yml/badge.svg)](https://github.com/arunvenkatadri/AgentHandler/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 [![Tests](https://img.shields.io/badge/tests-658-brightgreen.svg)]()
 
-**Stop your AI agents from going rogue and set your long acting agents up for success.** Clawboss wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
+**Stop your AI agents from going rogue and set your long acting agents up for success.** AgentHandler wraps tool calls with timeouts, budgets, circuit breakers, and audit logging so one bad tool call doesn't drain your wallet or loop forever.
 
 Zero dependencies. Works with **any agent framework** — LangChain, CrewAI, AutoGen, OpenClaw, your own custom loop, whatever. Just wrap your tool calls. Includes durable sessions that survive restarts, a REST control plane, and a [dashboard](#dashboard) for managing everything in one place.
 
-> **Clawboss is built for long-duration agents** — agents that run for hours or days, not minutes. Read [the manifesto](docs/manifesto.md) for the full vision.
+> **AgentHandler is built for long-duration agents** — agents that run for hours or days, not minutes. Read [the manifesto](docs/manifesto.md) for the full vision.
 
 ## Why
 
@@ -25,29 +25,29 @@ You deploy an agent. It calls a flaky API in a loop. 47 times. At $0.03 per call
 
 Or: your agent decides to "keep researching" and burns through your entire token budget in one conversation. Or: a tool hangs for 90 seconds and your user stares at a spinner.
 
-Clawboss is the guardrail layer between your agent and its tools. Every tool call goes through supervision — timeouts, budgets, circuit breakers — so you can deploy agents without white-knuckling it.
+AgentHandler is the guardrail layer between your agent and its tools. Every tool call goes through supervision — timeouts, budgets, circuit breakers — so you can deploy agents without white-knuckling it.
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Clawboss architecture — agent → supervision layer → tools" width="900">
+  <img src="docs/architecture.svg" alt="AgentHandler architecture — agent → supervision layer → tools" width="900">
 </p>
 
 ### No arbitrary code downloads
 
 Most agent platforms want you to install skills from a community marketplace — arbitrary code that runs unsandboxed in your agent's process. One bad plugin and your agent has full access to your filesystem, credentials, and network.
 
-Clawboss takes a different approach. **You define skills and agents declaratively** — what tools are available, what parameters they accept, what supervision limits apply. No downloading stranger code. No hoping someone reviewed that community plugin before you installed it. You control exactly what your agents can do, and every tool call goes through supervision whether you built it or someone else did.
+AgentHandler takes a different approach. **You define skills and agents declaratively** — what tools are available, what parameters they accept, what supervision limits apply. No downloading stranger code. No hoping someone reviewed that community plugin before you installed it. You control exactly what your agents can do, and every tool call goes through supervision whether you built it or someone else did.
 
 ## Install
 
 ```bash
-pip install clawboss
+pip install agenthandler
 ```
 
 ## Quick start
 
 ```python
 import asyncio
-from clawboss import Supervisor, Policy
+from agenthandler import Supervisor, Policy
 
 # Define limits
 policy = Policy(
@@ -88,7 +88,7 @@ Open `dashboard.html` in a browser for a full management UI:
 
 - **Agents** — create, edit, deploy, and manage agents. Each agent has a system prompt, task, assigned skills, policies, budget overrides, and an optional POML pipeline. Agents persist to localStorage across refreshes.
 - **LLM-powered agent builder** — describe what you want in plain English. Claude generates a system prompt, picks the right skills and policies, sets a schedule, suggests budgets, and creates a multi-step pipeline — all auto-applied. Hit "Refine" to iterate on the prompt.
-- **Live chat** — open a conversation with any agent directly from the dashboard. Messages go through a real LLM with full clawboss supervision (budgets, iterations, timeouts, circuit breakers). Tool calls are visible in the chat.
+- **Live chat** — open a conversation with any agent directly from the dashboard. Messages go through a real LLM with full agenthandler supervision (budgets, iterations, timeouts, circuit breakers). Tool calls are visible in the chat.
 - **Deploy** — click Deploy on an agent card to create a supervised session and auto-run the agent's task. The chat panel opens and shows the agent working.
 - **Skills** — define reusable capabilities (tool collections) and assign them to agents
 - **Pipeline editor** — visual step builder with drag-to-reorder, or describe the pipeline in natural language and let Claude generate the POML. Toggle between visual and raw POML views.
@@ -98,7 +98,7 @@ Open `dashboard.html` in a browser for a full management UI:
 - **Costs** — track spend, set budgets with hard stops, view usage over time
 - **Policies** — see all active supervision rules at a glance
 
-The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API. The LLM features (prompt generation, chat, pipeline generation) require a backend with an LLM API key — use [Artemis](https://github.com/arunvenkatadri/artemis) or provide your own `/chat` and `/generate-prompt` endpoints.
+The Sessions tab connects to the REST control plane (`uvicorn agenthandler.server:app`) and shows real-time session data. Agent cards show live status and controls work against the real API. The LLM features (prompt generation, chat, pipeline generation) require a backend with an LLM API key — use [Artemis](https://github.com/arunvenkatadri/artemis) or provide your own `/chat` and `/generate-prompt` endpoints.
 
 
 <img width="1383" height="1270" alt="Sdd" src="https://github.com/user-attachments/assets/b4fec9fa-59d4-4476-93ac-19684c835ab0" />
@@ -132,7 +132,7 @@ The Sessions tab connects to the REST control plane (`uvicorn clawboss.server:ap
 
 ## Works with any agent framework
 
-Clawboss doesn't care what framework you use. It supervises tool calls — any async or sync callable. If your agent calls tools, Clawboss can wrap them.
+AgentHandler doesn't care what framework you use. It supervises tool calls — any async or sync callable. If your agent calls tools, AgentHandler can wrap them.
 
 ```python
 # LangChain? Wrap your tools.
@@ -183,13 +183,13 @@ Constraint types:
 
 ## Context compression
 
-Long-running agents drift. They forget their original instructions, blow past constraints, and hallucinate prior context. Clawboss solves this with **supervision-anchored compression** — a novel approach that only works because you have a supervision layer.
+Long-running agents drift. They forget their original instructions, blow past constraints, and hallucinate prior context. AgentHandler solves this with **supervision-anchored compression** — a novel approach that only works because you have a supervision layer.
 
 The key insight: supervised agents can compress more aggressively than unsupervised ones. Safety-critical state (policies, budgets, circuit breakers) is enforced by the supervisor, not by the LLM's memory. So you never need to keep that in context — it's reconstructed fresh every turn.
 
 ```python
-from clawboss import Supervisor, Policy
-from clawboss.context import ContextWindow
+from agenthandler import Supervisor, Policy
+from agenthandler.context import ContextWindow
 
 supervisor = Supervisor(Policy(max_iterations=10, token_budget=10000))
 ctx = ContextWindow(supervisor, max_recent_turns=10, skill_name="research")
@@ -218,10 +218,10 @@ The anchored state is never compressed — it's rebuilt from the supervisor's li
 
 ## Pipeline orchestration
 
-Chain tool calls into supervised sequential pipelines. Output flows from one step to the next — every step goes through full Clawboss supervision (timeouts, budgets, circuit breakers, PII redaction, approvals).
+Chain tool calls into supervised sequential pipelines. Output flows from one step to the next — every step goes through full AgentHandler supervision (timeouts, budgets, circuit breakers, PII redaction, approvals).
 
 ```python
-from clawboss import Pipeline, SessionManager, MemoryStore
+from agenthandler import Pipeline, SessionManager, MemoryStore
 
 store = MemoryStore()
 mgr = SessionManager(store)
@@ -246,7 +246,7 @@ Pipelines stop early if a step fails, the budget is exceeded, or a tool needs ap
 Describe what you want in plain English. The LLM generates POML, which gets parsed into an executable pipeline.
 
 ```python
-from clawboss import PipelineBuilder
+from agenthandler import PipelineBuilder
 
 # Auto-discover schema so the LLM writes correct SQL
 schema = await sql.discover_schema()
@@ -321,7 +321,7 @@ pipeline.add_threshold(
 Query SQL and NoSQL databases as supervised tool calls. Results flow through PII redaction, audit logging, and observability like any other tool.
 
 ```python
-from clawboss.connectors import SqlConnector
+from agenthandler.connectors import SqlConnector
 
 sql = SqlConnector("sqlite:///data.db")  # also: postgresql://, mysql://
 
@@ -372,7 +372,7 @@ The REST endpoint `GET /pipelines/schema` returns the schema for all registered 
 Long-duration agents don't just loop `run()` forever. They think → act → observe → reflect → think again. Each phase is its own LLM call, each phase is audited, and the reflection output feeds into the next think phase.
 
 ```python
-from clawboss import ReflectionLoop, SessionManager, MemoryStore
+from agenthandler import ReflectionLoop, SessionManager, MemoryStore
 
 mgr = SessionManager(MemoryStore())
 
@@ -400,7 +400,7 @@ See `examples/long_running_agent.py` for a full reference implementation.
 Every session's audit log is a complete record of what the agent did. `SessionReplay` reconstructs the timeline step by step — every tool call, every decision, every guardrail check, every state change.
 
 ```python
-from clawboss import SessionReplay
+from agenthandler import SessionReplay
 
 replay = SessionReplay(mgr, session_id)
 summary = replay.summary()
@@ -481,7 +481,7 @@ The pipeline keeps a rolling history (last 20 runs) in `session.payload["history
 Subscribe agents to real-time event streams. Each message fires the agent pipeline with the message payload as input.
 
 ```python
-from clawboss import KafkaStreamConnector
+from agenthandler import KafkaStreamConnector
 
 async def on_message(payload):
     # Run pipeline with the message as input
@@ -500,11 +500,11 @@ Three streaming backends — install only what you need:
 
 | Connector | Install | Use for |
 |-----------|---------|---------|
-| `KafkaStreamConnector` | `pip install clawboss[kafka]` | Self-hosted, enterprise, replay, consumer groups |
-| `KinesisStreamConnector` | `pip install clawboss[kinesis]` | AWS-native event streams |
-| `RedisStreamConnector` | `pip install clawboss[redis]` | Simpler deployments, already-have-Redis |
+| `KafkaStreamConnector` | `pip install agenthandler[kafka]` | Self-hosted, enterprise, replay, consumer groups |
+| `KinesisStreamConnector` | `pip install agenthandler[kinesis]` | AWS-native event streams |
+| `RedisStreamConnector` | `pip install agenthandler[redis]` | Simpler deployments, already-have-Redis |
 
-Or install all three: `pip install clawboss[streams]`
+Or install all three: `pip install agenthandler[streams]`
 
 All three use at-least-once delivery — messages are acknowledged only after the handler completes successfully. If the agent crashes mid-processing, the message is redelivered.
 
@@ -513,7 +513,7 @@ All three use at-least-once delivery — messages are acknowledged only after th
 Run pipelines on a schedule, on webhook, or when data changes.
 
 ```python
-from clawboss import Scheduler, WebhookTrigger
+from agenthandler import Scheduler, WebhookTrigger
 
 scheduler = Scheduler()
 
@@ -557,10 +557,10 @@ The dashboard shows trigger mode selection in the agent creation flow — on-dem
 
 ## Durable sessions
 
-Long-running agents survive process restarts. Clawboss checkpoints supervisor state (iterations, token usage, circuit breaker states) to a pluggable store after every operation.
+Long-running agents survive process restarts. AgentHandler checkpoints supervisor state (iterations, token usage, circuit breaker states) to a pluggable store after every operation.
 
 ```python
-from clawboss import SessionManager, SqliteStore
+from agenthandler import SessionManager, SqliteStore
 
 store = SqliteStore("sessions.db")  # or MemoryStore() for testing
 mgr = SessionManager(store)
@@ -593,7 +593,7 @@ mgr.stop(session_id)
 Implement the `StateStore` protocol for your own backend:
 
 ```python
-from clawboss import StateStore, Checkpoint
+from agenthandler import StateStore, Checkpoint
 
 class RedisStore:
     def save_checkpoint(self, checkpoint: Checkpoint) -> None: ...
@@ -615,7 +615,7 @@ session_id = mgr.start("my-agent", {
 })
 
 # After 5 crashes and resumes, the next resume() raises:
-# ClawbossError("max_resumes_exceeded", "Crash loop: resumed 5 times (limit: 5)")
+# AgentHandlerError("max_resumes_exceeded", "Crash loop: resumed 5 times (limit: 5)")
 # Session is automatically marked as FAILED.
 ```
 
@@ -651,20 +651,20 @@ Stateless sessions can be paused and stopped normally. They cannot be resumed af
 Manage agent sessions remotely over HTTP. Optional dependency — install with:
 
 ```bash
-pip install clawboss[server]
+pip install agenthandler[server]
 ```
 
 Start the server:
 
 ```bash
-uvicorn clawboss.server:app
+uvicorn agenthandler.server:app
 ```
 
 With API key auth:
 
 ```bash
 # Pick any string as your secret — there's no signup or external service
-CLAWBOSS_API_KEY=my-secret-key uvicorn clawboss.server:app
+AGENTHANDLER_API_KEY=my-secret-key uvicorn agenthandler.server:app
 ```
 
 Clients pass the key as a Bearer token:
@@ -675,17 +675,17 @@ curl -H "Authorization: Bearer my-secret-key" http://localhost:8000/sessions
 
 WebSocket connections pass it as a query param: `ws://localhost:8000/sessions/{id}/events?token=my-secret-key`
 
-The default `uvicorn clawboss.server:app` rejects all requests unless `CLAWBOSS_API_KEY` or OAuth is configured. For local dev without auth, create the app in code: `create_app()` (no `require_auth`).
+The default `uvicorn agenthandler.server:app` rejects all requests unless `AGENTHANDLER_API_KEY` or OAuth is configured. For local dev without auth, create the app in code: `create_app()` (no `require_auth`).
 
 ### OAuth2 (GitHub, Google)
 
 For production deployments, configure OAuth2 via environment variables:
 
 ```bash
-CLAWBOSS_OAUTH_PROVIDER=github \
-CLAWBOSS_OAUTH_CLIENT_ID=your-client-id \
-CLAWBOSS_OAUTH_CLIENT_SECRET=your-client-secret \
-uvicorn clawboss.server:app
+AGENTHANDLER_OAUTH_PROVIDER=github \
+AGENTHANDLER_OAUTH_CLIENT_ID=your-client-id \
+AGENTHANDLER_OAUTH_CLIENT_SECRET=your-client-secret \
+uvicorn agenthandler.server:app
 ```
 
 This adds `/auth/login` (get the OAuth redirect URL), `/auth/callback` (exchange code for session token), and `/auth/me` (current user info). Session tokens are Bearer tokens — use them the same way as API keys. Supported providers: `github`, `google`.
@@ -733,15 +733,15 @@ curl http://localhost:8000/sessions/{id}
 
 ## Security model
 
-Clawboss is designed to supervise untrusted agent behavior. The stateful session layer enforces several invariants:
+AgentHandler is designed to supervise untrusted agent behavior. The stateful session layer enforces several invariants:
 
-**Policy is immutable and integrity-checked.** The supervision policy is frozen at `start()` and cannot be changed by the agent. An HMAC checksum is stored alongside the policy — on `resume()`, the checksum is verified and the session is rejected if it doesn't match. Even if someone edits the SQLite file directly, they can't downgrade supervision without the HMAC key (configurable via `CLAWBOSS_POLICY_KEY`).
+**Policy is immutable and integrity-checked.** The supervision policy is frozen at `start()` and cannot be changed by the agent. An HMAC checksum is stored alongside the policy — on `resume()`, the checksum is verified and the session is rejected if it doesn't match. Even if someone edits the SQLite file directly, they can't downgrade supervision without the HMAC key (configurable via `AGENTHANDLER_POLICY_KEY`).
 
 **Payload is untrusted.** The `payload` field is agent-writable storage for intermediate work. It is validated for size (1 MB limit) and serializability, but its *contents* should be treated like user input. If your agent reads from payload after a resume, sanitize it.
 
 **Session IDs are cryptographic.** 128-bit random IDs via `secrets.token_hex` — not guessable or enumerable.
 
-**The REST API supports API key and OAuth2 auth.** Set `CLAWBOSS_API_KEY` for simple Bearer token auth, or configure OAuth2 (GitHub/Google) for production. The default `uvicorn clawboss.server:app` rejects all requests unless auth is configured. CORS is restricted to localhost by default.
+**The REST API supports API key and OAuth2 auth.** Set `AGENTHANDLER_API_KEY` for simple Bearer token auth, or configure OAuth2 (GitHub/Google) for production. The default `uvicorn agenthandler.server:app` rejects all requests unless auth is configured. CORS is restricted to localhost by default.
 
 **SQLite files are owner-only.** The default `SqliteStore` creates database files with `0600` permissions.
 
@@ -751,10 +751,10 @@ Clawboss is designed to supervise untrusted agent behavior. The stateful session
 
 ## OpenClaw integration
 
-Clawboss includes a built-in bridge for [OpenClaw](https://github.com/openclaw/openclaw). Expose your supervised tools to OpenClaw over HTTP — all supervision (timeouts, budgets, circuit breakers) applies automatically.
+AgentHandler includes a built-in bridge for [OpenClaw](https://github.com/openclaw/openclaw). Expose your supervised tools to OpenClaw over HTTP — all supervision (timeouts, budgets, circuit breakers) applies automatically.
 
 ```python
-from clawboss import OpenClawBridge, Skill, ToolDefinition, ToolParameter
+from agenthandler import OpenClawBridge, Skill, ToolDefinition, ToolParameter
 
 # Define your skill with tools and supervision limits
 skill = Skill(
@@ -784,7 +784,7 @@ Then install the TypeScript plugin from `openclaw-plugin/` into OpenClaw. The pl
 You can also convert schemas without running a bridge:
 
 ```python
-from clawboss import to_openclaw_tool_schema, to_openclaw_manifest
+from agenthandler import to_openclaw_tool_schema, to_openclaw_manifest
 
 schema = to_openclaw_tool_schema(tool_def)    # OpenClaw JSON Schema format
 manifest = to_openclaw_manifest(skill)         # openclaw.plugin.json content
@@ -818,7 +818,7 @@ result = supervisor.call_sync("calculator", my_sync_fn, x=42)
 Every supervised action is recorded. Write to JSONL, stdout, or implement your own sink:
 
 ```python
-from clawboss import Supervisor, Policy, AuditLog, JsonlAuditSink
+from agenthandler import Supervisor, Policy, AuditLog, JsonlAuditSink
 
 # Log to file
 sink = JsonlAuditSink.file("audit.jsonl")
@@ -832,7 +832,7 @@ sink = JsonlAuditSink.stdout()
 Custom sink — implement the `AuditSink` interface:
 
 ```python
-from clawboss import AuditSink, AuditEntry
+from agenthandler import AuditSink, AuditEntry
 
 class MyDatabaseSink(AuditSink):
     def write(self, entry: AuditEntry) -> None:
@@ -841,10 +841,10 @@ class MyDatabaseSink(AuditSink):
 
 ## Guardrails
 
-Clawboss ships **16 guardrails** that hook into every supervised tool call. Eight are deterministic (rule-based, fast, zero-overhead when disabled). Eight are LLM-backed (bring-your-own-LLM, opt-in).
+AgentHandler ships **16 guardrails** that hook into every supervised tool call. Eight are deterministic (rule-based, fast, zero-overhead when disabled). Eight are LLM-backed (bring-your-own-LLM, opt-in).
 
 ```python
-from clawboss import (
+from agenthandler import (
     SessionManager, UrlGuard, SchemaValidator, RecursionDetector,
     PromptInjectionDetector, IntentDriftDetector,
 )
@@ -914,7 +914,7 @@ policy = Policy(
 
 ```python
 # Standalone usage
-from clawboss import Redactor
+from agenthandler import Redactor
 
 r = Redactor(categories=["email", "phone"])
 result = r.redact("Contact bob@example.com or call 555-123-4567")
@@ -947,7 +947,7 @@ policy = Policy(
 
 When the agent calls `delete_file`, instead of executing:
 
-1. The Supervisor returns `SupervisedResult(error=ClawbossError("approval_pending"))` with an `approval_id`
+1. The Supervisor returns `SupervisedResult(error=AgentHandlerError("approval_pending"))` with an `approval_id`
 2. The approval appears in the dashboard (yellow notification) and on the WebSocket events stream
 3. A human reviews and clicks Approve or Deny (or calls the REST endpoint)
 4. The agent calls `sv.execute_approved(approval_id, fn)` to run the approved tool
@@ -993,7 +993,7 @@ policy = Policy(
 Control what happens when limits are hit:
 
 ```python
-from clawboss import Policy, OnFailure, Action
+from agenthandler import Policy, OnFailure, Action
 
 policy = Policy(
     on_timeout=OnFailure(Action.RETURN_ERROR),
@@ -1012,7 +1012,7 @@ Actions:
 Create skills from natural language. Bring your own LLM — pass any async function that takes a prompt and returns text.
 
 ```python
-from clawboss import SkillBuilder, SkillStore
+from agenthandler import SkillBuilder, SkillStore
 
 # Bring your own LLM (OpenAI, Anthropic, local, whatever)
 async def my_llm(prompt: str) -> str:
@@ -1038,14 +1038,14 @@ print(skill.instructions)   # ["Always cite sources", ...]
 skill = await builder.refine(skill, "Add a rule about preferring recent sources")
 
 # Save it
-store = SkillStore("~/.clawboss/skills")
+store = SkillStore("~/.agenthandler/skills")
 store.save(skill)
 ```
 
 ### Managing skills
 
 ```python
-store = SkillStore("~/.clawboss/skills")
+store = SkillStore("~/.agenthandler/skills")
 
 # List all skills
 for s in store.list():
@@ -1073,7 +1073,7 @@ Skills are stored as JSON and can be exported to POML. The format includes:
 - **name, description, triggers** — identity and activation
 - **role, task, instructions, examples** — what the agent should do
 - **tools** — what tools are available (with parameter schemas)
-- **supervision** — clawboss limits (maps directly to `Policy.from_dict()`)
+- **supervision** — agenthandler limits (maps directly to `Policy.from_dict()`)
 
 ## API
 
@@ -1096,7 +1096,7 @@ Dataclass with all configuration. Every field has a sensible default.
 ### `SupervisedResult`
 
 - `output` — the tool's return value (if succeeded)
-- `error` — `ClawbossError` (if failed)
+- `error` — `AgentHandlerError` (if failed)
 - `succeeded` — bool
 - `duration_ms` — how long the call took
 - `budget` — `BudgetSnapshot` at time of completion
@@ -1232,7 +1232,7 @@ Parses a POML document with `<pipeline>` tags into a Pipeline object.
 Structured telemetry for agent behavior — latency, success rates, token counts, **dollar cost**, per tool, per session, per agent, per model. Optional OpenTelemetry export for Datadog, Grafana, Honeycomb, etc.
 
 ```python
-from clawboss import Observer, PricingTable
+from agenthandler import Observer, PricingTable
 
 # PricingTable.default() ships with common models
 obs = Observer(pricing=PricingTable.default())
@@ -1304,7 +1304,7 @@ ruff check .
 ruff format --check .
 
 # Type check
-mypy clawboss/
+mypy agenthandler/
 ```
 
 ## License

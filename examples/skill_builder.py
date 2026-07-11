@@ -8,7 +8,7 @@ import asyncio
 import json
 import tempfile
 
-from clawboss import SkillBuilder, SkillStore
+from agenthandler import SkillBuilder, SkillStore
 
 
 # ── Replace this with your real LLM ──────────────────────────────────

@@ -1,10 +1,10 @@
-"""Clawboss — supervision for AI agent tool execution.
+"""AgentHandler — supervision for AI agent tool execution.
 
 Timeouts, budgets, circuit breakers, and audit for tool calls.
 Works with any agent framework — just wrap your tool calls.
 
 Usage:
-    from clawboss import Supervisor, Policy
+    from agenthandler import Supervisor, Policy
 
     policy = Policy(max_iterations=3, tool_timeout=15, token_budget=10000)
     supervisor = Supervisor(policy)
@@ -26,7 +26,7 @@ from .builder import SkillBuilder
 from .circuit_breaker import CircuitBreaker, CircuitState
 from .connectors import MongoConnector, SqlConnector
 from .context import AnchoredState, CompressedContext, CompressedHistory, ContextWindow, Turn
-from .errors import ClawbossError
+from .errors import AgentHandlerError
 from .guardrails import (
     ActiveHours,
     AnomalyScorer,
@@ -91,7 +91,7 @@ __all__ = [
     "AuditOutcome",
     "AuditSink",
     "JsonlAuditSink",
-    "ClawbossError",
+    "AgentHandlerError",
     "Skill",
     "SkillStore",
     "ToolDefinition",

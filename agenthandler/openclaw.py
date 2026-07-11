@@ -1,17 +1,17 @@
-"""OpenClaw integration — bridge clawboss-supervised tools to OpenClaw.
+"""OpenClaw integration — bridge agenthandler-supervised tools to OpenClaw.
 
-Converts clawboss Skill/ToolDefinition to OpenClaw's JSON Schema format
+Converts agenthandler Skill/ToolDefinition to OpenClaw's JSON Schema format
 and serves them over HTTP for the OpenClaw TypeScript plugin.
 
 Usage:
-    from clawboss import OpenClawBridge, Policy, ToolDefinition, ToolParameter
+    from agenthandler import OpenClawBridge, Policy, ToolDefinition, ToolParameter
 
     bridge = OpenClawBridge(policy=Policy(tool_timeout=10))
     bridge.register_tool(tool_def, my_async_fn)
     bridge.serve()  # http://127.0.0.1:9229
 
 Or convert schemas without running a server:
-    from clawboss import to_openclaw_tool_schema
+    from agenthandler import to_openclaw_tool_schema
     schema = to_openclaw_tool_schema(tool_def)
 """
 
@@ -39,7 +39,7 @@ def _slugify(name: str) -> str:
 
 
 def to_openclaw_tool_schema(tool: ToolDefinition) -> dict[str, Any]:
-    """Convert a clawboss ToolDefinition to OpenClaw's registerTool format.
+    """Convert a agenthandler ToolDefinition to OpenClaw's registerTool format.
 
     Returns a dict with name, description, and JSON Schema parameters
     compatible with OpenClaw's api.registerTool().
@@ -80,13 +80,13 @@ def to_openclaw_manifest(
 
     Args:
         skill: The skill to generate a manifest for.
-        plugin_id: Plugin identifier. Defaults to "clawboss-{skill.name}".
+        plugin_id: Plugin identifier. Defaults to "agenthandler-{skill.name}".
         bridge_port: Port the bridge server will run on.
     """
-    pid = plugin_id or f"clawboss-{_slugify(skill.name)}"
+    pid = plugin_id or f"agenthandler-{_slugify(skill.name)}"
     return {
         "id": pid,
-        "name": f"Clawboss: {skill.name}",
+        "name": f"AgentHandler: {skill.name}",
         "version": skill.version,
         "description": skill.description,
         "entry": "dist/index.js",
@@ -96,7 +96,7 @@ def to_openclaw_manifest(
                 "bridgeUrl": {
                     "type": "string",
                     "default": f"http://localhost:{bridge_port}",
-                    "description": "URL of the clawboss bridge server",
+                    "description": "URL of the agenthandler bridge server",
                 },
             },
         },
@@ -141,7 +141,7 @@ def _supervised_result_to_dict(result: SupervisedResult) -> dict[str, Any]:
 
 
 class OpenClawBridge:
-    """HTTP bridge that exposes clawboss-supervised tools to OpenClaw.
+    """HTTP bridge that exposes agenthandler-supervised tools to OpenClaw.
 
     Registers tool definitions with their async callables, then serves
     them over HTTP for the OpenClaw TypeScript plugin to discover and invoke.
@@ -207,7 +207,7 @@ class OpenClawBridge:
         self._loop_thread = threading.Thread(
             target=self._loop.run_forever,
             daemon=True,
-            name="clawboss-bridge-loop",
+            name="agenthandler-bridge-loop",
         )
         self._loop_thread.start()
 
@@ -357,7 +357,7 @@ class OpenClawBridge:
         thread = threading.Thread(
             target=self._server.serve_forever,
             daemon=True,
-            name="clawboss-bridge-http",
+            name="agenthandler-bridge-http",
         )
         thread.start()
         return thread

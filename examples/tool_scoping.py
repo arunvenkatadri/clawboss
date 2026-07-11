@@ -1,6 +1,6 @@
 """Tool scoping — parameter-level permissions and rate limits."""
 
-from clawboss import Policy, ScopeRule, ToolScope
+from agenthandler import Policy, ScopeRule, ToolScope
 
 
 def main():

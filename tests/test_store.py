@@ -1,9 +1,9 @@
-"""Tests for clawboss.store — MemoryStore, SqliteStore, and security invariants."""
+"""Tests for agenthandler.store — MemoryStore, SqliteStore, and security invariants."""
 
 import os
 import tempfile
 
-from clawboss.store import (
+from agenthandler.store import (
     MAX_PAYLOAD_BYTES,
     Checkpoint,
     MemoryStore,

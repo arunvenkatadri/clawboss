@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from clawboss.audit import AuditLog, MemoryAuditSink
-from clawboss.policy import Policy, ScopeRule, ToolScope
-from clawboss.supervisor import Supervisor
+from agenthandler.audit import AuditLog, MemoryAuditSink
+from agenthandler.policy import Policy, ScopeRule, ToolScope
+from agenthandler.supervisor import Supervisor
 
 # ---------------------------------------------------------------------------
 # Helper tool functions

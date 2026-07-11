@@ -4,10 +4,10 @@ import json
 
 import pytest
 
-from clawboss.reflection import ReflectionLoop
-from clawboss.replay import SessionReplay
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.reflection import ReflectionLoop
+from agenthandler.replay import SessionReplay
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 POLICY = {"max_iterations": 50, "tool_timeout": 10, "token_budget": 100000}
 

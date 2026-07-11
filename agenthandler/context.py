@@ -6,7 +6,7 @@ supervisor, not by the LLM's memory. This module reconstructs anchored state
 fresh each turn and compresses older history safely.
 
 Usage:
-    from clawboss import Supervisor, Policy, ContextWindow
+    from agenthandler import Supervisor, Policy, ContextWindow
 
     supervisor = Supervisor(Policy(max_iterations=5, token_budget=10000))
     ctx = ContextWindow(supervisor, max_recent_turns=10)

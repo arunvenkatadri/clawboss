@@ -1,12 +1,12 @@
-"""Tests for clawboss.budget — BudgetTracker and BudgetSnapshot."""
+"""Tests for agenthandler.budget — BudgetTracker and BudgetSnapshot."""
 
 import threading
 
 import pytest
 
-from clawboss.budget import BudgetSnapshot, BudgetTracker
-from clawboss.errors import ClawbossError
-from clawboss.policy import Policy
+from agenthandler.budget import BudgetSnapshot, BudgetTracker
+from agenthandler.errors import AgentHandlerError
+from agenthandler.policy import Policy
 
 # ---------------------------------------------------------------------------
 # BudgetSnapshot properties
@@ -71,7 +71,7 @@ class TestBudgetTrackerTokens:
     def test_record_tokens_raises_when_over_budget(self):
         bt = BudgetTracker(token_limit=1000, iteration_limit=5)
         bt.record_tokens(800)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             bt.record_tokens(300)
         assert exc_info.value.kind == "budget_exceeded"
 
@@ -105,7 +105,7 @@ class TestBudgetTrackerIterations:
         bt = BudgetTracker(token_limit=None, iteration_limit=2)
         bt.record_iteration()
         bt.record_iteration()
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             bt.record_iteration()
         assert exc_info.value.kind == "max_iterations"
 

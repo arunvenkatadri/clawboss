@@ -33,7 +33,7 @@ class ToolDefinition:
 class Skill:
     """A complete skill definition — what the agent does, how, and within what limits.
 
-    This is the clawboss-native skill format. It can be converted to/from
+    This is the agenthandler-native skill format. It can be converted to/from
     POML, JSON, YAML, or any other format your agent framework uses.
     """
 
@@ -178,7 +178,7 @@ class SkillStore:
     """File-based CRUD for skills. Each skill is a JSON file on disk.
 
     Usage:
-        store = SkillStore("~/.clawboss/skills")
+        store = SkillStore("~/.agenthandler/skills")
         store.save(skill)
         skill = store.get("web_research")
         all_skills = store.list()

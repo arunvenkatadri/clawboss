@@ -2,7 +2,7 @@
 
 import asyncio
 
-from clawboss import ApprovalQueue, Policy, Supervisor
+from agenthandler import ApprovalQueue, Policy, Supervisor
 
 
 async def delete_database(db_name: str) -> str:

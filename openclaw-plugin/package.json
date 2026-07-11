@@ -1,7 +1,7 @@
 {
-  "name": "clawboss-openclaw-plugin",
+  "name": "agenthandler-openclaw-plugin",
   "version": "0.91.0",
-  "description": "OpenClaw plugin that bridges to clawboss-supervised Python tools",
+  "description": "OpenClaw plugin that bridges to agenthandler-supervised Python tools",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

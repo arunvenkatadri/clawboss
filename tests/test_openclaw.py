@@ -1,4 +1,4 @@
-"""Tests for clawboss.openclaw — OpenClaw integration, bridge, schema conversion."""
+"""Tests for agenthandler.openclaw — OpenClaw integration, bridge, schema conversion."""
 
 from __future__ import annotations
 
@@ -10,13 +10,13 @@ import urllib.request
 
 import pytest
 
-from clawboss.openclaw import (
+from agenthandler.openclaw import (
     OpenClawBridge,
     to_openclaw_manifest,
     to_openclaw_tool_schema,
 )
-from clawboss.policy import Policy
-from clawboss.skill import Skill, ToolDefinition, ToolParameter
+from agenthandler.policy import Policy
+from agenthandler.skill import Skill, ToolDefinition, ToolParameter
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -145,8 +145,8 @@ class TestToOpenclawManifest:
             tools=[_make_tool_def()],
         )
         manifest = to_openclaw_manifest(skill)
-        assert manifest["id"] == "clawboss-web-research"
-        assert manifest["name"] == "Clawboss: web_research"
+        assert manifest["id"] == "agenthandler-web-research"
+        assert manifest["name"] == "AgentHandler: web_research"
         assert manifest["version"] == "2.0"
         assert manifest["description"] == "Research topics"
         assert "configSchema" in manifest

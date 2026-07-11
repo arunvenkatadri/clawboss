@@ -4,7 +4,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from .errors import ClawbossError
+from .errors import AgentHandlerError
 
 
 @dataclass
@@ -42,8 +42,8 @@ class BudgetTracker:
 
     Usage:
         tracker = BudgetTracker(token_limit=10000, iteration_limit=5)
-        tracker.record_tokens(500)    # raises ClawbossError if over
-        tracker.record_iteration()    # raises ClawbossError if over
+        tracker.record_tokens(500)    # raises AgentHandlerError if over
+        tracker.record_iteration()    # raises AgentHandlerError if over
         snap = tracker.snapshot()     # read current state
     """
 
@@ -66,7 +66,7 @@ class BudgetTracker:
         with self._lock:
             self._tokens_used += tokens
             if self._token_limit is not None and self._tokens_used > self._token_limit:
-                raise ClawbossError.budget_exceeded(self._tokens_used, self._token_limit)
+                raise AgentHandlerError.budget_exceeded(self._tokens_used, self._token_limit)
             return self._tokens_used
 
     def record_iteration(self) -> int:
@@ -74,7 +74,7 @@ class BudgetTracker:
         with self._lock:
             self._iterations += 1
             if self._iterations > self._iteration_limit:
-                raise ClawbossError.max_iterations(self._iterations, self._iteration_limit)
+                raise AgentHandlerError.max_iterations(self._iterations, self._iteration_limit)
             return self._iterations
 
     def snapshot(self) -> BudgetSnapshot:

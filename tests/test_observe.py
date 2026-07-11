@@ -1,10 +1,10 @@
-"""Tests for clawboss.observe — agent observability and metrics."""
+"""Tests for agenthandler.observe — agent observability and metrics."""
 
 import pytest
 
-from clawboss.observe import Observer
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.observe import Observer
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # Observer unit tests

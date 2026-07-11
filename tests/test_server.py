@@ -1,4 +1,4 @@
-"""Tests for clawboss.server — REST control plane endpoints, auth, and security."""
+"""Tests for agenthandler.server — REST control plane endpoints, auth, and security."""
 
 import pytest
 
@@ -7,9 +7,9 @@ try:
 except ImportError:
     pytest.skip("fastapi not installed", allow_module_level=True)
 
-from clawboss.server import create_app
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.server import create_app
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # Fixtures

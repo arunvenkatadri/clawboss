@@ -2,7 +2,7 @@
 
 import asyncio
 
-from clawboss import Policy, Supervisor
+from agenthandler import Policy, Supervisor
 
 call_count = 0
 

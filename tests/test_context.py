@@ -1,4 +1,4 @@
-"""Tests for clawboss.context — context compression module."""
+"""Tests for agenthandler.context — context compression module."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ import threading
 
 import pytest
 
-from clawboss.budget import BudgetSnapshot
-from clawboss.context import (
+from agenthandler.budget import BudgetSnapshot
+from agenthandler.context import (
     AnchoredState,
     CompressedContext,
     CompressedHistory,
     ContextWindow,
     Turn,
 )
-from clawboss.policy import Policy
-from clawboss.supervisor import Supervisor
+from agenthandler.policy import Policy
+from agenthandler.supervisor import Supervisor
 
 # ---------------------------------------------------------------------------
 # Helper tool functions

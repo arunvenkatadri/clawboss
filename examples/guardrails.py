@@ -10,7 +10,7 @@ Run:
 import asyncio
 import json
 
-from clawboss import (
+from agenthandler import (
     IntentDriftDetector,
     MemoryStore,
     OutputLengthLimit,

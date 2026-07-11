@@ -1,4 +1,4 @@
-"""OpenClaw bridge — expose clawboss-supervised tools to OpenClaw.
+"""OpenClaw bridge — expose agenthandler-supervised tools to OpenClaw.
 
 This example:
 1. Defines tools with ToolDefinition
@@ -21,7 +21,7 @@ Test with curl:
 import asyncio
 import json
 
-from clawboss import (
+from agenthandler import (
     OpenClawBridge,
     Skill,
     ToolDefinition,

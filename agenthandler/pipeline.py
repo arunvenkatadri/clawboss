@@ -4,7 +4,7 @@ Level 1: Sequential steps with output chaining.
 Level 2: Conditional branching — if/else/threshold routing.
 
 Usage:
-    from clawboss import Pipeline, SessionManager, MemoryStore
+    from agenthandler import Pipeline, SessionManager, MemoryStore
 
     store = MemoryStore()
     mgr = SessionManager(store)

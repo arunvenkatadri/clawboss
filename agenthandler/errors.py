@@ -1,8 +1,8 @@
-"""Clawboss error types — every error has a user_message()."""
+"""AgentHandler error types — every error has a user_message()."""
 
 
-class ClawbossError(Exception):
-    """Base error for all clawboss supervision failures."""
+class AgentHandlerError(Exception):
+    """Base error for all agenthandler supervision failures."""
 
     def __init__(self, kind: str, message: str, **details: object) -> None:
         self.kind = kind
@@ -13,16 +13,16 @@ class ClawbossError(Exception):
         return str(self)
 
     @staticmethod
-    def timeout(timeout_ms: int) -> "ClawbossError":
-        return ClawbossError(
+    def timeout(timeout_ms: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "timeout",
             f"Tool call timed out after {timeout_ms}ms",
             timeout_ms=timeout_ms,
         )
 
     @staticmethod
-    def budget_exceeded(used: int, limit: int) -> "ClawbossError":
-        return ClawbossError(
+    def budget_exceeded(used: int, limit: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "budget_exceeded",
             f"Token budget exceeded: {used} / {limit}",
             used=used,
@@ -30,8 +30,8 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def max_iterations(iterations: int, max_iter: int) -> "ClawbossError":
-        return ClawbossError(
+    def max_iterations(iterations: int, max_iter: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "max_iterations",
             f"Maximum iterations reached: {iterations} / {max_iter}",
             iterations=iterations,
@@ -39,8 +39,8 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def circuit_open(tool: str, consecutive_failures: int) -> "ClawbossError":
-        return ClawbossError(
+    def circuit_open(tool: str, consecutive_failures: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "circuit_open",
             f"Circuit breaker open for '{tool}': {consecutive_failures} consecutive failures",
             tool=tool,
@@ -48,24 +48,24 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def tool_error(message: str) -> "ClawbossError":
-        return ClawbossError("tool_error", message)
+    def tool_error(message: str) -> "AgentHandlerError":
+        return AgentHandlerError("tool_error", message)
 
     @staticmethod
-    def dead_man_switch(silence_ms: int) -> "ClawbossError":
-        return ClawbossError(
+    def dead_man_switch(silence_ms: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "dead_man_switch",
             f"Dead man's switch: no activity for {silence_ms}ms",
             silence_ms=silence_ms,
         )
 
     @staticmethod
-    def policy_denied(reason: str) -> "ClawbossError":
-        return ClawbossError("policy_denied", f"Policy denied: {reason}", reason=reason)
+    def policy_denied(reason: str) -> "AgentHandlerError":
+        return AgentHandlerError("policy_denied", f"Policy denied: {reason}", reason=reason)
 
     @staticmethod
-    def scope_denied(tool: str, detail: str) -> "ClawbossError":
-        return ClawbossError(
+    def scope_denied(tool: str, detail: str) -> "AgentHandlerError":
+        return AgentHandlerError(
             "scope_denied",
             f"Scope violation for '{tool}': {detail}",
             tool=tool,
@@ -73,8 +73,8 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def rate_limited(tool: str, limit: int) -> "ClawbossError":
-        return ClawbossError(
+    def rate_limited(tool: str, limit: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "rate_limited",
             f"Rate limit exceeded for '{tool}': max {limit} calls/minute",
             tool=tool,
@@ -82,8 +82,8 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def approval_pending(tool_name: str, approval_id: str) -> "ClawbossError":
-        return ClawbossError(
+    def approval_pending(tool_name: str, approval_id: str) -> "AgentHandlerError":
+        return AgentHandlerError(
             "approval_pending",
             f"Tool '{tool_name}' requires approval (id: {approval_id})",
             tool_name=tool_name,
@@ -91,11 +91,11 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def approval_denied(tool_name: str, reason: str = "") -> "ClawbossError":
+    def approval_denied(tool_name: str, reason: str = "") -> "AgentHandlerError":
         msg = f"Tool '{tool_name}' was denied"
         if reason:
             msg += f": {reason}"
-        return ClawbossError(
+        return AgentHandlerError(
             "approval_denied",
             msg,
             tool_name=tool_name,
@@ -103,24 +103,24 @@ class ClawbossError(Exception):
         )
 
     @staticmethod
-    def agent_paused(session_id: str) -> "ClawbossError":
-        return ClawbossError(
+    def agent_paused(session_id: str) -> "AgentHandlerError":
+        return AgentHandlerError(
             "agent_paused",
             f"Agent is paused (session {session_id})",
             session_id=session_id,
         )
 
     @staticmethod
-    def session_not_found(session_id: str) -> "ClawbossError":
-        return ClawbossError(
+    def session_not_found(session_id: str) -> "AgentHandlerError":
+        return AgentHandlerError(
             "session_not_found",
             f"Session not found: {session_id}",
             session_id=session_id,
         )
 
     @staticmethod
-    def max_resumes_exceeded(session_id: str, resume_count: int, limit: int) -> "ClawbossError":
-        return ClawbossError(
+    def max_resumes_exceeded(session_id: str, resume_count: int, limit: int) -> "AgentHandlerError":
+        return AgentHandlerError(
             "max_resumes_exceeded",
             f"Session {session_id} has been resumed {resume_count} times "
             f"(limit: {limit}). Possible crash loop — session marked as failed.",

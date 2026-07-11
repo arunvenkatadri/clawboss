@@ -10,10 +10,10 @@ Run:
 import asyncio
 import time
 
-from clawboss import MemoryStore, SessionManager
-from clawboss.connectors import SqlConnector
-from clawboss.pipeline import Pipeline
-from clawboss.triggers import Scheduler, WebhookTrigger
+from agenthandler import MemoryStore, SessionManager
+from agenthandler.connectors import SqlConnector
+from agenthandler.pipeline import Pipeline
+from agenthandler.triggers import Scheduler, WebhookTrigger
 
 # -- Simulated tools --
 

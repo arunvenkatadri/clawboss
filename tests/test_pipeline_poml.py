@@ -1,10 +1,10 @@
-"""Tests for clawboss.pipeline_poml — POML parsing and PipelineBuilder."""
+"""Tests for agenthandler.pipeline_poml — POML parsing and PipelineBuilder."""
 
 import pytest
 
-from clawboss.pipeline_poml import PipelineBuilder, _make_predicate, parse_pipeline_poml
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.pipeline_poml import PipelineBuilder, _make_predicate, parse_pipeline_poml
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 POLICY = {"max_iterations": 10, "tool_timeout": 10}
 

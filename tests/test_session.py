@@ -1,10 +1,10 @@
-"""Tests for clawboss.session — SessionManager lifecycle and security invariants."""
+"""Tests for agenthandler.session — SessionManager lifecycle and security invariants."""
 
 import pytest
 
-from clawboss.errors import ClawbossError
-from clawboss.session import SessionManager
-from clawboss.store import MAX_PAYLOAD_BYTES, MemoryStore, SessionStatus
+from agenthandler.errors import AgentHandlerError
+from agenthandler.session import SessionManager
+from agenthandler.store import MAX_PAYLOAD_BYTES, MemoryStore, SessionStatus
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -124,21 +124,21 @@ class TestSessionErrors:
     def test_pause_nonexistent_raises(self):
         store = MemoryStore()
         mgr = SessionManager(store)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr.pause("nope")
         assert exc_info.value.kind == "session_not_found"
 
     def test_resume_nonexistent_raises(self):
         store = MemoryStore()
         mgr = SessionManager(store)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr.resume("nope")
         assert exc_info.value.kind == "session_not_found"
 
     def test_stop_nonexistent_raises(self):
         store = MemoryStore()
         mgr = SessionManager(store)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr.stop("nope")
         assert exc_info.value.kind == "session_not_found"
 
@@ -204,7 +204,7 @@ class TestPayload:
     def test_update_payload_nonexistent_raises(self):
         store = MemoryStore()
         mgr = SessionManager(store)
-        with pytest.raises(ClawbossError):
+        with pytest.raises(AgentHandlerError):
             mgr.update_payload("nope", {})
 
     def test_oversized_payload_rejected_on_start(self):
@@ -430,7 +430,7 @@ class TestStatelessSessions:
         del mgr1
 
         mgr2 = SessionManager(store)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr2.resume(sid)
         assert exc_info.value.kind == "session_not_recoverable"
 
@@ -465,7 +465,7 @@ class TestStatelessSessions:
 class TestCrashLoopProtection:
     def test_default_max_resumes_is_3(self):
         """Policy defaults to max_resumes=3."""
-        from clawboss.policy import Policy
+        from agenthandler.policy import Policy
 
         p = Policy()
         assert p.max_resumes == 3
@@ -510,7 +510,7 @@ class TestCrashLoopProtection:
 
         # Resume 3 — should fail (limit is 2)
         mgr.pause(sid)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr.resume(sid)
         assert exc_info.value.kind == "max_resumes_exceeded"
 
@@ -540,7 +540,7 @@ class TestCrashLoopProtection:
 
         # Process 4: resume should fail — crash loop detected
         mgr4 = SessionManager(store)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr4.resume(sid)
         assert exc_info.value.kind == "max_resumes_exceeded"
         assert "crash loop" in str(exc_info.value).lower()
@@ -556,6 +556,6 @@ class TestCrashLoopProtection:
             mgr.resume(sid)
         # 11th should fail
         mgr.pause(sid)
-        with pytest.raises(ClawbossError) as exc_info:
+        with pytest.raises(AgentHandlerError) as exc_info:
             mgr.resume(sid)
         assert exc_info.value.kind == "max_resumes_exceeded"

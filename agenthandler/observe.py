@@ -7,7 +7,7 @@ Honeycomb, etc.
 Zero overhead when disabled. No required dependencies.
 
 Usage:
-    from clawboss.observe import Observer, PricingTable
+    from agenthandler.observe import Observer, PricingTable
 
     # Optional: configure pricing for real dollar cost attribution
     pricing = PricingTable.default()  # or PricingTable(models={...})
@@ -280,19 +280,19 @@ class Observer:
                 BatchSpanProcessor,
             )
 
-            resource = Resource.create({"service.name": "clawboss"})
+            resource = Resource.create({"service.name": "agenthandler"})
 
             tracer_provider = TracerProvider(resource=resource)
             tracer_provider.add_span_processor(
                 BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
             )
             trace.set_tracer_provider(tracer_provider)
-            self._otel_tracer = trace.get_tracer("clawboss")
+            self._otel_tracer = trace.get_tracer("agenthandler")
 
             reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=endpoint))
             meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
             metrics.set_meter_provider(meter_provider)
-            self._otel_meter = metrics.get_meter("clawboss")
+            self._otel_meter = metrics.get_meter("agenthandler")
         except ImportError:
             pass
 

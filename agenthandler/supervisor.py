@@ -1,4 +1,4 @@
-"""Supervisor — the core of clawboss.
+"""Supervisor — the core of agenthandler.
 
 Wraps tool calls with timeout, budget, circuit breaker, and audit.
 Doesn't own the agent loop — supervises whatever loop you're running.
@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 from .audit import AuditLog, AuditOutcome, AuditPhase
 from .budget import BudgetSnapshot, BudgetTracker
 from .circuit_breaker import CircuitBreaker
-from .errors import ClawbossError
+from .errors import AgentHandlerError
 from .policy import Policy
 from .redact import Redactor
 
@@ -45,7 +45,7 @@ class SupervisedResult:
     """Result of a supervised tool call."""
 
     output: Any = None
-    error: Optional[ClawbossError] = None
+    error: Optional[AgentHandlerError] = None
     succeeded: bool = False
     duration_ms: int = 0
     budget: Optional[BudgetSnapshot] = None
@@ -147,14 +147,14 @@ class Supervisor:
         return self._budget.snapshot()
 
     def record_tokens(self, tokens: int) -> int:
-        """Record token usage. Returns new total. Raises ClawbossError if over budget."""
+        """Record token usage. Returns new total. Raises AgentHandlerError if over budget."""
         total = self._budget.record_tokens(tokens)
         self._auto_checkpoint()
         return total
 
     def record_iteration(self) -> int:
         """Record an iteration of the agent loop. Returns iteration count.
-        Raises ClawbossError if max iterations exceeded.
+        Raises AgentHandlerError if max iterations exceeded.
         """
         self._last_activity = time.monotonic()
         try:
@@ -166,7 +166,7 @@ class Supervisor:
             )
             self._auto_checkpoint()
             return count
-        except ClawbossError as e:
+        except AgentHandlerError as e:
             self._audit.record(
                 AuditPhase.ITERATION_CHECK,
                 AuditOutcome.DENIED,
@@ -191,7 +191,7 @@ class Supervisor:
         """Check if the overall request has timed out."""
         elapsed = time.monotonic() - self._start_time
         if elapsed > self._policy.request_timeout:
-            raise ClawbossError.timeout(int(elapsed * 1000))
+            raise AgentHandlerError.timeout(int(elapsed * 1000))
 
     def _check_silence(self) -> None:
         """Check the dead man's switch."""
@@ -199,18 +199,18 @@ class Supervisor:
             return
         silence = time.monotonic() - self._last_activity
         if silence > self._policy.silence_timeout:
-            raise ClawbossError.dead_man_switch(int(silence * 1000))
+            raise AgentHandlerError.dead_man_switch(int(silence * 1000))
 
     def _check_paused(self) -> None:
         """Check if this supervisor is paused."""
         if self._paused and self._session_id:
-            raise ClawbossError.agent_paused(self._session_id)
+            raise AgentHandlerError.agent_paused(self._session_id)
 
     def _check_confirm(self, tool_name: str, kwargs: Dict[str, Any]) -> Optional[str]:
         """Check if this tool requires confirmation.
 
         If an approval queue is configured, queues the call and returns an
-        approval_id. Otherwise raises ClawbossError.
+        approval_id. Otherwise raises AgentHandlerError.
 
         Returns:
             approval_id if queued, None if no confirmation needed.
@@ -220,7 +220,7 @@ class Supervisor:
         if self._approval_queue is not None and self._session_id:
             req = self._approval_queue.submit(tool_name, kwargs, self._session_id)
             return req.approval_id
-        raise ClawbossError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
+        raise AgentHandlerError.policy_denied(f"Tool '{tool_name}' requires user confirmation")
 
     def _check_scopes(self, tool_name: str, kwargs: Dict[str, Any]) -> None:
         """Check if tool arguments satisfy scope rules."""
@@ -230,14 +230,14 @@ class Supervisor:
                 # Check argument rules
                 error_msg = scope.check_args(kwargs)
                 if error_msg:
-                    raise ClawbossError.scope_denied(tool_name, error_msg)
+                    raise AgentHandlerError.scope_denied(tool_name, error_msg)
                 # Check rate limit
                 if scope.max_calls_per_minute is not None:
                     times = self._tool_call_times.get(tool_name, [])
                     cutoff = now - 60.0
                     recent = [t for t in times if t > cutoff]
                     if len(recent) >= scope.max_calls_per_minute:
-                        raise ClawbossError.rate_limited(tool_name, scope.max_calls_per_minute)
+                        raise AgentHandlerError.rate_limited(tool_name, scope.max_calls_per_minute)
                     recent.append(now)
                     self._tool_call_times[tool_name] = recent
 
@@ -275,13 +275,13 @@ class Supervisor:
                     metadata={"approval_id": approval_id},
                 )
                 return SupervisedResult(
-                    error=ClawbossError.approval_pending(tool_name, approval_id),
+                    error=AgentHandlerError.approval_pending(tool_name, approval_id),
                     duration_ms=int((time.monotonic() - start) * 1000),
                     budget=self._budget.snapshot(),
                     tool_name=tool_name,
                 )
             self._check_scopes(tool_name, kwargs)
-        except ClawbossError as e:
+        except AgentHandlerError as e:
             phase = (
                 AuditPhase.SCOPE_CHECK
                 if e.kind in ("scope_denied", "rate_limited")
@@ -304,7 +304,7 @@ class Supervisor:
         cb = self._get_circuit_breaker(tool_name)
         try:
             cb.check(tool_name)
-        except ClawbossError as e:
+        except AgentHandlerError as e:
             self._audit.record(
                 AuditPhase.CIRCUIT_BREAKER,
                 AuditOutcome.DENIED,
@@ -331,7 +331,9 @@ class Supervisor:
                     detail=f"Guardrail '{result.guardrail_name}' blocked: {result.reason}",
                 )
                 return SupervisedResult(
-                    error=ClawbossError.policy_denied(f"{result.guardrail_name}: {result.reason}"),
+                    error=AgentHandlerError.policy_denied(
+                        f"{result.guardrail_name}: {result.reason}"
+                    ),
                     duration_ms=int((time.monotonic() - start) * 1000),
                     budget=self._budget.snapshot(),
                     tool_name=tool_name,
@@ -388,7 +390,7 @@ class Supervisor:
             )
         except asyncio.TimeoutError:
             cb.record_failure()
-            error = ClawbossError.timeout(int(self._policy.tool_timeout * 1000))
+            error = AgentHandlerError.timeout(int(self._policy.tool_timeout * 1000))
             self._audit.record(
                 AuditPhase.TOOL_CALL,
                 AuditOutcome.TIMED_OUT,
@@ -405,7 +407,7 @@ class Supervisor:
             return r
         except Exception as e:
             cb.record_failure()
-            error = ClawbossError.tool_error(str(e))
+            error = AgentHandlerError.tool_error(str(e))
             self._audit.record(
                 AuditPhase.TOOL_CALL,
                 AuditOutcome.FAILED,
@@ -439,7 +441,9 @@ class Supervisor:
                     detail=f"Post-guardrail '{result.guardrail_name}' blocked: {result.reason}",
                 )
                 return SupervisedResult(
-                    error=ClawbossError.policy_denied(f"{result.guardrail_name}: {result.reason}"),
+                    error=AgentHandlerError.policy_denied(
+                        f"{result.guardrail_name}: {result.reason}"
+                    ),
                     duration_ms=duration_ms,
                     budget=self._budget.snapshot(),
                     tool_name=tool_name,
@@ -523,7 +527,7 @@ class Supervisor:
         if tokens > 0:
             try:
                 self._budget.record_tokens(tokens)
-            except ClawbossError as e:
+            except AgentHandlerError as e:
                 self._audit.record(
                     AuditPhase.BUDGET_CHECK,
                     AuditOutcome.BUDGET_EXCEEDED,
@@ -579,7 +583,7 @@ class Supervisor:
         """
         if self._approval_queue is None:
             return SupervisedResult(
-                error=ClawbossError.policy_denied("No approval queue configured"),
+                error=AgentHandlerError.policy_denied("No approval queue configured"),
                 budget=self._budget.snapshot(),
             )
 
@@ -588,18 +592,18 @@ class Supervisor:
         req = self._approval_queue.get(approval_id)
         if req is None:
             return SupervisedResult(
-                error=ClawbossError.policy_denied(f"Approval {approval_id} not found"),
+                error=AgentHandlerError.policy_denied(f"Approval {approval_id} not found"),
                 budget=self._budget.snapshot(),
             )
         if req.status == ApprovalStatus.DENIED:
             return SupervisedResult(
-                error=ClawbossError.approval_denied(req.tool_name, req.deny_reason),
+                error=AgentHandlerError.approval_denied(req.tool_name, req.deny_reason),
                 budget=self._budget.snapshot(),
                 tool_name=req.tool_name,
             )
         if req.status != ApprovalStatus.APPROVED:
             return SupervisedResult(
-                error=ClawbossError.approval_pending(req.tool_name, approval_id),
+                error=AgentHandlerError.approval_pending(req.tool_name, approval_id),
                 budget=self._budget.snapshot(),
                 tool_name=req.tool_name,
             )

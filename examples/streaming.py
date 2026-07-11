@@ -10,9 +10,9 @@ Run:
 
 import asyncio
 
-from clawboss import MemoryStore, SessionManager
-from clawboss.pipeline import Pipeline
-from clawboss.streams import KafkaStreamConnector
+from agenthandler import MemoryStore, SessionManager
+from agenthandler.pipeline import Pipeline
+from agenthandler.streams import KafkaStreamConnector
 
 # -- Simulated tools --
 
@@ -55,7 +55,7 @@ async def main() -> None:
     _connector = KafkaStreamConnector(
         bootstrap_servers="localhost:9092",
         topic="agent-events",
-        group_id="clawboss-demo",
+        group_id="agenthandler-demo",
         on_message=on_message,
     )
 
@@ -71,7 +71,7 @@ async def main() -> None:
 
     print("\n=== Connector setup (would connect to Kafka) ===")
     print("  Topic: agent-events")
-    print("  Group: clawboss-demo")
+    print("  Group: agenthandler-demo")
     print("  Servers: localhost:9092")
     print(f"  Session: {session_id} (reused across messages)")
 

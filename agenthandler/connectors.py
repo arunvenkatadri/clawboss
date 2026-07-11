@@ -1,7 +1,7 @@
 """Database connectors — supervised query tools for SQL and NoSQL.
 
 Give agents the ability to query databases as regular supervised tool calls.
-Results flow through the full Clawboss pipeline: PII redaction, audit logging,
+Results flow through the full AgentHandler pipeline: PII redaction, audit logging,
 tool scoping, budgets, and observability.
 
 Connectors return async callables that work with ``supervisor.call()`` and
@@ -13,7 +13,7 @@ any PEP 249 driver). No required dependencies beyond stdlib.
 MongoDB — optional, requires ``pymongo``.
 
 Usage:
-    from clawboss.connectors import SqlConnector
+    from agenthandler.connectors import SqlConnector
 
     sql = SqlConnector("sqlite:///data.db")
     result = await supervisor.call("query", sql.query, sql="SELECT * FROM users LIMIT 10")

@@ -1,4 +1,4 @@
-"""Clawboss guardrails — deterministic and LLM-backed safety checks.
+"""AgentHandler guardrails — deterministic and LLM-backed safety checks.
 
 Guardrails hook into Supervisor.call() as pre-call and post-call checks.
 Pre-call checks can block a tool from executing. Post-call checks can

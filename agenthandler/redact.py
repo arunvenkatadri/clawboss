@@ -8,7 +8,7 @@ For HIPAA/GDPR-grade redaction, use a dedicated NER service — this
 catches accidental leakage, not adversarial exfiltration.
 
 Usage:
-    from clawboss.redact import Redactor
+    from agenthandler.redact import Redactor
 
     redactor = Redactor(categories=["email", "phone", "ssn"])
     clean = redactor.redact("Call me at 555-123-4567 or bob@example.com")

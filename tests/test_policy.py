@@ -1,6 +1,6 @@
-"""Tests for clawboss.policy — Policy dataclass, OnFailure, Action."""
+"""Tests for agenthandler.policy — Policy dataclass, OnFailure, Action."""
 
-from clawboss.policy import Action, Policy
+from agenthandler.policy import Action, Policy
 
 # ---------------------------------------------------------------------------
 # Action.from_str

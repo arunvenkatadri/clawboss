@@ -2,7 +2,7 @@
 
 import pytest
 
-from clawboss.guardrails import (
+from agenthandler.guardrails import (
     ActiveHours,
     AnomalyScorer,
     CategoryRateLimit,
@@ -21,8 +21,8 @@ from clawboss.guardrails import (
     SemanticPiiRedactor,
     UrlGuard,
 )
-from clawboss.session import SessionManager
-from clawboss.store import MemoryStore
+from agenthandler.session import SessionManager
+from agenthandler.store import MemoryStore
 
 # ---------------------------------------------------------------------------
 # GuardrailResult
