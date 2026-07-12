@@ -136,20 +136,11 @@ class EdgeReduceLLM:
 
     @staticmethod
     def _default_policy(RoutingPolicy: Any) -> Any:
-        """Sensible default: route everything local, escalate to cloud if uncertain."""
+        """Default: cloud-only. Configure a policy file to enable local routing."""
         return RoutingPolicy(
             rules=[
-                {
-                    "name": "sensitive-local-only",
-                    "match": {
-                        "keywords_any": ["patient", "ssn", "confidential", "internal-only"],
-                    },
-                    "route": "local",
-                    "escalation": "forbidden",
-                },
-                {"name": "default", "match": {}, "route": "local", "escalation": "allowed"},
+                {"name": "default", "match": {}, "route": "cloud"},
             ],
-            escalation={"method": "self_score", "threshold": 6, "max_escalations_per_hour": 30},
         )
 
     @classmethod
