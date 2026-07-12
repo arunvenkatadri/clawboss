@@ -114,9 +114,9 @@ class EdgeReduceLLM:
             import yaml
 
             with open(self._policy_path) as f:
-                policy = RoutingPolicy.from_dict(yaml.safe_load(f))
+                policy = RoutingPolicy(**yaml.safe_load(f))
         else:
-            policy = RoutingPolicy.default()
+            policy = self._default_policy(RoutingPolicy)
 
         local = LocalTier(
             base_url=self._local_base_url,
@@ -133,6 +133,24 @@ class EdgeReduceLLM:
             cloud=cloud,
         )
         return self._engine
+
+    @staticmethod
+    def _default_policy(RoutingPolicy: Any) -> Any:
+        """Sensible default: route everything local, escalate to cloud if uncertain."""
+        return RoutingPolicy(
+            rules=[
+                {
+                    "name": "sensitive-local-only",
+                    "match": {
+                        "keywords_any": ["patient", "ssn", "confidential", "internal-only"],
+                    },
+                    "route": "local",
+                    "escalation": "forbidden",
+                },
+                {"name": "default", "match": {}, "route": "local", "escalation": "allowed"},
+            ],
+            escalation={"method": "self_score", "threshold": 6, "max_escalations_per_hour": 30},
+        )
 
     @classmethod
     def from_engine(
