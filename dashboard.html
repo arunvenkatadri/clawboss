@@ -668,6 +668,7 @@
   <button class="tab" data-tab="skills" role="tab">Skills</button>
   <button class="tab" data-tab="costs" role="tab">Costs</button>
   <button class="tab" data-tab="policies" role="tab">Policies</button>
+  <button class="tab" data-tab="routing" role="tab">Routing</button>
   <button class="tab" data-tab="sessions" role="tab">Sessions</button>
 </div>
 
@@ -895,6 +896,83 @@
     </div>
     <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Your Policies</h3>
     <div class="card-grid" id="policy-grid"></div>
+  </div>
+
+  <!-- Routing (edge-reduce config) -->
+  <div class="section" id="sec-routing">
+    <div class="builder-box">
+      <h3 style="display:flex; align-items:center; justify-content:space-between;">
+        LLM Routing Policy
+        <span>
+          <button class="btn-secondary" onclick="addRoutingRule()">+ Add Rule</button>
+          <button class="btn-secondary" onclick="exportRoutingYaml()">Export YAML</button>
+          <button class="btn-secondary" onclick="testRoutingQuery()">Test Query</button>
+        </span>
+      </h3>
+      <p style="font-size:0.82rem; color:var(--muted); line-height:1.4;">
+        Configure how LLM queries are routed between local and cloud models.
+        Rules are evaluated top-down (first match wins). Drag to reorder.
+        Export as <code>routing_policy.yaml</code> for use with <code>EdgeReduceLLM</code>.
+      </p>
+    </div>
+
+    <!-- Global settings -->
+    <div class="card" style="margin-bottom:1rem;">
+      <h4 style="font-size:0.85rem; margin-bottom:0.5rem;">Global Settings</h4>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem;">
+        <label style="font-size:0.78rem;">
+          Cloud Model
+          <input class="form-input" id="rt-cloud-model" value="claude-sonnet-4-20250514" style="width:100%; margin-top:0.25rem;">
+        </label>
+        <label style="font-size:0.78rem;">
+          Local Model
+          <input class="form-input" id="rt-local-model" value="qwen3:14b" placeholder="e.g. llama3.2, qwen3:14b" style="width:100%; margin-top:0.25rem;">
+        </label>
+        <label style="font-size:0.78rem;">
+          Local URL
+          <input class="form-input" id="rt-local-url" value="http://localhost:11434/v1" style="width:100%; margin-top:0.25rem;">
+        </label>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-top:0.75rem;">
+        <label style="font-size:0.78rem;">
+          Escalation Threshold (1-10)
+          <input class="form-input" id="rt-esc-threshold" type="number" min="1" max="10" value="6" style="width:100%; margin-top:0.25rem;">
+        </label>
+        <label style="font-size:0.78rem;">
+          Max Escalations / Hour
+          <input class="form-input" id="rt-esc-max" type="number" min="1" value="30" style="width:100%; margin-top:0.25rem;">
+        </label>
+        <label style="font-size:0.78rem;">
+          Max Cloud Tokens
+          <input class="form-input" id="rt-max-tokens" type="number" min="1000" value="30000" style="width:100%; margin-top:0.25rem;">
+        </label>
+      </div>
+    </div>
+
+    <!-- Rules list -->
+    <h3 style="font-size:0.85rem; color:var(--muted); margin:0 0 0.5rem;">Routing Rules <span style="font-size:0.75rem;">(first match wins)</span></h3>
+    <div id="routing-rules-list"></div>
+
+    <!-- Test panel -->
+    <div id="routing-test-panel" style="display:none; margin-top:1rem;">
+      <div class="card">
+        <h4 style="font-size:0.85rem; margin-bottom:0.5rem;">Test a Query</h4>
+        <div style="display:flex; gap:0.5rem;">
+          <input class="form-input" id="rt-test-input" placeholder="Type a query to test routing..." style="flex:1;">
+          <button class="btn-primary" onclick="runRoutingTest()">Route</button>
+        </div>
+        <div id="rt-test-result" style="margin-top:0.5rem; font-size:0.82rem;"></div>
+      </div>
+    </div>
+
+    <!-- YAML preview -->
+    <div id="routing-yaml-panel" style="display:none; margin-top:1rem;">
+      <div class="card">
+        <h4 style="font-size:0.85rem; margin-bottom:0.5rem;">routing_policy.yaml</h4>
+        <pre id="rt-yaml-output" style="background:var(--bg); padding:0.75rem; border-radius:6px; font-size:0.78rem; overflow-x:auto; max-height:400px; overflow-y:auto;"></pre>
+        <button class="btn-secondary" style="margin-top:0.5rem;" onclick="copyRoutingYaml()">Copy to Clipboard</button>
+      </div>
+    </div>
   </div>
 
   <!-- Sessions (live from REST API) -->
@@ -4007,6 +4085,182 @@ function renderAll() {
 }
 
 renderAll();
+
+// ---------------------------------------------------------------------------
+// Routing tab
+// ---------------------------------------------------------------------------
+
+let routingRules = [
+  { name: 'default', match: {}, route: 'cloud', escalation: '' }
+];
+
+function renderRoutingRules() {
+  const container = document.getElementById('routing-rules-list');
+  if (!container) return;
+  container.innerHTML = routingRules.map((rule, i) => `
+    <div class="card" style="margin-bottom:0.5rem; cursor:grab;" draggable="true"
+         ondragstart="rtDragStart(event,${i})" ondragover="rtDragOver(event)" ondrop="rtDrop(event,${i})">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="font-size:0.75rem; color:var(--muted);">#${i+1}</span>
+          <input class="form-input" value="${rule.name}" onchange="routingRules[${i}].name=this.value"
+                 style="width:180px; font-size:0.82rem; font-weight:600;">
+          <span class="badge ${rule.route==='cloud'?'badge-blue':rule.route==='local'?'badge-green':'badge-yellow'}"
+                style="font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:4px;">
+            ${rule.route.toUpperCase()}
+          </span>
+        </div>
+        <div style="display:flex; gap:0.35rem;">
+          ${i > 0 ? `<button class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem;" onclick="moveRule(${i},-1)">&#9650;</button>` : ''}
+          ${i < routingRules.length-1 ? `<button class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem;" onclick="moveRule(${i},1)">&#9660;</button>` : ''}
+          <button class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem; color:var(--red);" onclick="removeRule(${i})">&#10005;</button>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;">
+        <label style="font-size:0.75rem; color:var(--muted);">
+          Route
+          <select class="form-input" style="width:100%; margin-top:0.15rem;" onchange="routingRules[${i}].route=this.value; renderRoutingRules();">
+            <option value="cloud" ${rule.route==='cloud'?'selected':''}>Cloud (frontier)</option>
+            <option value="local" ${rule.route==='local'?'selected':''}>Local (Ollama)</option>
+            <option value="workflow" ${rule.route==='workflow'?'selected':''}>Workflow (fan-out)</option>
+          </select>
+        </label>
+        <label style="font-size:0.75rem; color:var(--muted);">
+          Escalation
+          <select class="form-input" style="width:100%; margin-top:0.15rem;" onchange="routingRules[${i}].escalation=this.value;">
+            <option value="" ${!rule.escalation?'selected':''}>Default</option>
+            <option value="allowed" ${rule.escalation==='allowed'?'selected':''}>Allowed</option>
+            <option value="forbidden" ${rule.escalation==='forbidden'?'selected':''}>Forbidden</option>
+          </select>
+        </label>
+        <label style="font-size:0.75rem; color:var(--muted);">
+          Keywords (comma-sep)
+          <input class="form-input" style="width:100%; margin-top:0.15rem;"
+                 value="${(rule.match.keywords_any||[]).join(', ')}"
+                 onchange="routingRules[${i}].match.keywords_any=this.value.split(',').map(s=>s.trim()).filter(Boolean);">
+        </label>
+      </div>
+      ${rule.route === 'workflow' ? `
+      <label style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem; display:block;">
+        Workflow Name
+        <input class="form-input" style="width:200px; margin-top:0.15rem;"
+               value="${rule.workflow||''}" onchange="routingRules[${i}].workflow=this.value;">
+      </label>` : ''}
+    </div>
+  `).join('');
+}
+
+function addRoutingRule() {
+  const n = routingRules.length;
+  routingRules.splice(n > 0 ? n - 1 : 0, 0, {
+    name: 'new-rule', match: { keywords_any: [] }, route: 'local', escalation: 'allowed'
+  });
+  renderRoutingRules();
+}
+
+function removeRule(i) {
+  if (routingRules.length <= 1) return;
+  routingRules.splice(i, 1);
+  renderRoutingRules();
+}
+
+function moveRule(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= routingRules.length) return;
+  [routingRules[i], routingRules[j]] = [routingRules[j], routingRules[i]];
+  renderRoutingRules();
+}
+
+let rtDragIdx = -1;
+function rtDragStart(e, i) { rtDragIdx = i; e.dataTransfer.effectAllowed = 'move'; }
+function rtDragOver(e) { e.preventDefault(); }
+function rtDrop(e, i) {
+  e.preventDefault();
+  if (rtDragIdx < 0 || rtDragIdx === i) return;
+  const item = routingRules.splice(rtDragIdx, 1)[0];
+  routingRules.splice(i, 0, item);
+  rtDragIdx = -1;
+  renderRoutingRules();
+}
+
+function buildRoutingYaml() {
+  const lines = [];
+  lines.push('version: 1');
+  lines.push('revision: 1');
+  lines.push(`local_model: "${document.getElementById('rt-local-model').value}"`);
+  lines.push('');
+  lines.push('rules:');
+  for (const rule of routingRules) {
+    lines.push(`- name: ${rule.name}`);
+    const kw = rule.match.keywords_any || [];
+    if (kw.length > 0) {
+      lines.push('  match:');
+      lines.push(`    keywords_any: [${kw.map(k => `"${k}"`).join(', ')}]`);
+    } else {
+      lines.push('  match: {}');
+    }
+    lines.push(`  route: ${rule.route}`);
+    if (rule.escalation) lines.push(`  escalation: ${rule.escalation}`);
+    if (rule.workflow) lines.push(`  workflow: ${rule.workflow}`);
+    lines.push('');
+  }
+  lines.push('escalation:');
+  lines.push('  method: self_score');
+  lines.push(`  threshold: ${document.getElementById('rt-esc-threshold').value}`);
+  lines.push(`  max_escalations_per_hour: ${document.getElementById('rt-esc-max').value}`);
+  lines.push('');
+  lines.push('budget:');
+  lines.push(`  max_cloud_tokens: ${document.getElementById('rt-max-tokens').value}`);
+  lines.push('');
+  lines.push('cloud:');
+  lines.push(`  model: "${document.getElementById('rt-cloud-model').value}"`);
+  lines.push('');
+  lines.push('local:');
+  lines.push(`  base_url: "${document.getElementById('rt-local-url').value}"`);
+  lines.push(`  model: "${document.getElementById('rt-local-model').value}"`);
+  return lines.join('\n');
+}
+
+function exportRoutingYaml() {
+  const panel = document.getElementById('routing-yaml-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('rt-yaml-output').textContent = buildRoutingYaml();
+}
+
+function copyRoutingYaml() {
+  navigator.clipboard.writeText(document.getElementById('rt-yaml-output').textContent);
+  const btn = event.target;
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy to Clipboard', 1500);
+}
+
+function testRoutingQuery() {
+  const panel = document.getElementById('routing-test-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function runRoutingTest() {
+  const query = document.getElementById('rt-test-input').value.toLowerCase();
+  const resultEl = document.getElementById('rt-test-result');
+  if (!query) { resultEl.textContent = 'Enter a query above.'; return; }
+
+  let matched = null;
+  for (const rule of routingRules) {
+    const kw = rule.match.keywords_any || [];
+    if (kw.length === 0) { matched = rule; break; }
+    if (kw.some(k => query.includes(k.toLowerCase()))) { matched = rule; break; }
+  }
+
+  if (matched) {
+    const color = matched.route === 'cloud' ? 'var(--accent)' : matched.route === 'local' ? 'var(--green)' : 'var(--yellow)';
+    resultEl.innerHTML = `<span style="color:${color}; font-weight:600;">${matched.route.toUpperCase()}</span> &mdash; matched rule "<strong>${matched.name}</strong>"` +
+      (matched.escalation ? ` (escalation: ${matched.escalation})` : '');
+  } else {
+    resultEl.innerHTML = '<span style="color:var(--red);">No rule matched</span> &mdash; query would be rejected.';
+  }
+}
+
+renderRoutingRules();
 </script>
 </body>
 </html>
