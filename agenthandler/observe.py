@@ -243,8 +243,10 @@ class Observer:
         self,
         otlp_endpoint: Optional[str] = None,
         pricing: Optional[PricingTable] = None,
+        max_records: int = 10000,
     ):
         self._records: List[ToolCallRecord] = []
+        self._max_records = max_records
         self._lock = threading.Lock()
         self._otel_tracer = None
         self._otel_meter = None
@@ -340,6 +342,9 @@ class Observer:
         )
         with self._lock:
             self._records.append(record)
+            # Evict oldest records when the limit is exceeded
+            if len(self._records) > self._max_records:
+                self._records = self._records[-self._max_records :]
 
         if self._otel_tracer:
             with self._otel_tracer.start_as_current_span(f"tool_call.{tool_name}") as span:

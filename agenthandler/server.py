@@ -31,7 +31,7 @@ try:
         WebSocketDisconnect,
     )
     from fastapi.middleware.cors import CORSMiddleware
-    from pydantic import BaseModel
+    from pydantic import BaseModel, Field
 except ImportError as e:
     raise ImportError(
         "agenthandler[server] extras required: pip install agenthandler[server]"
@@ -47,53 +47,53 @@ from .store import SqliteStore
 
 
 class CreateSessionRequest(BaseModel):
-    agent_id: str
+    agent_id: str = Field(..., max_length=256)
     policy: Optional[Dict[str, Any]] = None
     payload: Optional[Dict[str, Any]] = None
     stateless: bool = False
 
 
 class DenyRequest(BaseModel):
-    reason: str = ""
+    reason: str = Field("", max_length=1000)
 
 
 class GeneratePipelineRequest(BaseModel):
-    description: str
+    description: str = Field(..., max_length=10000)
     tools: Optional[List[str]] = None  # tool names to make available
 
 
 class ParsePipelineRequest(BaseModel):
-    poml: str
-    agent_id: str
+    poml: str = Field(..., max_length=102400)  # 100 KB
+    agent_id: str = Field(..., max_length=256)
     policy: Optional[Dict[str, Any]] = None
     stateless: bool = False
 
 
 class CreatePipelineSessionRequest(BaseModel):
-    agent_id: str
-    poml: str
+    agent_id: str = Field(..., max_length=256)
+    poml: str = Field(..., max_length=102400)  # 100 KB
     policy: Optional[Dict[str, Any]] = None
     payload: Optional[Dict[str, Any]] = None
     stateless: bool = False
 
 
 class CreateTriggerRequest(BaseModel):
-    name: str
-    trigger_type: str  # "interval", "cron", "webhook", "db_watch"
+    name: str = Field(..., max_length=256)
+    trigger_type: str = Field(..., max_length=64)  # "interval", "cron", "webhook", "db_watch"
     # Interval
     seconds: Optional[float] = None
     minutes: Optional[float] = None
     hours: Optional[float] = None
     # Cron
-    cron: Optional[str] = None
+    cron: Optional[str] = Field(None, max_length=256)
     # DB watch
-    query: Optional[str] = None
+    query: Optional[str] = Field(None, max_length=10000)
     threshold: Optional[float] = None
-    operator: Optional[str] = ">"  # >, >=, <, ==, !=
+    operator: Optional[str] = Field(">", max_length=8)  # >, >=, <, ==, !=
     poll_seconds: Optional[float] = 60
     # Pipeline to run (POML)
-    poml: Optional[str] = None
-    agent_id: Optional[str] = None
+    poml: Optional[str] = Field(None, max_length=102400)  # 100 KB
+    agent_id: Optional[str] = Field(None, max_length=256)
     policy: Optional[Dict[str, Any]] = None
 
 
@@ -655,10 +655,20 @@ def create_app(
 
         WebSocket auth: pass the API key as a query param ?token=<key>
         or in the first message after connect.
+
+        WARNING: The API key is sent as a query parameter because the
+        WebSocket protocol does not support custom headers during the
+        handshake in browsers. Query parameters may appear in server
+        access logs, browser history, and proxy logs. Use short-lived
+        tokens or a ticket-based auth flow in production to limit exposure.
         """
         # WebSocket auth via query param
         if resolved_key is not None:
             token = websocket.query_params.get("token", "")
+            # Reject obviously oversized tokens to prevent abuse
+            if len(token) > 512:
+                await websocket.close(code=4001)
+                return
             if not secrets.compare_digest(token, resolved_key):
                 await websocket.close(code=4001)
                 return

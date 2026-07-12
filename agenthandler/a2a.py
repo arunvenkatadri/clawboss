@@ -18,6 +18,7 @@ To make your agent discoverable:
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -460,11 +461,13 @@ class A2ASupervisedEndpoint:
         name: str = "agenthandler",
         description: str = "",
         url: str = "",
+        auth_token: Optional[str] = None,
     ) -> None:
         self._manager = manager
         self._session_id = session_id
         self._tool_router = tool_router
         self._tasks: Dict[str, A2ATask] = {}
+        self._auth_token = auth_token
 
         sv = manager.get_supervisor(session_id)
         if agent_card is not None:
@@ -581,6 +584,23 @@ class A2ASupervisedEndpoint:
             "result": task.to_dict(),
         }
 
+    def _check_auth(self, request: Any) -> None:
+        """Validate the auth token on an incoming request if configured.
+
+        Raises HTTPException(401) when a token is configured but the
+        request does not supply a matching ``Authorization: Bearer <token>``.
+        """
+        if self._auth_token is None:
+            return
+        from fastapi import HTTPException
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing authentication")
+        provided = auth_header[len("Bearer ") :]
+        if not secrets.compare_digest(provided, self._auth_token):
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+
     def router(self) -> Any:
         """Build a FastAPI APIRouter with A2A endpoints.
 
@@ -605,18 +625,21 @@ class A2ASupervisedEndpoint:
 
         @api.post("/a2a/tasks/send")
         async def send_task(request: Request) -> JSONResponse:
+            self._check_auth(request)
             body = await request.json()
             result = await self.handle_send(body)
             return JSONResponse(content=result)
 
         @api.post("/a2a/tasks/get")
         async def get_task(request: Request) -> JSONResponse:
+            self._check_auth(request)
             body = await request.json()
             result = await self.handle_get(body)
             return JSONResponse(content=result)
 
         @api.post("/a2a/tasks/cancel")
         async def cancel_task(request: Request) -> JSONResponse:
+            self._check_auth(request)
             body = await request.json()
             result = await self.handle_cancel(body)
             return JSONResponse(content=result)

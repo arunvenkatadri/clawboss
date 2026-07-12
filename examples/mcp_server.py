@@ -33,9 +33,42 @@ async def send_email(to: str = "", subject: str = "", body: str = "") -> str:
 
 
 def calculator(expression: str = "") -> str:
-    """Evaluate a math expression."""
+    """Evaluate a math expression (basic arithmetic only)."""
+    import ast
+    import operator
+
+    _ops = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.FloorDiv: operator.floordiv,
+        ast.Mod: operator.mod,
+        ast.Pow: operator.pow,
+        ast.USub: operator.neg,
+        ast.UAdd: operator.pos,
+    }
+
+    def _safe_eval(node: ast.AST) -> float:
+        if isinstance(node, ast.Expression):
+            return _safe_eval(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return node.value
+        if isinstance(node, ast.BinOp):
+            op_fn = _ops.get(type(node.op))
+            if op_fn is None:
+                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+            return op_fn(_safe_eval(node.left), _safe_eval(node.right))
+        if isinstance(node, ast.UnaryOp):
+            op_fn = _ops.get(type(node.op))
+            if op_fn is None:
+                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+            return op_fn(_safe_eval(node.operand))
+        raise ValueError(f"Unsupported expression: {ast.dump(node)}")
+
     try:
-        result = eval(expression, {"__builtins__": {}})  # noqa: S307
+        tree = ast.parse(expression.strip(), mode="eval")
+        result = _safe_eval(tree)
         return str(result)
     except Exception as e:
         return f"Error: {e}"

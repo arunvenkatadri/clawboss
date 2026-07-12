@@ -112,6 +112,11 @@ def register_oauth_routes(
         """Redirect URL for OAuth2 login."""
         callback_url = str(request.base_url) + "auth/callback"
         state = secrets.token_hex(16)
+        # Store the state so the callback can verify it
+        _oauth_tokens[f"_state_{state}"] = {
+            "auth_type": "_oauth_state",
+            "expires_at": time.time() + 600,  # 10 minutes
+        }
         url = (
             f"{config['authorize_url']}?"
             f"client_id={client_id}&"
@@ -124,6 +129,14 @@ def register_oauth_routes(
     @app.get("/auth/callback")
     async def oauth_callback(code: str, state: str = "") -> Dict[str, Any]:
         """OAuth2 callback — exchange code for token, create session."""
+        # Verify the state parameter matches one we issued
+        state_key = f"_state_{state}"
+        state_record = _oauth_tokens.pop(state_key, None)
+        if state_record is None or state_record.get("expires_at", 0) <= time.time():
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or expired OAuth state parameter",
+            )
         try:
             import httpx
         except ImportError:

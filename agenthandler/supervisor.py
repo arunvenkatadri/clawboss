@@ -355,11 +355,14 @@ class Supervisor:
                 )
 
         # Execute with timeout
+        audit_args = {k: str(v)[:100] for k, v in exec_kwargs.items()}
+        if self._redactor:
+            audit_args, _ = self._redactor.redact_dict(audit_args)
         self._audit.record(
             AuditPhase.TOOL_CALL,
             AuditOutcome.ALLOWED,
             target=tool_name,
-            metadata={"args": {k: str(v)[:100] for k, v in exec_kwargs.items()}},
+            metadata={"args": audit_args},
         )
 
         # If a pre-guardrail provided cached output (idempotency), skip execution
@@ -407,12 +410,15 @@ class Supervisor:
             return r
         except Exception as e:
             cb.record_failure()
-            error = AgentHandlerError.tool_error(str(e))
+            error_msg = str(e)
+            if self._redactor:
+                error_msg = self._redactor.redact(error_msg).text
+            error = AgentHandlerError.tool_error(error_msg)
             self._audit.record(
                 AuditPhase.TOOL_CALL,
                 AuditOutcome.FAILED,
                 target=tool_name,
-                detail=str(e),
+                detail=error_msg,
             )
             r = SupervisedResult(
                 error=error,

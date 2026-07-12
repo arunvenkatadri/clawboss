@@ -152,17 +152,24 @@ class OpenClawBridge:
         bridge.serve()  # blocking, Ctrl+C to stop
     """
 
+    _DEFAULT_ALLOWED_ORIGINS = [
+        "http://localhost",
+        "http://127.0.0.1",
+    ]
+
     def __init__(
         self,
         policy: Optional[Policy] = None,
         audit: Optional[AuditLog] = None,
         host: str = "127.0.0.1",
         port: int = 9229,
+        allowed_origins: Optional[List[str]] = None,
     ):
         self._policy = policy or Policy()
         self._audit = audit
         self._host = host
         self._port = port
+        self._allowed_origins = allowed_origins or self._DEFAULT_ALLOWED_ORIGINS
         self._registry: Dict[
             str, Tuple[ToolDefinition, Callable[..., Coroutine[Any, Any, Any]]]
         ] = {}
@@ -245,18 +252,40 @@ class OpenClawBridge:
             def log_message(self, format: str, *args: Any) -> None:
                 pass  # suppress default stderr logging
 
+            def _get_cors_origin(self) -> Optional[str]:
+                """Return the request Origin if it is in the allowed list, else None."""
+                origin = self.headers.get("Origin", "")
+                if not origin:
+                    return None
+                for allowed in bridge._allowed_origins:
+                    if allowed == origin:
+                        return origin
+                    # Support port-wildcard patterns like "http://localhost:*"
+                    if allowed.endswith(":*"):
+                        prefix = allowed[:-1]  # "http://localhost:"
+                        base = allowed[:-2]  # "http://localhost"
+                        if origin == base or origin.startswith(prefix):
+                            return origin
+                return None
+
             def _send_json(self, status: int, data: dict[str, Any]) -> None:
                 body = json.dumps(data).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
+                cors_origin = self._get_cors_origin()
+                if cors_origin:
+                    self.send_header("Access-Control-Allow-Origin", cors_origin)
+                    self.send_header("Vary", "Origin")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
 
             def do_OPTIONS(self) -> None:
                 self.send_response(204)
-                self.send_header("Access-Control-Allow-Origin", "*")
+                cors_origin = self._get_cors_origin()
+                if cors_origin:
+                    self.send_header("Access-Control-Allow-Origin", cors_origin)
+                    self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type")
                 self.end_headers()

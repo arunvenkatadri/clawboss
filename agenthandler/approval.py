@@ -66,11 +66,31 @@ class ApprovalQueue:
     """Thread-safe queue of pending tool call approvals.
 
     One queue per SessionManager — holds approvals for all sessions.
+
+    Args:
+        max_requests: Maximum number of requests to keep. When exceeded,
+                      oldest resolved (non-pending) requests are evicted.
+                      New submissions are rejected if the queue is full
+                      even after eviction.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_requests: int = 10000) -> None:
         self._requests: Dict[str, ApprovalRequest] = {}
+        self._max_requests = max_requests
         self._lock = threading.Lock()
+
+    def _evict_resolved(self) -> None:
+        """Remove oldest resolved requests to make room. Must hold _lock."""
+        resolved = [
+            (aid, req)
+            for aid, req in self._requests.items()
+            if req.status != ApprovalStatus.PENDING
+        ]
+        # Sort by resolved_at (or created_at as fallback) so oldest go first
+        resolved.sort(key=lambda pair: pair[1].resolved_at or pair[1].created_at)
+        to_remove = len(self._requests) - self._max_requests + 1
+        for aid, _ in resolved[:to_remove]:
+            del self._requests[aid]
 
     def submit(
         self,
@@ -78,7 +98,11 @@ class ApprovalQueue:
         tool_args: Dict[str, Any],
         session_id: str,
     ) -> ApprovalRequest:
-        """Queue a tool call for approval. Returns the ApprovalRequest."""
+        """Queue a tool call for approval. Returns the ApprovalRequest.
+
+        Raises RuntimeError if the queue is full and cannot evict enough
+        resolved requests to make room.
+        """
         req = ApprovalRequest(
             approval_id=secrets.token_hex(8),
             session_id=session_id,
@@ -86,6 +110,13 @@ class ApprovalQueue:
             tool_args=tool_args,
         )
         with self._lock:
+            if len(self._requests) >= self._max_requests:
+                self._evict_resolved()
+                if len(self._requests) >= self._max_requests:
+                    raise RuntimeError(
+                        f"Approval queue full ({self._max_requests} requests). "
+                        "Resolve existing approvals before submitting new ones."
+                    )
             self._requests[req.approval_id] = req
         return req
 
