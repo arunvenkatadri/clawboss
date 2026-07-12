@@ -28,6 +28,73 @@ from __future__ import annotations
 import re
 import sqlite3
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
+# Regex patterns for stripping SQL comments before safety checks
+_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_LINE_COMMENT_RE = re.compile(r"--[^\n]*")
+
+# DML / DDL keywords that must never appear in read-only queries
+_WRITE_KEYWORDS = frozenset(
+    {
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "DROP",
+        "ALTER",
+        "CREATE",
+        "TRUNCATE",
+        "REPLACE",
+        "ATTACH",
+        "DETACH",
+        "PRAGMA",
+        "COPY",
+        "LOAD",
+        "GRANT",
+        "REVOKE",
+    }
+)
+
+# Valid table-name pattern (alphanumeric + underscore only)
+_SAFE_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _redact_connection_string(conn_str: str) -> str:
+    """Return a redacted form of *conn_str* safe for error messages.
+
+    Credentials (userinfo component) are replaced with ``***``.  SQLite
+    paths and unrecognised formats are returned as-is since they carry no
+    credentials.
+    """
+    if conn_str.startswith("sqlite"):
+        return conn_str  # no credentials to redact
+    try:
+        parsed = urlparse(conn_str)
+        if parsed.username or parsed.password:
+            # Rebuild with redacted userinfo
+            host_part = parsed.hostname or ""
+            if parsed.port:
+                host_part += f":{parsed.port}"
+            return f"{parsed.scheme}://***:***@{host_part}{parsed.path}"
+    except Exception:
+        pass
+    return "<redacted>"
+
+
+def _strip_sql_comments(sql: str) -> str:
+    """Remove block ``/* */`` and line ``--`` comments from *sql*."""
+    sql = _BLOCK_COMMENT_RE.sub(" ", sql)
+    sql = _LINE_COMMENT_RE.sub(" ", sql)
+    return sql
+
+
+def _validate_table_name(name: str) -> None:
+    """Raise ValueError if *name* is not a safe SQL identifier."""
+    if not _SAFE_TABLE_NAME_RE.match(name):
+        raise ValueError(
+            f"Unsafe table name rejected: {name!r}. "
+            "Only alphanumeric characters and underscores are allowed."
+        )
 
 
 class SqlConnector:
@@ -64,7 +131,12 @@ class SqlConnector:
 
         if self._conn_str.startswith("sqlite:///"):
             path = self._conn_str[len("sqlite:///") :]
-            self._conn = sqlite3.connect(path)
+            if not self._allow_write:
+                # Use URI mode with ?mode=ro for defense-in-depth read-only
+                uri = f"file:{path}?mode=ro"
+                self._conn = sqlite3.connect(uri, uri=True)
+            else:
+                self._conn = sqlite3.connect(path)
             self._conn.row_factory = sqlite3.Row
         elif self._conn_str == "sqlite://:memory:":
             self._conn = sqlite3.connect(":memory:")
@@ -86,7 +158,10 @@ class SqlConnector:
                 # Parse mysql://user:pass@host/db
                 parsed = re.match(r"mysql://([^:]+):([^@]+)@([^/]+)/(.+)", self._conn_str)
                 if not parsed:
-                    raise ValueError(f"Invalid MySQL connection string: {self._conn_str}")
+                    raise ValueError(
+                        f"Invalid MySQL connection string: "
+                        f"{_redact_connection_string(self._conn_str)}"
+                    )
                 self._conn = mysql.connector.connect(
                     user=parsed.group(1),
                     password=parsed.group(2),
@@ -99,22 +174,59 @@ class SqlConnector:
                 ) from e
         else:
             raise ValueError(
-                f"Unsupported connection string: {self._conn_str}. "
+                f"Unsupported connection string: "
+                f"{_redact_connection_string(self._conn_str)}. "
                 "Use sqlite:///path, postgresql://..., or mysql://..."
             )
         return self._conn
 
     def _check_write(self, sql: str) -> None:
-        """Block write operations if allow_write is False."""
+        """Block write operations if allow_write is False.
+
+        Uses an *allowlist* approach: only ``SELECT`` and read-only ``WITH``
+        (CTE) statements are permitted.  SQL comments are stripped first so
+        that ``--`` and ``/* */`` tricks cannot hide DML.  Multi-statement
+        strings (containing ``;``) are rejected outright.
+        """
         if self._allow_write:
             return
-        normalized = sql.strip().upper()
-        write_ops = ("INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "REPLACE")
-        for op in write_ops:
-            if normalized.startswith(op):
+
+        # Strip comments so they cannot be used to hide write operations
+        cleaned = _strip_sql_comments(sql)
+        normalized = cleaned.strip().upper()
+
+        if not normalized:
+            raise PermissionError("Empty SQL statement after comment stripping.")
+
+        # Reject multi-statement queries (e.g. "SELECT 1; DROP TABLE x")
+        # Split on semicolons, ignore trailing empty parts
+        statements = [s.strip() for s in normalized.split(";") if s.strip()]
+        if len(statements) > 1:
+            raise PermissionError("Multi-statement queries are not allowed in read-only mode.")
+
+        # Allowlist: statement must start with SELECT or WITH
+        first_word = normalized.split()[0] if normalized.split() else ""
+        if first_word == "SELECT":
+            return  # simple SELECT — allowed
+
+        if first_word == "WITH":
+            # WITH (CTE) is allowed only if the body contains no DML
+            # Tokenise the whole statement and check for write keywords
+            tokens = set(re.findall(r"[A-Z_]+", normalized))
+            found = tokens & _WRITE_KEYWORDS
+            if found:
                 raise PermissionError(
-                    f"Write operation '{op}' blocked. Set allow_write=True to enable."
+                    f"Write keyword(s) {', '.join(sorted(found))} found inside "
+                    f"WITH/CTE. Set allow_write=True to enable."
                 )
+            return  # CTE with only SELECTs — allowed
+
+        # Anything else (INSERT, UPDATE, DELETE, DROP, PRAGMA, …) is blocked
+        raise PermissionError(
+            f"Statement type '{first_word}' is not allowed in read-only mode. "
+            f"Only SELECT and read-only WITH/CTE are permitted. "
+            f"Set allow_write=True to enable write operations."
+        )
 
     async def query(
         self,
@@ -141,10 +253,10 @@ class SqlConnector:
         cursor = conn.cursor()
 
         try:
-            if params:
-                cursor.execute(query_str, params)
-            else:
-                cursor.execute(query_str)
+            # Always use parameterized execution — pass an empty dict when
+            # no params are provided so the driver never interprets raw SQL
+            # format-specifiers (e.g. ``%s``, ``?``) as literal text.
+            cursor.execute(query_str, params or {})
 
             # For SELECT queries, fetch results
             if cursor.description:
@@ -199,13 +311,21 @@ class SqlConnector:
             for tname in table_names:
                 if tname.startswith("sqlite_"):
                     continue
-                cursor.execute(f"PRAGMA table_info({tname})")  # noqa: S608
+                # Validate table name to prevent SQL injection via
+                # crafted table names stored in sqlite_master.
+                _validate_table_name(tname)
+                cursor.execute(f"PRAGMA table_info([{tname}])")
                 cols = [
-                    {"name": row[1], "type": row[2], "nullable": not row[3], "pk": bool(row[5])}
+                    {
+                        "name": row[1],
+                        "type": row[2],
+                        "nullable": not row[3],
+                        "pk": bool(row[5]),
+                    }
                     for row in cursor.fetchall()
                 ]
                 # Sample a few rows for context
-                cursor.execute(f"SELECT COUNT(*) FROM {tname}")  # noqa: S608
+                cursor.execute(f"SELECT COUNT(*) FROM [{tname}]")
                 row_count = cursor.fetchone()[0]
                 tables.append(
                     {
@@ -247,7 +367,8 @@ class SqlConnector:
             cursor.execute("SHOW TABLES")
             table_names = [row[0] for row in cursor.fetchall()]
             for tname in table_names:
-                cursor.execute(f"DESCRIBE {tname}")  # noqa: S608
+                _validate_table_name(tname)
+                cursor.execute(f"DESCRIBE `{tname}`")
                 cols = [
                     {
                         "name": row[0],
