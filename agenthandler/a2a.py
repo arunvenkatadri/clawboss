@@ -306,7 +306,7 @@ class A2AClient:
                     headers=self._headers,
                 )
                 resp.raise_for_status()
-                return resp.json()
+                return dict(resp.json())
 
         return await self._supervisor.call(
             "a2a_call",
@@ -344,7 +344,7 @@ class A2AClient:
                     headers=self._headers,
                 )
                 resp.raise_for_status()
-                return resp.json()
+                return dict(resp.json())
 
         return await self._supervisor.call(
             "a2a_call",
@@ -384,7 +384,7 @@ class A2AClient:
                     headers=self._headers,
                 )
                 resp.raise_for_status()
-                return resp.json()
+                return dict(resp.json())
 
         return await self._supervisor.call(
             "a2a_call",
@@ -413,7 +413,7 @@ class A2AClient:
                     headers=self._headers,
                 )
                 resp.raise_for_status()
-                return resp.json()
+                return dict(resp.json())
 
         return await self._supervisor.call(
             "a2a_call",
@@ -480,7 +480,7 @@ class A2ASupervisedEndpoint:
     def agent_card(self) -> A2AAgentCard:
         return self._card
 
-    def _get_supervisor(self) -> Supervisor:
+    def _get_supervisor(self) -> Any:
         sv = self._manager.get_supervisor(self._session_id)
         if sv is None:
             raise AgentHandlerError.session_not_found(self._session_id)

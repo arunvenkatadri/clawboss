@@ -73,7 +73,7 @@ def wrap_openai_tool(
     Returns:
         An async callable with the same signature, supervised by AgentHandler.
     """
-    name = tool_name or getattr(fn, "__name__", "tool")
+    name: str = tool_name or str(getattr(fn, "__name__", "tool"))
     async_fn = _ensure_async(fn)
 
     @functools.wraps(fn)
@@ -106,7 +106,7 @@ def wrap_claude_tool(
     Returns:
         An async callable supervised by AgentHandler.
     """
-    name = tool_name or getattr(fn, "__name__", "tool")
+    name: str = tool_name or str(getattr(fn, "__name__", "tool"))
     async_fn = _ensure_async(fn)
 
     @functools.wraps(fn)
@@ -235,6 +235,8 @@ def supervised_tool_registry(
     """
     sid = manager.start(agent_id, policy or {})
     sv = manager.get_supervisor(sid)
+    if sv is None:
+        raise RuntimeError(f"Failed to create supervisor for session {sid}")
 
     supervised: Dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
     for name, fn in tools.items():
@@ -288,6 +290,8 @@ class AgentHandlerMiddleware:
         sid = self._manager.start(self._agent_id, self._policy)
         self._session_id = sid
         sv = self._manager.get_supervisor(sid)
+        if sv is None:
+            raise RuntimeError(f"Failed to create supervisor for session {sid}")
 
         supervised_tools: Dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
         if tools:

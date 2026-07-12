@@ -90,6 +90,11 @@ try:
 except ImportError:
     pass
 
+try:
+    from .edge_reduce import EdgeReduceLLM, EdgeReduceResult, make_supervised_llm
+except ImportError:
+    pass
+
 __all__ = [
     "Policy",
     "OnFailure",
@@ -192,4 +197,8 @@ __all__ = [
     "openai_guardrail_adapter",
     "supervised_tool_registry",
     "AgentHandlerMiddleware",
+    # Edge-reduce
+    "EdgeReduceLLM",
+    "EdgeReduceResult",
+    "make_supervised_llm",
 ]
