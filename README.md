@@ -127,6 +127,10 @@ The Sessions tab connects to the REST control plane (`uvicorn agenthandler.serve
 | **16 guardrails** | No layered safety — rule-based + LLM-backed checks for every tool call |
 | **Reflection loops** | Agents looping without thinking about whether they're making progress |
 | **Session replay** | No way to reconstruct what an agent did after the fact |
+| **Model routing** | Paying frontier prices for simple queries — route to cheap models automatically |
+| **MCP server mode** | No standard way to expose supervised tools to any MCP client |
+| **A2A protocol** | No supervision on inter-agent communication |
+| **SDK adapters** | No way to add guardrails to OpenAI/Claude SDK tools without rewriting |
 | **Streaming inputs** | No way to react to real-time events (Kafka/Kinesis/Redis) |
 | **Triggers & scheduling** | No way to run agents on schedule or on data events |
 | **Pipeline orchestration** | No structured way to chain tool calls |
@@ -788,6 +792,98 @@ server.run()  # stdio for Claude Desktop
 Every tool call through MCP goes through the Supervisor — timeouts, budgets, circuit breakers, PII redaction, guardrails, approvals, audit, cost tracking. A capability manifest is available at `agenthandler://manifest`.
 
 See `examples/mcp_server.py` for a full working example.
+
+## Model routing (cost optimization)
+
+Route queries to different models based on complexity. Simple queries go to cheap models; complex queries go to expensive ones. Configure rules in code or via the dashboard.
+
+```python
+from agenthandler import ModelRouter, RoutingRule, Supervisor, Policy
+
+supervisor = Supervisor(Policy(token_budget=100000))
+
+router = ModelRouter(
+    api_key="sk-ant-...",
+    rules=[
+        RoutingRule(name="simple", match_default=True, model="claude-haiku-4-5"),
+        RoutingRule(name="complex", keywords=["analyze", "compare", "architecture"],
+                    model="claude-sonnet-4-6"),
+        RoutingRule(name="critical", keywords=["audit", "security", "legal"],
+                    model="claude-opus-4-6"),
+    ],
+    supervisor=supervisor,
+)
+
+await router("What is 2+2?")          # → Haiku ($0.25/M input)
+await router("Analyze this codebase") # → Sonnet ($3/M input)
+await router("Audit the security")    # → Opus ($15/M input)
+```
+
+Rules are evaluated top-down (first match wins). Each rule supports keyword matching, regex patterns, or a default fallback. The dashboard **Routing** tab provides a visual editor with model dropdowns, drag-to-reorder, test queries, and YAML export.
+
+For local/cloud hybrid routing (run a local model and only escalate to cloud when needed), see the [edge-reduce integration](https://github.com/arunvenkatadri/edge-reduce-llm).
+
+## SDK adapters
+
+Wrap tools from any agent SDK with AgentHandler supervision — no rewrite needed.
+
+```python
+from agenthandler import supervised_tool_registry, SessionManager, MemoryStore
+
+# Bulk-wrap a dict of tools — creates a supervised session automatically
+supervised = supervised_tool_registry(
+    {"search": search_fn, "write": write_fn},
+    SessionManager(MemoryStore()),
+    policy={"tool_timeout": 30, "token_budget": 50000},
+)
+
+# Use supervised["search"] in your OpenAI/Claude/Mastra agent
+```
+
+Individual wrapping for finer control:
+
+```python
+from agenthandler import wrap_openai_tool, wrap_claude_tool
+
+# For OpenAI Agents SDK
+supervised_search = wrap_openai_tool(search_fn, supervisor, tool_name="search")
+
+# For Claude Agent SDK
+supervised_write = wrap_claude_tool(write_fn, supervisor, tool_name="write")
+```
+
+Convert AgentHandler guardrails to OpenAI format:
+
+```python
+from agenthandler import openai_guardrail_adapter, UrlGuard, RecursionDetector
+
+oai_guardrails = openai_guardrail_adapter([
+    UrlGuard(allowlist=["*.example.com"]),
+    RecursionDetector(max_repeats=3),
+])
+```
+
+## A2A protocol (agent-to-agent)
+
+Supervise inter-agent communication via Google's Agent2Agent protocol. Every outbound call goes through the Supervisor.
+
+```python
+from agenthandler import A2AClient, A2AAgentCard, Supervisor, Policy
+
+supervisor = Supervisor(Policy(tool_timeout=30, token_budget=50000))
+client = A2AClient(supervisor=supervisor)
+
+# Call another agent
+result = await client.send_task(
+    agent_url="https://other-agent.example.com",
+    task={"skill": "research", "input": "quantum computing"},
+)
+
+# Make your agent discoverable
+card = A2AAgentCard.from_supervisor(
+    supervisor, name="my-agent", url="https://my-agent.example.com"
+)
+```
 
 ## Policy from config
 
