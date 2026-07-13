@@ -62,7 +62,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["agenthandler.server", "agenthandler.auth", "agenthandler.mcp_server", "agenthandler.a2a", "agenthandler.sdk_adapters", "agenthandler.edge_reduce"]
+module = ["agenthandler.server", "agenthandler.auth", "agenthandler.mcp_server", "agenthandler.a2a", "agenthandler.sdk_adapters", "agenthandler.edge_reduce", "agenthandler.model_router"]
 warn_unused_ignores = false
 disallow_untyped_decorators = false
 disallow_subclassing_any = false
@@ -83,6 +83,7 @@ module = [
     "pymongo.*",
     "opentelemetry.*",
     "localreduce.*",
+    "anthropic.*",
     "openai_agents.*",
     "claude_agent_sdk.*",
     "yaml.*",

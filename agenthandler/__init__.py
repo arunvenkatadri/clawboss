@@ -95,6 +95,8 @@ try:
 except ImportError:
     pass
 
+from .model_router import ModelRouter, RoutingDecision, RoutingRule
+
 __all__ = [
     "Policy",
     "OnFailure",
@@ -201,4 +203,8 @@ __all__ = [
     "EdgeReduceLLM",
     "EdgeReduceResult",
     "make_supervised_llm",
+    # Model router
+    "ModelRouter",
+    "RoutingRule",
+    "RoutingDecision",
 ]
