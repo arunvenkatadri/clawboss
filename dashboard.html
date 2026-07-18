@@ -947,6 +947,26 @@
           <input class="form-input" id="rt-max-tokens" type="number" min="1000" value="30000" style="width:100%; margin-top:0.25rem;">
         </label>
       </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-top:0.75rem;">
+        <label style="font-size:0.78rem;">
+          Compression (Headroom)
+          <select class="form-input" id="rt-compression" style="width:100%; margin-top:0.25rem;">
+            <option value="off">Off</option>
+            <option value="auto" selected>Auto (large outputs)</option>
+            <option value="always">Always</option>
+          </select>
+        </label>
+        <label style="font-size:0.78rem;">
+          Min Tokens to Compress
+          <input class="form-input" id="rt-min-compress" type="number" min="10" value="100" style="width:100%; margin-top:0.25rem;">
+        </label>
+        <label style="font-size:0.78rem;">
+          Est. Savings
+          <div id="rt-savings-est" style="margin-top:0.25rem; padding:0.35rem 0.5rem; background:var(--bg); border-radius:4px; font-size:0.82rem; color:var(--green);">
+            ~60-95% on JSON, ~15-20% on code
+          </div>
+        </label>
+      </div>
     </div>
 
     <!-- Rules list -->
@@ -4237,6 +4257,13 @@ function buildRoutingYaml() {
   lines.push('local:');
   lines.push(`  base_url: "${document.getElementById('rt-local-url').value}"`);
   lines.push(`  model: "${document.getElementById('rt-local-model').value}"`);
+  const compression = document.getElementById('rt-compression').value;
+  if (compression !== 'off') {
+    lines.push('');
+    lines.push('compression:');
+    lines.push(`  mode: "${compression}"`);
+    lines.push(`  min_tokens: ${document.getElementById('rt-min-compress').value}`);
+  }
   return lines.join('\n');
 }
 
