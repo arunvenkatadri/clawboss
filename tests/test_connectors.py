@@ -68,7 +68,7 @@ class TestSqlConnectorSqlite:
         path = self._make_db()
         try:
             sql = SqlConnector(f"sqlite:///{path}")
-            with pytest.raises(PermissionError, match="blocked"):
+            with pytest.raises(PermissionError, match="not allowed"):
                 await sql.query(sql="INSERT INTO users VALUES (4, 'Dave', 'dave@test.com')")
         finally:
             os.unlink(path)

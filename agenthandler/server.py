@@ -289,9 +289,13 @@ def create_app(
 
     @app.post("/sessions/{session_id}/approvals/{approval_id}/deny")
     def deny_tool_call(
-        session_id: str, approval_id: str, body: DenyRequest = DenyRequest(), _: Any = Depends(auth)
+        session_id: str,
+        approval_id: str,
+        body: Optional[DenyRequest] = None,
+        _: Any = Depends(auth),
     ) -> Any:
-        req = manager.approval_queue.deny(approval_id, reason=body.reason)
+        reason = body.reason if body else ""
+        req = manager.approval_queue.deny(approval_id, reason=reason)
         if req is None:
             raise HTTPException(
                 status_code=404,
