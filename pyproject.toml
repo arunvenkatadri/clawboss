@@ -33,6 +33,7 @@ kinesis = ["aioboto3>=12.0"]
 redis = ["redis>=5.0"]
 streams = ["aiokafka>=0.10", "aioboto3>=12.0", "redis>=5.0"]
 mcp = ["mcp>=1.0"]
+compression = ["headroom-ai>=0.20"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "mypy>=1.0", "ruff>=0.4", "httpx>=0.25"]
 
 [project.urls]
@@ -84,6 +85,7 @@ module = [
     "opentelemetry.*",
     "localreduce.*",
     "anthropic.*",
+    "headroom.*",
     "openai_agents.*",
     "claude_agent_sdk.*",
     "yaml.*",

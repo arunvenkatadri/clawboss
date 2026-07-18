@@ -128,6 +128,7 @@ The Sessions tab connects to the REST control plane (`uvicorn agenthandler.serve
 | **Reflection loops** | Agents looping without thinking about whether they're making progress |
 | **Session replay** | No way to reconstruct what an agent did after the fact |
 | **Model routing** | Paying frontier prices for simple queries — route to cheap models automatically |
+| **Context compression** | Sending 10x more tokens than needed — compress tool outputs before they hit the LLM |
 | **MCP server mode** | No standard way to expose supervised tools to any MCP client |
 | **A2A protocol** | No supervision on inter-agent communication |
 | **SDK adapters** | No way to add guardrails to OpenAI/Claude SDK tools without rewriting |
@@ -822,6 +823,39 @@ await router("Audit the security")    # → Opus ($15/M input)
 Rules are evaluated top-down (first match wins). Each rule supports keyword matching, regex patterns, or a default fallback. The dashboard **Routing** tab provides a visual editor with model dropdowns, drag-to-reorder, test queries, and YAML export.
 
 For local/cloud hybrid routing (run a local model and only escalate to cloud when needed), see the [edge-reduce integration](https://github.com/arunvenkatadri/edge-reduce-llm).
+
+## Context compression (Headroom)
+
+Compress tool outputs before they reach the LLM — 60-95% fewer tokens for JSON, 15-20% for code. Powered by [Headroom](https://github.com/chopratejas/headroom) (Netflix).
+
+```bash
+pip install agenthandler[compression]
+```
+
+```python
+from agenthandler import CompressedSupervisor, Policy
+
+sv = CompressedSupervisor(
+    Policy(token_budget=50000),
+    compression="auto",       # "auto", "always", or "off"
+    target_model="claude-sonnet-4-6",
+)
+
+result = await sv.call("search", search_fn, query="quantum computing")
+# result.output is compressed — same information, fewer tokens
+```
+
+Or compress individual outputs:
+
+```python
+from agenthandler import compress_output
+
+raw_data = {"rows": [{"id": i, "name": f"item_{i}"} for i in range(1000)]}
+compressed = compress_output(raw_data, model="claude-sonnet-4-6")
+# 60-95% smaller for JSON payloads
+```
+
+Compression is lossless and reversible — Headroom caches originals locally. If the LLM needs full detail, it retrieves via the `headroom_retrieve` tool. Combine with model routing for maximum cost reduction.
 
 ## SDK adapters
 

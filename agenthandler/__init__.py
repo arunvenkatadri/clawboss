@@ -97,6 +97,11 @@ except ImportError:
 
 from .model_router import ModelRouter, RoutingDecision, RoutingRule
 
+try:
+    from .compression import CompressedSupervisor, compress_messages, compress_output
+except ImportError:
+    pass
+
 __all__ = [
     "Policy",
     "OnFailure",
@@ -207,4 +212,8 @@ __all__ = [
     "ModelRouter",
     "RoutingRule",
     "RoutingDecision",
+    # Compression
+    "CompressedSupervisor",
+    "compress_output",
+    "compress_messages",
 ]
